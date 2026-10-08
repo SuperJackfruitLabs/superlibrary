@@ -5,10 +5,10 @@
 import type { Env, RetentionMessage } from './env';
 import { resolvePerson } from './auth/caller';
 import { protectedResourceMetadata } from './auth/org-plane';
-import { error, json } from './http';
+import { error, json, type Handler } from './http';
+import { uploadRoutes } from './uploads/routes';
 
-type Handler = (request: Request, env: Env, ctx: ExecutionContext, url: URL) => Promise<Response | null>;
-const handlers: Handler[] = [];
+const handlers: Handler[] = [uploadRoutes];
 
 async function route(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
   const url = new URL(request.url);
