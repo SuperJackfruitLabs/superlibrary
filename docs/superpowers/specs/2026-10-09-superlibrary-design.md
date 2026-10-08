@@ -1,272 +1,447 @@
 # Superlibrary: design
 
-**Status:** draft for operator review, 2026-10-09. The decisions taken so far are in §12.
-**Product:** Superlibrary — everything your agents make, kept and viewable.
-**Domains:**
-- `superlibrary.dev`: the product, with the app at `app.superlibrary.dev` and docs at
+**Status:** for operator review, 2026-10-09. Decisions taken so far are in §15.
+
+**Product:** Superlibrary, the memory of the Super Jackfruit Labs stack. Agents consult it before
+they work, and people browse it.
+
+**Domains**
+- `superlibrary.dev`: the product. The app is at `app.superlibrary.dev` and the docs at
   `docs.superlibrary.dev`.
-- `superlibrarycontent.dev`: the sandbox for untrusted content. Nothing with a login is ever
-  served from this domain.
+- `superlibrarycontent.dev`: the sandbox for untrusted content. It never serves anything with a
+  login.
+
+Both are active zones in the Cloudflare account that hosts Superpipeline.
 
 ## 1. Problem
 
-Agents write reports, designs, screenshots, web pages and data files in their workspaces. Until
-now nothing could hold them:
-- **Superpipeline stores no content.** `superpipeline_add_reference` takes only a URL ("publish the
-  document first").
-- **AgentPod can read a workspace, but only live**, while the station is up.
+Knowledge in the stack is scattered, and none of it is retrievable by the agents doing the work:
 
-So agents published their work elsewhere: as gists under the operator's personal GitHub account,
-because the agent host's `gh` was signed in as them. On 2026-10-03 and 2026-10-04 that produced two
-public gists of internal material. The gists have since been made secret and `gh` removed from the
-host. The gap remains.
+- Ideas are in `sketchbook` and decisions are in `charter`.
+- Designs are in `atelier` and in per-repo specs.
+- Each agent's memory is private to its own profile.
+- Work history is in Superpipeline cards and their handoffs.
+- Evidence is in Superwitness, and conversations are in Supermessage.
 
-Superlibrary is where agent-made work is kept: private to the workspace, attributed to the agent
-and run that made it, versioned, durable, and viewable in the browser. That includes interactive
-pages, in the same way a chat assistant's artifacts are.
+An agent starting a card has no way to ask what has already been done, decided or tried.
 
-## 2. Product shape
+There is also nowhere to keep what agents make:
+- Superpipeline stores no content. A reference is a URL.
+- AgentPod reads a workspace live, and only while the station is up.
 
-**Artifact**
-- An immutable snapshot of one file or one folder, with a title, a kind, its source, who made
-  it, and a version history.
-- Linking the same path again creates version *n+1*. The link shows the latest version, with a
-  history.
-- Every version is content-addressed by SHA-256. Identical bytes are stored once.
+So agents published elsewhere. On 2026-10-03 and 2026-10-04 that meant gists under the operator's
+personal GitHub account, two of them public. Those gists have since been made secret and `gh`
+removed from the agent host. The gap remains.
 
-**Library**
-- Each workspace has one. You browse it by project, card, station, agent, kind and date, and
-  search titles and text content.
-- **Collections** group artifacts across sources, for example "Building in public — week 41".
+## 2. What Superlibrary is
 
-**Sources**
-- Where artifacts come from. The first source is an **AgentPod station workspace**.
-- Later sources: direct upload by a person, Superpipeline card attachments, Superwitness evidence
-  and Supermessage files. Each source is a small adapter that hands Superlibrary the bytes plus
-  their provenance.
+Superlibrary is **retrieval with provenance**. Every item answers three questions: where it came
+from, who made it, and how it turned out.
 
-**Consumers**
-- Superpipeline cards show inline previews.
-- Supermessage shows a link card.
-- The AgentPod console links from a station's files.
+- **At launch it holds:**
+  1. **Agent artifacts:** files an agent links from its own workspace (§6–§9).
+  2. **Superpipeline work history:** finished and abandoned cards, with their spec, each stage's
+     handoff, comments and references (§5).
+- **Later sources** are adapters, added one at a time: `charter` decisions, `sketchbook` ideas,
+  agents' own memories, Superwitness evidence and Supermessage threads.
+- **Agents** use it through MCP tools (§10). The board bridge can also add "related prior work"
+  to each claim's prompt.
+- **People** use it through the library app: browse, search, collections, and views by outcome
+  (§11).
 
-## 3. Architecture
+## 3. Concepts
+
+- **Item:** one unit of memory. It has a kind (`artifact` or `work-record` at launch), a title, a
+  body or file, its provenance, an **outcome**, a **visibility scope**, and its index entries.
+- **Artifact:** an item backed by an immutable snapshot of a file or a folder.
+  - It is versioned by source path: linking the same path again creates version *n+1*.
+  - Its bytes are content-addressed by SHA-256, so identical content is stored once.
+- **Work record:** an item that summarises one Superpipeline card from start to finish.
+  - It holds the title, the spec, each stage's handoff (agent, stage, time and attempt), the
+    comments and the references.
+  - Any artifacts the card references are linked to it.
+  - It is updated as the card moves, and gets its final outcome when the card finishes.
+- **Outcome:** one of `approved`, `completed`, `rejected`, `failed`, `abandoned`, `superseded` or
+  `in-progress`.
+  - Set automatically from the source, for example a card completing or being rejected at a gate.
+  - It drives ranking and is shown on every result.
+- **Scope:** which board an item belongs to, or `workspace` for items visible to the whole
+  workspace. Scope drives visibility (§4).
+- **Provenance:** workspace, board, card, stage, run, agent principal, station, source path, the
+  time it was created, and the source's own id and URL.
+- **Collection:** a named set of items that people curate, such as "Building in public — week 41".
+
+## 4. Visibility
+
+The same rule applies to search, to `get`, to `related` and to the prompt context.
+
+- **Agents** see items whose scope is a board they are **rostered on**, meaning they hold an
+  enabled board-bridge row there, plus items scoped `workspace`. A cross-board link does not widen
+  what an agent can see.
+- **People** see items on boards they can read in Superpipeline, plus `workspace` items.
+- **The filter comes first.** Visibility is applied before ranking, in the vector query's metadata
+  filter and in the SQL query. A result an agent may not see never reaches the ranking step, and
+  neither do snippets of it.
+- **Changing scope** to `workspace` is a person's act, recorded in the audit log. An agent can
+  propose it, but cannot do it.
+- **The roster** comes from the AgentPod hub, which owns the board-bridge rows. Superlibrary reads
+  it through a new read endpoint, `GET /api/bridge/principals/:prn/boards`, and caches it for five
+  minutes. The cache is cleared when a bridge row changes.
+
+## 5. Sources at launch
+
+### Superpipeline work history
+
+- Superlibrary registers a push config on each workspace board for these events:
+  - `card.created`, `card.updated` and `card.advanced`;
+  - `card.completed`, `card.rejected`, `card.failed`, `card.deleted` and `card.resumed`;
+  - `card.comment.added` and `card.comment.deleted`;
+  - `gate.resolved`.
+- Each event updates that card's work record. On a terminal event, the full card is read back to
+  settle the final outcome.
+- A **backfill job** imports existing cards, archived ones included, so memory starts with
+  history, not empty.
+- **Outcome mapping:**
+  - terminal stage reached after an approved gate → `approved`;
+  - terminal stage with no gate → `completed`;
+  - rejected at a gate → `rejected`;
+  - circuit breaker or permanent failure → `failed`;
+  - archived without completing → `abandoned`;
+  - a later card with a `supersedes` link → `superseded`.
+- **Indexed:** the title, the description, structured spec fields flattened to text, each handoff,
+  comments, and reference titles. Secret-scanned before indexing (§8).
+
+### AgentPod artifacts
+
+1. The agent calls `agentpod_link_artifact { path, title?, kind?, entry? }`.
+2. The hub identifies the caller's station from its run-scoped token; that is the only station it
+   may read.
+3. The hub reads the bytes through `fs.read`, with a new `offset` for chunked reads, and applies
+   the source guardrails (§8).
+4. The hub calls Superlibrary with its service credential, with `act` set to the agent principal.
+   It sends the provenance, including the board and card of the run, so the artifact is scoped to
+   that board.
+5. Superlibrary returns `{ itemId, version, url, sha256, mediaType, bytes }`. The URL is
+   `https://app.superlibrary.dev/a/<itemId>`.
+6. The agent attaches the URL to the card with `superpipeline_add_reference`. The card's work
+   record links it.
+
+**People** can link station files with `fleet artifacts link` or the console's **Link this file**,
+and can upload directly through the app or `slib upload`. Agents cannot upload directly in v1:
+everything an agent stores comes from its own workspace, with provenance.
+
+## 6. Architecture
 
 Superlibrary is Cloudflare-native, like Superpipeline:
 
-| Part | Runs on | Role |
-|---|---|---|
-| `apps/api` | Worker, with D1 and R2 | REST and MCP API. Metadata in D1; blobs in a private R2 bucket keyed by SHA-256. Verifies organization-plane tokens offline (audience `https://app.superlibrary.dev`). |
-| `apps/web` | Pages (SvelteKit) | The library and viewer at `app.superlibrary.dev`. Signs in through accounts.superjackfruit.com, with PKCE and tokens held in memory, as the AgentPod console does. |
-| `apps/content` | Worker on `*.superlibrarycontent.dev` | Serves artifact bytes only, with a short-lived signed URL. One subdomain per artifact. No cookies, no auth state, no API. |
-| `packages/contract` | — | Zod schemas shared with AgentPod and Superpipeline. |
+| Part | Runs on | Holds | Role |
+|---|---|---|---|
+| `apps/api` | Worker `superlibrary-api` | D1 (read and write), R2 (read and write), Vectorize, Workers AI, the URL-signing key | REST and MCP API. Verifies organization-plane tokens offline (audience `https://app.superlibrary.dev`). Runs the ingest and indexing queues. |
+| `apps/web` | Pages `superlibrary-web` | — | The library and viewer at `app.superlibrary.dev`. Signs in through accounts.superjackfruit.com, with PKCE and tokens held in memory. |
+| `apps/content` | Worker `superlibrary-content` on `*.superlibrarycontent.dev` | **R2 read-only**, and the signing key's verification half | Serves artifact bytes for one valid signed URL. No cookies, no API, no database. |
+| `packages/contract` | — | — | Zod schemas shared with AgentPod and Superpipeline. |
 
-The organization plane registers Superlibrary as a product: an audience, web and CLI clients, an
-entitlement (`superlibrary` in `ent`), and scopes `artifacts:read`, `artifacts:write` and
-`artifacts:admin`. A workspace without the entitlement gets `403 product_not_enabled`, like every
-other product.
+**Two Workers on purpose.** The content Worker serves agent-written pages. A bug there can at most
+read artifact bytes. It cannot reach the database, a write permission or a key, and the API cannot
+be reached on the content domain.
 
-## 4. Flows
+**Background work** runs on Cloudflare Queues:
+- `ingest`: source events into items;
+- `index`: text extraction, chunking and embeddings;
+- `retention`: the daily sweep.
 
-### An agent links a file
+Every handler is idempotent, so a duplicate delivery changes nothing.
 
-The first source is AgentPod.
+**Accounts registers Superlibrary as a product:**
+- an audience;
+- the web and CLI clients;
+- an entitlement, `superlibrary`, carried in `ent`;
+- scopes: `library:read`, `library:write` and `library:admin`;
+- a service grant that lets the AgentPod hub create artifacts on an agent's behalf.
 
-1. The agent calls the AgentPod MCP tool `agentpod_link_artifact { path, title?, kind?, entry? }`.
-   `entry` is for folders, for example `index.html`.
-2. The AgentPod hub identifies the caller's station from its run-scoped token, which is the only
-   station it may read. It reads the bytes through the node's `fs.read`, extended with `offset` for
-   chunked reads.
-3. The hub applies the source-side guardrails (§7), then calls Superlibrary
-   `POST /v1/artifacts` with its service credential. It passes `act` = the agent's principal, plus
-   the provenance: workspace, station, path, run and card, and the file's sha256.
-4. Superlibrary runs the content checks (§7), stores the bytes and returns
-   `{ artifactId, version, url, sha256, mediaType, bytes }`. The URL is
-   `https://app.superlibrary.dev/a/<artifactId>`.
-5. The agent attaches the URL with `superpipeline_add_reference`. Superpipeline recognises the
-   `superlibrary` provider and renders a preview.
+A workspace without the entitlement gets `403 product_not_enabled`.
 
-### A person
+## 7. Search and the move to own hardware
 
-- Uploads a file directly in the app, or with `slib upload`.
-- Links a station file with `fleet artifacts link --station ID --path P`, or with **Link this
-  file** in the console's file panel. Both go through the same hub path as the agent.
-- Manages artifacts with `slib` or `fleet artifacts`: `list`, `show`, `versions`, `revoke`,
-  `expire`, `collect`.
+**Hybrid retrieval**
+1. **Semantic:** Workers AI embeddings (`@cf/baai/bge-m3`, multilingual, 1024 dimensions), stored
+   in Vectorize with metadata for `workspace`, `scope`, `kind`, `outcome` and `itemId`.
+2. **Exact words:** D1 FTS5 over the same chunks.
+3. **Fusion:** the two lists are merged with reciprocal rank fusion, then multiplied by an outcome
+   weight:
+   - `approved` / `completed`: 1.0
+   - `in-progress`: 0.8
+   - `superseded`: 0.5
+   - `rejected` / `failed` / `abandoned`: 0.4
 
-### A viewer
+   Rejected and failed work therefore ranks lower but is never hidden.
+4. **Results** carry an outcome label, provenance, a snippet and a link.
 
-1. A person opens `app.superlibrary.dev/a/<id>[/v/<n>]`. The page shows the title, provenance,
-   version history, hash and size, and the preview.
-2. For kinds that run in the sandbox, the web app asks the API for a five-minute signed URL bound
-   to that one artifact version.
-3. It embeds that URL from `<artifactId>.superlibrarycontent.dev` in a sandboxed frame (§6).
+**Chunking:** text is cut into about 800 tokens with 15% overlap, and every chunk records its
+item, version and position. Code keeps its function boundaries where possible. Images are indexed
+by title and alt text, plus their caption if a person adds one. OCR and image embeddings are
+phase 5.
 
-## 5. File types
+**The move to own hardware.** Embedding and vector storage sit behind two interfaces,
+`Embedder.embed(texts)` and `VectorIndex.query/upsert/delete`.
+- Every vector records the embedder's id and dimensions, so two models never mix in one index.
+- Moving to foundry means three steps: deploy an `Embedder` that calls an embedding service on
+  foundry through the tunnel, run the **re-index job** (which re-embeds every chunk into a new
+  index), then switch reads to the new index.
+- No product code changes. D1 full-text search keeps working whatever happens to the index.
 
-The type is decided by sniffing the bytes; the extension is not trusted.
+## 8. Guardrails
+
+**Content**
+- **Path rules** (source side, and again for direct uploads):
+  - paths must stay inside the workspace root;
+  - `..` is refused, and so is a symlink that leaves the root;
+  - denied by default: `.env*`, `.ssh/`, `.gnupg/`, `*.pem`, `*.key`, `id_*`, `.git/` internals,
+    `.netrc`, `.npmrc`, `.pypirc`, cloud credential files, and each harness's own config, session
+    and token files.
+- **Secret scan** on every artifact and every work record before storing or indexing.
+  - It looks for AWS, GitHub, Slack, OpenAI and Anthropic keys, signed JWTs, PEM blocks and
+    high-entropy assignments.
+  - An artifact with a hit is refused, naming the file and line. A work record is stored with the
+    match replaced by `[redacted secret]`, and the redaction is flagged on the record.
+  - A person can override one artifact. The override is recorded.
+- **Sizes:**
+  - 25 MB per file;
+  - 100 MB and 500 files per folder;
+  - 1 GB per workspace by default.
+- **Type** is sniffed from the bytes, never taken from the extension.
+
+**Prompt safety.** Retrieved content is data, not instructions.
+- MCP results and the related-work section wrap every item in a labelled block: item id,
+  provenance and outcome.
+- Agents are told, in the tool description and in the prompt section, that retrieved text is
+  reference material and never instructions.
+- The related-work section is capped at about 1,500 tokens and five items.
+
+**Access**
+- Every read is checked against the visibility rule (§4) and written to the audit log.
+- There are no anonymous links in v1.
+
+## 9. Artifact viewing
+
+### File types
+
+The type comes from sniffing the bytes.
 
 | Kind | Shown as |
 |---|---|
-| **HTML**, including multi-file apps with their own JS, CSS and images | Interactive, sandboxed |
-| **Markdown** | Rendered: tables, task lists, highlighted code, Mermaid, images from the same folder |
-| **Images** (PNG, JPEG, GIF, WebP, AVIF) | Inline, zoomable |
-| **SVG** | As an image only, so its scripts cannot run; the source is available |
-| **PDF** | A viewer, in the sandbox |
-| **Code, text and logs** | Syntax-highlighted, paged when large |
-| **JSON, YAML, TOML** | A readable structured view, plus raw |
-| **CSV and TSV** | A sortable table (first 5,000 rows), plus download |
-| **Notebooks** (`.ipynb`) | Cells and saved outputs; nothing is executed |
-| **Diagrams** (Mermaid, Graphviz) | Rendered, plus source |
-| **Audio and video** | Native players |
-| **Office files** (DOCX, XLSX, PPTX) | Download; a text preview in phase 2 |
-| **Anything else** (archives, binaries) | Download, with type, size and hash shown |
+| HTML, including multi-file apps with their own JS, CSS and images | Interactive, sandboxed |
+| Markdown | Rendered: tables, task lists, code highlighting, Mermaid, images from the same folder |
+| PNG, JPEG, GIF, WebP, AVIF | Inline, zoomable |
+| SVG | As an image only (scripts cannot run), with the source available |
+| PDF | Viewer, inside the sandbox |
+| Code, text, logs | Syntax-highlighted, paged when large |
+| JSON, YAML, TOML | The readable structured view, plus raw |
+| CSV, TSV | Sortable table (first 5,000 rows), plus download |
+| `.ipynb` | Cells and saved outputs, never executed |
+| Mermaid, Graphviz | Rendered, plus source |
+| Audio, video | Native players |
+| DOCX, XLSX, PPTX | Download; a text preview in phase 5 |
+| Anything else | Download, with type, size and hash |
 
-## 6. Running untrusted HTML safely
+### Running untrusted HTML safely
 
 1. **A separate site.** `superlibrarycontent.dev` shares no cookies, storage or same-site
-   relationship with `superlibrary.dev`, the AgentPod console, Superpipeline or Accounts. It never
-   serves anything with a login.
-2. **One subdomain per artifact.** The content Worker uses a wildcard route,
-   `<artifactId>.superlibrarycontent.dev`.
+   relationship with any product.
+2. **One subdomain per artifact:** `<itemId>.superlibrarycontent.dev`, through a wildcard route.
 3. **A sandboxed frame:**
-
    ```html
    <iframe sandbox="allow-scripts allow-popups-to-escape-sandbox" referrerpolicy="no-referrer">
    ```
-
-   Without `allow-same-origin`, each frame runs in a unique, opaque origin. There is no
+   With no `allow-same-origin`, each artifact gets a unique opaque origin. The frame also has no
    `allow-forms`, `allow-top-navigation` or `allow-modals`.
-4. **CSP on the content origin:**
+4. **CSP:**
    - `default-src 'none'`;
-   - scripts, styles, images, fonts and media from `'self'`, `data:` and `blob:`, and from the
-     trusted CDNs only: `https://cdnjs.cloudflare.com`, `https://cdn.jsdelivr.net`,
-     `https://unpkg.com`, plus `https://fonts.googleapis.com` and `https://fonts.gstatic.com` for
-     styles and fonts;
-   - `connect-src 'none'`, so pages cannot fetch, send data out or open sockets;
+   - scripts, styles, images, fonts and media allowed from `'self'`, `data:` and `blob:`, and from
+     `https://cdnjs.cloudflare.com`, `https://cdn.jsdelivr.net` and `https://unpkg.com`;
+   - styles and fonts also allowed from `https://fonts.googleapis.com` and
+     `https://fonts.gstatic.com`;
+   - **`connect-src 'none'`**;
    - `frame-ancestors https://app.superlibrary.dev`;
    - no `form-action`.
-5. **Access through signed URLs, never cookies.** A URL lasts 5 minutes, covers one artifact
-   version, and is minted only after the viewer's permission is checked.
+5. **Signed URLs, never cookies.** Each URL lasts 5 minutes, covers one item version, and is minted
+   only after the viewer's permission has been checked.
 6. **Headers:**
    - `X-Content-Type-Options: nosniff`;
    - `Cross-Origin-Resource-Policy: same-site`;
    - `Cross-Origin-Opener-Policy: same-origin`;
    - `Content-Disposition: attachment` for every kind that is not rendered.
 
-## 7. Guardrails
+### Availability
 
-**Who can create**
-- An agent can create artifacts only from its own station, identified by its token. The tool has
-  no station argument.
-- A person can create artifacts from stations they can read, or by direct upload into a workspace
-  where they hold `artifacts:write`.
-- Agents cannot use direct upload in v1. Everything an agent stores comes from its own workspace,
-  with provenance.
+An artifact's bytes are copied when it is created, so viewing never depends on its station.
 
-**What can be linked** (checked by the source, and again by Superlibrary for direct uploads)
-- Paths must stay inside the workspace root. `..` is refused, and so is a symlink that leaves the
-  root.
-- Refused by default:
-  - `.env*`, `.ssh/`, `.gnupg/`;
-  - `*.pem`, `*.key`, `id_*`;
-  - `.git/` internals;
-  - `.netrc`, `.npmrc`, `.pypirc`;
-  - cloud credential files;
-  - each harness's own config, session and token files (taken from its descriptor).
-- Size limits: 25 MB per file; 100 MB and 500 files per folder; 1 GB stored per workspace by
-  default, configurable.
-- A **secret scan** runs before anything is stored. It looks for token-shaped strings (AWS,
-  GitHub, Slack, OpenAI, Anthropic, signed JWTs, PEM blocks, high-entropy assignments). A hit is
-  refused, naming the file and line. An operator can override one artifact, and the override is
-  recorded.
-
-**Who can view**
-- Signed-in members of the artifact's workspace with `artifacts:read`. This is checked on every
-  view, and every view is audited.
-- No anonymous links in v1.
-
-**Lifecycle**
-- Revoke one artifact or one version, or set an expiry.
-- **Removing a station or node keeps its artifacts.** They are marked "from a removed station" and
-  stay viewable to the workspace.
-- Revoking every artifact from a station is a separate, explicit action. Node removal offers it as
-  a checkbox, off by default.
-- Retention: artifacts a card references, or that sit in a collection, are kept. Everything else
-  is deleted after **30 days**.
-
-## 8. Availability
-
-The bytes are copied when an artifact is created, so viewing never depends on the station.
-
-| Situation | Existing artifacts | Creating new ones | "Changed since linked" |
+| Situation | Existing items | New artifacts | "Changed since linked" check |
 |---|---|---|---|
-| Station stopped, or node offline or asleep | work | refused, "station unavailable" | "can't check right now" |
+| Station stopped, node offline or asleep | work | refused: "station unavailable" | "can't check right now" |
 | File edited, moved or deleted | show the frozen version | linking again creates a new version | "changed" or "no longer there" |
-| Workspace cleaned, or runtime destroyed | work | refused | "no longer there" |
-| Station or node removed | work, marked removed | refused | — |
-| AgentPod hub down | work, since viewing goes straight to Superlibrary | refused, because station sources need the hub | — |
-| Superlibrary or R2 down | unavailable until it recovers | refused | — |
+| Workspace cleaned or runtime destroyed | work | refused | "no longer there" |
+| Station or node removed | work, marked as removed | refused | — |
+| AgentPod hub down | work | refused | — |
+| Superlibrary or R2 down | unavailable until recovery | refused | — |
 
-## 9. Changes in other repositories
+## 10. Agent interface (MCP)
 
-**accounts**
-- Product registry entry, audience, web and CLI clients.
-- The `superlibrary` entitlement and `artifacts:*` scopes.
-- The AgentPod hub's service grant to create artifacts on an agent's behalf.
+These tools are served by `superlibrary-api` at `/mcp`. They accept the agent's own
+organization-plane token, which gains the Superlibrary audience.
 
-**agentpod**
-- `fs.read` gains `offset`.
-- A folder manifest walk that honours the guardrails.
-- The `agentpod_link_artifact` MCP tool.
-- `fleet artifacts` commands.
-- **Link this file** in the console.
-- The hub's Superlibrary client.
-- Node-side path-escape checks.
+- **`library_search { query, kinds?, outcomes?, board?, limit? }`:** ranked results with an
+  outcome label, provenance, a snippet and an item id.
+- **`library_get { itemId, version? }`:** the full item. For an artifact this is its text content
+  or a description of it. For a work record it is the whole record.
+- **`library_related { cardId? | itemId? }`:** items related to a card or an item, using the
+  title, spec and references.
+- **`agentpod_link_artifact`** (served by AgentPod): adds a file from the agent's own workspace.
 
-**superpipeline**
-- Recognise `app.superlibrary.dev/a/…` references.
-- An inline preview in the card drawer for safe kinds (images, Markdown, text, code), fetched with
-  the viewer's own token.
-- Every other kind opens Superlibrary.
+**Related prior work in the prompt.** When a card is claimed, the AgentPod bridge calls
+`library_related { cardId }` and adds a capped "Related prior work" section to the prompt. Each
+item carries its outcome and link, and the section is labelled as reference material. It can be
+switched off per board. If Superlibrary is unreachable, the section is left out and the claim goes
+ahead.
 
-**Agent instructions** (coordinator and every station)
-- Link produced files with `agentpod_link_artifact` and attach them to the card.
-- Never use gists or personal accounts.
+**Agent instructions** (the coordinator and every station):
+- check `library_search` before starting non-trivial work;
+- link produced files with `agentpod_link_artifact` and attach them to the card;
+- never publish through gists or personal accounts.
 
-## 10. Phases
+## 11. People's interface
 
-1. **The repo, the plane registration, the API, storage and the content Worker**, with direct
-   upload by a person and the viewer for every kind.
-2. **AgentPod as a source:** the MCP tool, `fleet artifacts`, and the console's Link action.
-3. **Superpipeline previews**, and the agent instructions.
-4. **The library:** browse, search, collections, retention jobs and the audit view.
+- **The library app:**
+  - search, with filters for kind, outcome, board, agent, station and date;
+  - an item page with provenance, versions and related items;
+  - work-record timelines;
+  - collections.
+- **Views by outcome,** for example "everything rejected on Marketing & Community this month".
+- **Moderation:**
+  - change an item's scope to `workspace`;
+  - mark an item `superseded` by another;
+  - revoke an item or a single version;
+  - edit a caption;
+  - remove an item from memory, with a recorded reason.
+- **`slib` CLI:** `search`, `get`, `upload`, `collect`, `revoke`, `scope`.
+- **Superpipeline:** card drawers preview linked artifacts inline for images, Markdown, text and
+  code, and have a "Related prior work" panel.
 
-## 11. Tests (each guard proven by reverting it)
+## 12. Lifecycle
 
+- **Artifacts**
+  - Revoke one artifact or one version, or set an expiry.
+  - **Removing a station or node keeps its artifacts.** They are marked as from a removed station
+    and stay visible within their scope.
+  - Revoking all of a station's artifacts is a separate, explicit action. Node removal offers it
+    as a checkbox, off by default.
+  - **Retention:** artifacts referenced by a work record, a card or a collection are kept. Any
+    other artifact is deleted after **30 days**.
+- **Work records** are kept for as long as their card exists. Deleting a card deletes its work
+  record and its index entries.
+- **Deletion removes everything:** the D1 row, the R2 bytes when no other version shares them, the
+  Vectorize vectors and the FTS rows.
+
+## 13. Changes in other repositories
+
+- **accounts:**
+  - product registry entry, audience, and web and CLI clients;
+  - the `superlibrary` entitlement and `library:*` scopes;
+  - the hub's service grant;
+  - the Superlibrary audience in agents' station tokens.
+- **agentpod:**
+  - `fs.read` gains `offset`;
+  - a folder manifest walk;
+  - node-side path checks;
+  - the `agentpod_link_artifact` tool;
+  - the Superlibrary client;
+  - `fleet artifacts`;
+  - the console's **Link this file**;
+  - the roster endpoint (§4);
+  - "Related prior work" in the bridge's prompt (`CardPrompt` gains an optional field, so older
+    servers keep working).
+- **superpipeline:**
+  - recognise `app.superlibrary.dev` references;
+  - inline previews and the "Related prior work" panel in the card drawer;
+  - a `supersedes` link kind;
+  - make sure board push configs can subscribe to the events listed in §5.
+
+## 14. Phases
+
+1. **Core**
+   - repo, CI, the two Workers and the Pages app;
+   - D1, R2 and Queues;
+   - registration in Accounts;
+   - direct upload by a person;
+   - the viewer for every kind;
+   - the guardrails and the secret scan.
+2. **Sources:** AgentPod artifacts through `link_artifact`, and Superpipeline work history through
+   events, plus the backfill.
+3. **Retrieval:**
+   - hybrid search behind the `Embedder` and `VectorIndex` interfaces;
+   - the visibility filter;
+   - the MCP tools;
+   - "related prior work" in prompts;
+   - the agent instructions.
+4. **The library app:** browse, collections, outcome views, moderation, and the Superpipeline
+   drawer panels.
+5. **Later:**
+   - more sources (`charter`, `sketchbook`, agent memories, Superwitness, Supermessage);
+   - OCR and image embeddings;
+   - Office previews;
+   - the embedder on own hardware, when wanted.
+
+## 15. Tests
+
+Each guard is proven by reverting it and watching its test fail.
+
+**Visibility**
+- An agent gets no result from a board it is not rostered on, through search, `get`, `related`
+  or the prompt section.
+- A `workspace` item is visible to everyone in the workspace.
+- A hidden item never appears, even as a snippet.
+
+**Outcomes**
+- Each source event maps to the right outcome.
+- Ranking weights are applied.
+- Superseded items point to their replacement.
+
+**Ingest**
+- Duplicate deliveries are idempotent.
+- Backfill matches what live events produce.
+- Deleting a card removes its record and its vectors.
+
+**Sources**
 - An agent cannot link another station's file.
-- Path escape is refused, whether by `..`, an absolute path or a symlink.
-- A denylisted path is refused.
-- The secret scan refuses a match, and an override is recorded.
-- Size caps are enforced.
-- A sniffed type wins over the extension.
-- A malicious HTML fixture in the content origin cannot:
-  - read cookies or storage from other origins;
-  - fetch, use XHR or open a WebSocket;
-  - navigate the top window;
-  - frame itself outside the app.
-- A signed URL expires, and opens only its own artifact.
-- A non-member gets 403, and every view is audited.
-- Versions are immutable, and linking again creates *n+1*.
-- Revocation stops serving at once.
-- Removing a station keeps its artifacts.
-- Retention deletes only artifacts that no card or collection references.
+- A path that escapes the workspace is refused, and so is a denylisted path.
+- The secret scan refuses an artifact and redacts a work record. An override is recorded.
+- Sizes are capped, and the sniffed type wins over the extension.
 
-## 12. Decisions so far (operator, 2026-10-08 and 2026-10-09)
+**Content origin** (tested with a malicious HTML fixture)
+- It cannot read other origins' storage.
+- It cannot fetch, use XHR or open a WebSocket.
+- It cannot navigate the top window, or be framed outside the app.
+- A signed URL expires and opens only its own item version.
 
-1. Superlibrary is its own product, in its own repository.
-2. The domains are `superlibrary.dev` and `superlibrarycontent.dev`, registered through Cloudflare.
-3. HTML artifacts may load from trusted CDNs only: cdnjs, jsDelivr, unpkg, and Google Fonts for
-   styles and fonts. They have no network access.
-4. Unreferenced artifacts are kept for 30 days.
-5. Removing a station keeps its artifacts. Revoking them is a separate action.
+**Prompt safety**
+- Retrieved text is wrapped and labelled.
+- The section's caps hold.
+- If Superlibrary is down, the claim goes ahead without the section.
+
+**Swapping the index**
+- A re-index into a new index with a different embedder keeps search working.
+- Vectors from two embedders never mix.
+
+## 16. Decisions (operator, 2026-10-08 and 2026-10-09)
+
+1. Superlibrary is its own product, in its own repository, and is **the stack's knowledge layer**.
+2. Its first job is **memory that agents consult**, which people can also browse.
+3. At launch it holds **agent artifacts and Superpipeline work history**.
+4. **Everything goes in, labelled with its outcome.** Approved and completed work ranks first.
+5. An agent sees **the boards it is rostered on, plus workspace-wide items**.
+6. Search runs on **Cloudflare (Workers AI, Vectorize, D1 FTS)**, behind interfaces that allow a
+   later move to own hardware.
+7. Domains: `superlibrary.dev` and `superlibrarycontent.dev`.
+8. HTML artifacts may load libraries from trusted CDNs only, and have no network access.
+9. Unreferenced artifacts are deleted after 30 days.
+10. Removing a station keeps its artifacts. Revoking them is a separate act.

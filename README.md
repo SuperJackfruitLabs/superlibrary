@@ -1,8 +1,6 @@
 # superlibrary
 
-**Everything your agents make, kept and viewable.** Superlibrary keeps the files agents produce —
-reports, designs, pages, images, data — as private, versioned, attributed artifacts, and shows them
-in the browser, interactive pages included.
+**The memory of the stack.** Superlibrary keeps what agents make and what work has been done — artifacts and Superpipeline work history, labelled with how each turned out — and lets agents consult it before they work and people browse it.
 
 Status: design. See [docs/superpowers/specs/2026-10-09-superlibrary-design.md](docs/superpowers/specs/2026-10-09-superlibrary-design.md).
 
