@@ -56,3 +56,13 @@ pre code.hljs { padding: 0; background: transparent; color: var(--fg); }
   :root:not([data-theme='light']) .hljs-addition { color: #aff5b4; background-color: #033a16; }
   :root:not([data-theme='light']) .hljs-deletion { color: #ffdcd7; background-color: #67060c; }
 }
+article.markdown { max-width: 860px; }
+article.markdown img { max-width: 100%; }
+article.markdown table { margin: 12px 0; }
+figure.diagram { margin: 12px 0; overflow: auto; }
+.cell { margin: 12px 0; }
+.cell .prompt { color: var(--muted); font: 12px ui-monospace, monospace; }
+.cell pre { border: 1px solid var(--line); border-radius: 6px; padding: 8px; }
+.cell img { max-width: 100%; }
+.out { margin-top: 6px; } .out.error { color: #c0392b; }
+.pdf canvas { display: block; width: 100%; height: auto; border: 1px solid var(--line); margin-bottom: 12px; background: #fff; }

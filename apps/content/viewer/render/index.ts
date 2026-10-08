@@ -5,7 +5,11 @@ import { renderTable } from './table';
 import { renderImage, renderMedia, renderSvg } from './media';
 import { renderDownload } from './download';
 
-/** One renderer for every host (spec §9, Embedding). Task 13 adds markdown, diagrams, notebooks and PDF. */
+/**
+ * One renderer for every host (spec §9, Embedding). Markdown, diagrams, notebooks and PDF are lazy chunks
+ * (`/_viewer/chunks/*`, loaded as module scripts from 'self': connect-src is 'none'), so Mermaid, viz.js
+ * and pdf.js load only when their kind renders.
+ */
 export async function render(el: HTMLElement, d: ViewerData): Promise<void> {
   // Operator: view source. The Worker sets it only for a text-backed kind, with the text inlined.
   if (d.source) return renderCode(el, d);
@@ -27,6 +31,16 @@ export async function render(el: HTMLElement, d: ViewerData): Promise<void> {
     case 'audio':
     case 'video':
       return renderMedia(el, d);
+    case 'markdown':
+      return (await import('./markdown')).renderMarkdown(el, d);
+    case 'mermaid':
+      return (await import('./diagram')).renderMermaid(el, d);
+    case 'graphviz':
+      return (await import('./diagram')).renderGraphviz(el, d);
+    case 'ipynb':
+      return (await import('./notebook')).renderNotebook(el, d);
+    case 'pdf':
+      return (await import('./pdf')).renderPdf(el, d);
     default:
       return renderDownload(el, d);
   }

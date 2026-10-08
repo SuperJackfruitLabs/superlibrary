@@ -8,6 +8,8 @@ export default defineConfig({
     outDir: 'viewer-dist/_viewer',
     emptyOutDir: true,
     cssCodeSplit: false,
+    // Mermaid's layout engines, viz.js (asm.js) and pdf.js are large, but lazy: fetched only when their kind renders.
+    chunkSizeWarningLimit: 2000,
     modulePreload: { polyfill: false },
     rollupOptions: {
       input: { viewer: 'viewer/main.ts' },
