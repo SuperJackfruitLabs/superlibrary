@@ -3,6 +3,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { API, upload } from './helpers/upload';
 import { HUMAN_2, OTHER_ORG, devHeaders } from './helpers/org-plane';
 import { useSigningKey } from './helpers/signing';
+import { writeManifest } from '../src/storage/blobs';
 
 beforeAll(useSigningKey);
 const post = (path: string, body: object = {}, headers = devHeaders()) =>
@@ -86,6 +87,58 @@ describe('revocation is immediate', () => {
     expect((await post(`/api/v1/items/${r.body.itemId}/versions/1/revoke`)).status).toBe(200);
     expect((await post(`/api/v1/items/${r.body.itemId}/versions/1/revoke`)).status).toBe(200);
     expect((await auditRows('version.revoked', r.body.itemId)).results).toHaveLength(1);
+  });
+});
+
+/**
+ * A deterministic race: the first D1 batch (the revoke's) runs only after `meanwhile` has, as if a
+ * concurrent expiry change or n+1 commit rewrote a manifest between the revoke's delete and its batch.
+ */
+async function duringFirstBatch<T>(meanwhile: () => Promise<void>, act: () => Promise<T>): Promise<T> {
+  const db = env.DB as D1Database & { batch: D1Database['batch'] };
+  const original = db.batch.bind(db);
+  let held = false;
+  db.batch = (async (statements: D1PreparedStatement[]) => {
+    if (!held) {
+      held = true;
+      await meanwhile();
+    }
+    return original(statements);
+  }) as D1Database['batch'];
+  try {
+    return await act();
+  } finally {
+    db.batch = original;
+  }
+}
+
+describe('revocation wins a race with a manifest rewrite', () => {
+  it('an item revoke deletes the manifests again after its batch', async () => {
+    const r = await upload([{ path: 'a.md', body: '# race item' }]);
+    const res = await duringFirstBatch(() => writeManifest(env, r.body.itemId, 1), () => post(`/api/v1/items/${r.body.itemId}/revoke`));
+    expect(res.status).toBe(200);
+    expect(await env.BLOBS.head(`manifests/${r.body.itemId}/1.json`)).toBeNull();
+  });
+
+  it('a version revoke deletes its manifest again after its batch', async () => {
+    const r = await upload([{ path: 'a.md', body: '# race version' }]);
+    const res = await duringFirstBatch(() => writeManifest(env, r.body.itemId, 1), () => post(`/api/v1/items/${r.body.itemId}/versions/1/revoke`));
+    expect(res.status).toBe(200);
+    expect(await env.BLOBS.head(`manifests/${r.body.itemId}/1.json`)).toBeNull();
+  });
+});
+
+describe('a revoke reason is checked, not dropped', () => {
+  it('refuses a reason that is too long, not a string, or a body that is not JSON; accepts no body', async () => {
+    const r = await upload([{ path: 'a.md', body: '# reasons' }]);
+    expect((await post(`/api/v1/items/${r.body.itemId}/revoke`, { reason: 'x'.repeat(501) })).status).toBe(400);
+    expect((await post(`/api/v1/items/${r.body.itemId}/revoke`, { reason: 42 })).status).toBe(400);
+    const bad = await SELF.fetch(`${API}/api/v1/items/${r.body.itemId}/revoke`, { method: 'POST', headers: { ...devHeaders(), 'content-type': 'application/json' }, body: '{not json' });
+    expect(bad.status).toBe(400);
+    expect(await bad.json()).toMatchObject({ error: 'invalid' });
+    expect(await env.BLOBS.head(`manifests/${r.body.itemId}/1.json`)).not.toBeNull();
+    const none = await SELF.fetch(`${API}/api/v1/items/${r.body.itemId}/revoke`, { method: 'POST', headers: devHeaders() });
+    expect(none.status).toBe(200);
   });
 });
 

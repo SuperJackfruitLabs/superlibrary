@@ -49,3 +49,17 @@ export function scanText(text: string): Finding[] {
   });
   return out;
 }
+
+/**
+ * Bytes that sniffed as no known text and no known binary (`application/octet-stream`): text in a
+ * legacy single-byte encoding (Windows-1252), BOM-less UTF-16, or text with an early NUL. Each byte
+ * is read as one character (Latin-1), once as is and once with NUL bytes removed, which turns
+ * UTF-16 of ASCII back into ASCII. A finding in either counts (PR 2 review); duplicates are merged.
+ */
+export function scanUndecodedText(bytes: Uint8Array): Finding[] {
+  let text = '';
+  for (let i = 0; i < bytes.length; i += 8192) text += String.fromCharCode(...bytes.subarray(i, i + 8192));
+  const seen = new Map<string, Finding>();
+  for (const f of [...scanText(text), ...scanText(text.replace(/\0/g, ''))]) seen.set(`${f.line}:${f.rule}`, f);
+  return [...seen.values()].sort((a, b) => a.line - b.line || a.rule.localeCompare(b.rule));
+}

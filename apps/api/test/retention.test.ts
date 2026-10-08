@@ -7,8 +7,19 @@ import { sha256Hex, upload } from './helpers/upload';
 
 const DAY = 86_400_000;
 const SECRET = 'const t = "' + 'gh' + 'p_' + 'aB3xQ9zK7mP2wR5t'.repeat(3) + '";';
-const age = (itemId: string, days: number) =>
-  env.DB.prepare(`UPDATE items SET created_at = datetime('now', ?) WHERE id = ?`).bind(`-${days} days`, itemId).run();
+const VERSIONS_IMMUTABLE = env.TEST_MIGRATIONS.flatMap((m) => m.queries).find((q) => q.includes('CREATE TRIGGER versions_immutable'))!;
+/** Ages an item and every version of it. Versions are immutable, so the trigger steps aside for the test only. */
+const age = (itemId: string, days: number, versions: number[] | 'all' = 'all') =>
+  env.DB.batch([
+    env.DB.prepare(`UPDATE items SET created_at = datetime('now', ?) WHERE id = ?`).bind(`-${days} days`, itemId),
+    env.DB.prepare(`DROP TRIGGER versions_immutable`),
+    versions === 'all'
+      ? env.DB.prepare(`UPDATE versions SET created_at = datetime('now', ?) WHERE item_id = ?`).bind(`-${days} days`, itemId)
+      : env.DB.prepare(`UPDATE versions SET created_at = datetime('now', ?) WHERE item_id = ? AND version IN (${versions.join(',')})`).bind(`-${days} days`, itemId),
+    env.DB.prepare(VERSIONS_IMMUTABLE),
+  ]);
+const wouldDeleteRows = async (itemId: string) =>
+  (await env.DB.prepare(`SELECT COUNT(*) AS n FROM audit_events WHERE action = 'retention.would_delete' AND item_id = ?`).bind(itemId).first<{ n: number }>())!.n;
 const exists = async (itemId: string) => (await env.DB.prepare(`SELECT 1 FROM items WHERE id = ?`).bind(itemId).first()) !== null;
 const asMode = (mode: 'report' | 'enforce') => ({ ...env, RETENTION_MODE: mode });
 const keysUnder = async (prefix: string) => (await env.BLOBS.list({ prefix })).objects.map((o) => o.key);
@@ -40,6 +51,45 @@ describe('retention sweep (spec §12, plan D14)', () => {
     expect(await env.BLOBS.head(`manifests/${old.body.itemId}/1.json`)).toBeNull();
     expect(await exists(kept.body.itemId)).toBe(true);
     expect(await exists(young.body.itemId)).toBe(true);
+  });
+
+  it('report mode records each would-be deletion once, not once per sweep', async () => {
+    const r = await upload([{ path: 'old.txt', body: 'reported once' }]);
+    await age(r.body.itemId, 31);
+    await sweep(asMode('report'), Date.now());
+    await sweep(asMode('report'), Date.now());
+    expect(await wouldDeleteRows(r.body.itemId)).toBe(1);
+  });
+
+  it('staleness counts from the newest version: an old item with a new version is kept in enforce mode', async () => {
+    const r = await upload([{ path: 'a.txt', body: 'v1 long ago' }]);
+    await upload([{ path: 'a.txt', body: 'v2 yesterday' }], { item: r.body.itemId });
+    await age(r.body.itemId, 40, [1]);
+    await age(r.body.itemId, 1, [2]);
+    await env.DB.prepare(`UPDATE items SET created_at = datetime('now', '-40 days') WHERE id = ?`).bind(r.body.itemId).run();
+    const report = await sweep(asMode('enforce'), Date.now());
+    expect(report.unreferenced).not.toContain(r.body.itemId);
+    expect(await exists(r.body.itemId)).toBe(true);
+  });
+
+  it('abandoned uploads and quarantine are cleared before the stale step, so its failure cannot starve them', async () => {
+    const s = await upload([{ path: 'a.ts', body: `starved\n${SECRET}` }], { commit: false });
+    const db = env.DB;
+    const failing = new Proxy(db, {
+      get(target, prop) {
+        if (prop === 'prepare') {
+          return (sql: string) => {
+            if (sql.includes('item_references r')) throw new Error('stale step failed');
+            return target.prepare(sql);
+          };
+        }
+        const v = Reflect.get(target, prop);
+        return typeof v === 'function' ? v.bind(target) : v;
+      },
+    });
+    await expect(sweep({ ...asMode('report'), DB: failing }, Date.now() + 2 * DAY)).rejects.toThrow('stale step failed');
+    expect(await env.DB.prepare(`SELECT 1 FROM upload_sessions WHERE id = ?`).bind(s.uploadId).first()).toBeNull();
+    expect(await keysUnder(`quarantine/${s.uploadId}/`)).toEqual([]);
   });
 
   it('deleting one item keeps a blob another item still uses', async () => {

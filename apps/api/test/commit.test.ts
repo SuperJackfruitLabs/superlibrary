@@ -1,5 +1,6 @@
 import { SELF, env } from 'cloudflare:test';
 import { describe, expect, it } from 'vitest';
+import { deleteItem } from '../src/lifecycle/retention';
 import { API, sha256Hex, upload } from './helpers/upload';
 import { HUMAN_2, devHeaders } from './helpers/org-plane';
 
@@ -253,5 +254,66 @@ describe('commit against an item', () => {
   it('a committed upload never changes state or result again', async () => {
     const r = await upload([{ path: 'a.txt', body: 'settled' }]);
     await expect(env.DB.prepare(`UPDATE upload_sessions SET state = 'committed', result_version = 9 WHERE id = ?`).bind(r.uploadId).run()).rejects.toThrow(/already committed/);
+  });
+});
+
+describe('PR 2 review: versions only on items the caller manages, live, and whose bytes still exist', () => {
+  const commitOf = (uploadId: string, headers = devHeaders()) => SELF.fetch(`${API}/api/v1/uploads/${uploadId}/commit`, { method: 'POST', headers });
+
+  it('an owner cannot add a version to another person’s board item they cannot see (404); a workspace item is fine', async () => {
+    const org = 'org_00000000000000000c71';
+    const owner = devHeaders('prn_000000000000000000d1', org);
+    const member = devHeaders('prn_000000000000000000d2', org);
+    await SELF.fetch(`${API}/api/v1/me`, { headers: owner });
+    const board = await upload([{ path: 'a.txt', body: 'board-only' }], { headers: member, scope: 'board:brd_00000000000000b1' });
+    const refused = await upload([{ path: 'a.txt', body: 'owner v2 board' }], { headers: owner, item: board.body.itemId });
+    expect(refused.status).toBe(404);
+    expect(refused.body).toEqual({ error: 'not_found' });
+    const wide = await upload([{ path: 'a.txt', body: 'workspace-wide' }], { headers: member });
+    const allowed = await upload([{ path: 'a.txt', body: 'owner v2 workspace' }], { headers: owner, item: wide.body.itemId });
+    expect(allowed.status).toBe(201);
+    expect(allowed.body.version).toBe(2);
+  });
+
+  it('an expired but unswept item takes no new version, unless the upload sets a new future expiry', async () => {
+    const r = await upload([{ path: 'a.txt', body: 'expiring v1' }]);
+    await env.DB.prepare(`UPDATE items SET expires_at = ? WHERE id = ?`).bind(new Date(Date.now() - 1000).toISOString(), r.body.itemId).run();
+    // Refused at declare, before any byte is sent.
+    const refused = await upload([{ path: 'a.txt', body: 'onto expired' }], { item: r.body.itemId, commit: false });
+    expect(refused.status).toBe(410);
+    expect(refused.uploadId).toBe('');
+    expect(refused.body).toEqual({ error: 'expired' });
+    const at = new Date(Date.now() + 86_400_000).toISOString();
+    const revived = await upload([{ path: 'a.txt', body: 'onto expired, extended' }], { item: r.body.itemId, expiresAt: at });
+    expect(revived.status).toBe(201);
+    expect((await env.DB.prepare(`SELECT expires_at FROM items WHERE id = ?`).bind(r.body.itemId).first<{ expires_at: string }>())!.expires_at).toBe(at);
+  });
+
+  it('an item that expires between declare and commit refuses the commit (410 expired)', async () => {
+    const r = await upload([{ path: 'a.txt', body: 'expires mid-upload v1' }]);
+    const next = await upload([{ path: 'a.txt', body: 'expires mid-upload v2' }], { item: r.body.itemId, commit: false });
+    await env.DB.prepare(`UPDATE items SET expires_at = ? WHERE id = ?`).bind(new Date(Date.now() - 1000).toISOString(), r.body.itemId).run();
+    const res = await commitOf(next.uploadId);
+    expect(res.status).toBe(410);
+    expect(await res.json()).toEqual({ error: 'expired' });
+  });
+
+  it('a commit whose blob vanished (deduped at PUT, then swept) answers 409 incomplete and can be re-sent', async () => {
+    const s = await upload([{ path: 'gone.txt', body: 'blob that vanishes' }, { path: 'kept.txt', body: 'blob that stays' }], { commit: false });
+    await env.BLOBS.delete(`blobs/${await sha256Hex('blob that vanishes')}`);
+    const res = await commitOf(s.uploadId);
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: 'incomplete', missing: ['gone.txt'] });
+    expect((await env.DB.prepare(`SELECT received FROM upload_files WHERE session_id = ? AND path = 'gone.txt'`).bind(s.uploadId).first<{ received: number }>())!.received).toBe(0);
+    await SELF.fetch(`${API}/api/v1/uploads/${s.uploadId}/files?path=gone.txt`, { method: 'PUT', headers: devHeaders(), body: 'blob that vanishes' });
+    expect((await commitOf(s.uploadId)).status).toBe(201);
+  });
+
+  it('a retried commit whose item was deleted answers 410 gone, not 500', async () => {
+    const r = await upload([{ path: 'a.txt', body: 'deleted after commit' }]);
+    await deleteItem(env, r.body.itemId, 'retention', 'test');
+    const res = await commitOf(r.uploadId);
+    expect(res.status).toBe(410);
+    expect(await res.json()).toEqual({ error: 'gone' });
   });
 });

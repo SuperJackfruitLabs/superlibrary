@@ -10,9 +10,10 @@ import { newId } from '../ids';
 import { audit } from '../audit';
 import { resolvePerson, type Person } from '../auth/caller';
 import { decodeText, sniff } from '../guard/sniff';
-import { scanText } from '../guard/secrets';
+import { scanText, scanUndecodedText } from '../guard/secrets';
 import { committedUsage, newBytes, newCommittedBytes, workspaceUsage } from '../guard/limits';
 import { blobKey, quarantineKey, releaseQuarantine, sha256Hex, writeManifest } from '../storage/blobs';
+import { canManage, isExpired, loadItem } from '../items/visibility';
 
 export interface SessionRow {
   id: string; workspace_id: string; created_by: string; item_id: string | null; title: string; scope: string;
@@ -76,9 +77,13 @@ async function create(request: Request, env: Env, p: Person): Promise<Response> 
     entry = c.path;
   }
   if (body.item) {
-    const item = await env.DB.prepare(`SELECT created_by, revoked_at FROM items WHERE id = ? AND workspace_id = ?`).bind(body.item, p.workspaceId).first<{ created_by: string; revoked_at: string | null }>();
-    if (!item || (item.created_by !== p.principalId && p.role !== 'owner')) return error(404, 'not_found');
+    // The same rule as revoke, expiry and scope (plan D11/D12): an item the caller may not manage,
+    // including another person's board item an owner cannot see, is not confirmed to exist.
+    const item = await loadItem(env, body.item);
+    if (!item || !canManage(p, item)) return error(404, 'not_found');
     if (item.revoked_at) return error(410, 'revoked');
+    // Expired but not yet swept: only an upload that sets a new (future, checked above) expiry revives it.
+    if (isExpired(item) && !itemExpiresAt) return error(410, 'expired');
   }
   const quota = (await env.DB.prepare(`SELECT quota_bytes FROM workspaces WHERE id = ?`).bind(p.workspaceId).first<{ quota_bytes: number }>())?.quota_bytes ?? LIMITS.workspaceBytes;
   const used = await workspaceUsage(env.DB, p.workspaceId);
@@ -112,7 +117,11 @@ async function put(request: Request, env: Env, p: Person, id: string, url: URL):
   if ((await sha256Hex(bytes)) !== f.sha256) return error(400, 'sha256_mismatch', { path });
 
   const sniffed = sniff(bytes, path);
-  const findings = sniffed.text && sniffed.encoding ? scanText(decodeText(bytes, sniffed.encoding)) : [];
+  // Recognised binaries (images, audio, video, PDF, fonts, zip/Office) are not scanned; anything
+  // else that is not valid text may still be text in another encoding, so it is read byte-wise.
+  const findings = sniffed.text && sniffed.encoding
+    ? scanText(decodeText(bytes, sniffed.encoding))
+    : sniffed.mediaType === 'application/octet-stream' ? scanUndecodedText(bytes) : [];
   // Spec §8: scanned before storing. A hit never reaches blobs/ (ruling T7/T8): it waits in this
   // session's quarantine for an override at commit, or is deleted with the session.
   const quarantined = findings.length > 0;
@@ -182,7 +191,8 @@ async function resultOf(env: Env, itemId: string, version: number): Promise<Comm
 async function publish(env: Env, s: SessionRow, itemId: string, version: number): Promise<void> {
   await releaseQuarantine(env, s.id);
   // A new version that sets an expiry changes the item's, so every version's manifest is rewritten
-  // (plan D7: "changing an expiry rewrites it"); writeManifest skips revoked ones.
+  // (plan D7: "changing an expiry rewrites it"); for a revoked one writeManifest deletes the
+  // manifest instead of writing it.
   const versions = s.item_id && s.item_expires_at
     ? (await env.DB.prepare(`SELECT version FROM versions WHERE item_id = ? ORDER BY version`).bind(itemId).all<{ version: number }>()).results.map((r) => r.version)
     : [version];
@@ -190,6 +200,9 @@ async function publish(env: Env, s: SessionRow, itemId: string, version: number)
 }
 
 async function committed(env: Env, s: SessionRow): Promise<Response> {
+  // Its item may have been deleted since (expiry, retention): nothing is left to answer with.
+  const v = await env.DB.prepare(`SELECT 1 FROM versions WHERE item_id = ? AND version = ?`).bind(s.result_item_id, s.result_version).first();
+  if (!v) return error(410, 'gone');
   // Idempotent: a retried commit answers the first one's result and repairs what it left undone.
   await publish(env, s, s.result_item_id!, s.result_version!);
   return json(await resultOf(env, s.result_item_id!, s.result_version!), 200);
@@ -199,9 +212,20 @@ async function commit(env: Env, p: Person, id: string): Promise<Response> {
   const s = await ownSession(env, p, id);
   if (s instanceof Response) return s;
   if (s.state === 'committed') return committed(env, s);
-  const files = (await env.DB.prepare(`SELECT path, sha256, bytes, received, media_type, view FROM upload_files WHERE session_id = ? ORDER BY path`).bind(id).all<{ path: string; sha256: string; bytes: number; received: number; media_type: string | null; view: string | null }>()).results;
+  const files = (await env.DB.prepare(`SELECT path, sha256, bytes, received, media_type, view, quarantined FROM upload_files WHERE session_id = ? ORDER BY path`).bind(id).all<{ path: string; sha256: string; bytes: number; received: number; media_type: string | null; view: string | null; quarantined: number }>()).results;
   const missing = files.filter((f) => !f.received).map((f) => f.path);
   if (missing.length > 0) return error(409, 'incomplete', { missing });
+  // A PUT that found its bytes already in blobs/ stored nothing; those bytes may have been deleted
+  // since (PR 2 review). Every clean file's blob must exist now, or the client sends it again.
+  const absent = new Set<string>();
+  for (const sha of new Set(files.filter((f) => !f.quarantined).map((f) => f.sha256))) {
+    if (!(await env.BLOBS.head(blobKey(sha)))) absent.add(sha);
+  }
+  if (absent.size > 0) {
+    const gone = files.filter((f) => !f.quarantined && absent.has(f.sha256)).map((f) => f.path);
+    await env.DB.batch(gone.map((path) => env.DB.prepare(`UPDATE upload_files SET received = 0 WHERE session_id = ? AND path = ?`).bind(id, path)));
+    return error(409, 'incomplete', { missing: gone });
+  }
   // Refused: nothing is written. The flagged bytes stay in this session's private quarantine,
   // so an override can follow without a re-upload; retention deletes them if none does.
   const findings = await findingsOf(env, id);
@@ -216,9 +240,12 @@ async function commit(env: Env, p: Person, id: string): Promise<Response> {
   let version: number;
   const statements: D1PreparedStatement[] = [];
   if (s.item_id) {
-    const item = await env.DB.prepare(`SELECT latest_version, revoked_at FROM items WHERE id = ? AND workspace_id = ?`).bind(s.item_id, p.workspaceId).first<{ latest_version: number; revoked_at: string | null }>();
+    const item = await env.DB.prepare(`SELECT latest_version, revoked_at, expires_at FROM items WHERE id = ? AND workspace_id = ?`).bind(s.item_id, p.workspaceId).first<{ latest_version: number; revoked_at: string | null; expires_at: string | null }>();
     if (!item) return error(404, 'not_found');
     if (item.revoked_at) return error(410, 'revoked');
+    // Expired since declare and not swept yet: refused unless this upload sets a new future expiry.
+    const revives = s.item_expires_at !== null && Date.parse(s.item_expires_at) > Date.now();
+    if (item.expires_at !== null && Date.parse(item.expires_at) <= Date.now() && !revives) return error(410, 'expired');
     itemId = s.item_id;
     version = item.latest_version + 1;
   } else {

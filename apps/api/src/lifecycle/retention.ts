@@ -121,11 +121,33 @@ async function clearLeftoverQuarantine(env: Env): Promise<string[]> {
   return cleared;
 }
 
+/**
+ * Spec §12: an artifact nothing references, whose newest version is older than the cutoff (`?1`,
+ * SQLite's `YYYY-MM-DD HH:MM:SS`). Counted from the last version, not the item's creation, so an
+ * item with a version added yesterday is not deleted whole.
+ */
+const STALE = `i.kind = 'artifact'
+  AND COALESCE((SELECT MAX(v.created_at) FROM versions v WHERE v.item_id = i.id), i.created_at) <= ?1
+  AND NOT EXISTS (SELECT 1 FROM item_references r WHERE r.item_id = i.id)`;
+
+/**
+ * Order matters (PR 2 review): the bounded cleanups that must always happen (abandoned uploads,
+ * quarantine, expired items) run before the stale step, whose size grows with the library, so a
+ * stale step that fails or runs out of budget can never starve them.
+ */
 export async function sweep(env: Env, now: number): Promise<SweepReport> {
   const nowIso = new Date(now).toISOString();
   const report: SweepReport = {
     expired: [], unreferenced: [], deletedUnreferenced: env.RETENTION_MODE === 'enforce', abandonedUploads: [], deletedBlobs: [], clearedQuarantines: [],
   };
+
+  // Uploads never committed, past their 24 hours (session `expires_at` is ISO).
+  const abandoned = await env.DB.prepare(`SELECT id FROM upload_sessions WHERE state = 'open' AND expires_at <= ?`).bind(nowIso).all<{ id: string }>();
+  for (const { id } of abandoned.results) {
+    report.deletedBlobs.push(...(await deleteAbandonedUpload(env, id)));
+    report.abandonedUploads.push(id);
+  }
+  report.clearedQuarantines = await clearLeftoverQuarantine(env);
 
   // Expiry is a person's explicit choice: honoured in both modes.
   const expired = await env.DB.prepare(`SELECT id FROM items WHERE expires_at IS NOT NULL AND expires_at <= ?`).bind(nowIso).all<{ id: string }>();
@@ -134,27 +156,22 @@ export async function sweep(env: Env, now: number): Promise<SweepReport> {
     report.deletedBlobs.push(...(await deleteItem(env, id, ACTOR, 'expired')));
   }
 
-  // Unreferenced after 30 days (spec §12). Enforced only in "enforce" (plan D14). `created_at` is
-  // SQLite's `YYYY-MM-DD HH:MM:SS`, so the cutoff is written in that form.
+  // Unreferenced after 30 days (spec §12). Enforced only in "enforce" (plan D14).
   const cutoff = new Date(now - LIMITS.retentionDays * 86_400_000).toISOString().replace('T', ' ').slice(0, 19);
-  const stale = await env.DB.prepare(
-    `SELECT i.id, i.workspace_id FROM items i WHERE i.kind = 'artifact' AND i.created_at <= ?
-       AND NOT EXISTS (SELECT 1 FROM item_references r WHERE r.item_id = i.id)`,
-  ).bind(cutoff).all<{ id: string; workspace_id: string }>();
-  for (const { id, workspace_id } of stale.results) {
-    report.unreferenced.push(id);
-    if (report.deletedUnreferenced) report.deletedBlobs.push(...(await deleteItem(env, id, ACTOR, 'unreferenced for 30 days')));
-    else await audit(env.DB, { workspaceId: workspace_id, actor: ACTOR, action: 'retention.would_delete', itemId: id }).run();
+  const stale = await env.DB.prepare(`SELECT i.id FROM items i WHERE ${STALE}`).bind(cutoff).all<{ id: string }>();
+  report.unreferenced = stale.results.map((r) => r.id);
+  if (report.deletedUnreferenced) {
+    for (const id of report.unreferenced) report.deletedBlobs.push(...(await deleteItem(env, id, ACTOR, 'unreferenced for 30 days')));
+  } else {
+    // One statement, and each item recorded once however many days it stays stale.
+    await env.DB.prepare(
+      `INSERT INTO audit_events (id, workspace_id, actor, action, item_id)
+       SELECT 'aud_' || lower(hex(randomblob(8))), i.workspace_id, ?2, 'retention.would_delete', i.id FROM items i
+       WHERE ${STALE}
+         AND NOT EXISTS (SELECT 1 FROM audit_events a WHERE a.item_id = i.id AND a.action = 'retention.would_delete')`,
+    ).bind(cutoff, ACTOR).run();
   }
 
-  // Uploads never committed, past their 24 hours (session `expires_at` is ISO).
-  const abandoned = await env.DB.prepare(`SELECT id FROM upload_sessions WHERE state = 'open' AND expires_at <= ?`).bind(nowIso).all<{ id: string }>();
-  for (const { id } of abandoned.results) {
-    report.deletedBlobs.push(...(await deleteAbandonedUpload(env, id)));
-    report.abandonedUploads.push(id);
-  }
-
-  report.clearedQuarantines = await clearLeftoverQuarantine(env);
   console.log('retention sweep', JSON.stringify({
     mode: env.RETENTION_MODE, expired: report.expired.length, unreferenced: report.unreferenced.length,
     abandoned: report.abandonedUploads.length, blobs: report.deletedBlobs.length, quarantines: report.clearedQuarantines.length,

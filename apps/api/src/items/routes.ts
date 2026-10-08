@@ -124,8 +124,17 @@ async function manageable(env: Env, p: Person, id: string): Promise<ItemRow | Re
 async function revokeItem(request: Request, env: Env, p: Person, id: string): Promise<Response> {
   const item = await manageable(env, p, id);
   if (item instanceof Response) return item;
-  const body = RevokeBody.safeParse(await request.json().catch(() => ({})));
-  const reason = body.success ? (body.data.reason || null) : null;
+  // No body means no reason; a body that is not JSON, or a reason that is not a short string, is refused.
+  const text = await request.text();
+  let raw: unknown = {};
+  try {
+    if (text.trim() !== '') raw = JSON.parse(text);
+  } catch {
+    return error(400, 'invalid');
+  }
+  const body = RevokeBody.safeParse(raw);
+  if (!body.success) return error(400, 'invalid', { detail: 'reason must be a string of at most 500 characters' });
+  const reason = body.data.reason || null;
   const versions = (await env.DB.prepare(`SELECT version FROM versions WHERE item_id = ?`).bind(id).all<{ version: number }>()).results;
   // Manifests first: the moment the API says "revoked", the content origin already refuses (plan D7).
   for (const v of versions) await deleteManifest(env, id, v.version);
@@ -133,6 +142,9 @@ async function revokeItem(request: Request, env: Env, p: Person, id: string): Pr
     env.DB.prepare(`UPDATE items SET revoked_at = datetime('now'), revoked_by = ?, revoke_reason = ? WHERE id = ? AND revoked_at IS NULL`).bind(p.principalId, reason, id),
     audit(env.DB, { workspaceId: p.workspaceId, actor: p.principalId, act: p.act, action: 'item.revoked', itemId: id, detail: reason ? { reason } : {} }),
   ]);
+  // And again after: an expiry change or an n+1 commit that read the item before this batch may
+  // have rewritten a manifest in between. From here on every writer sees revoked_at and deletes.
+  for (const v of versions) await deleteManifest(env, id, v.version);
   const now = await loadItem(env, id);
   return json({ revoked: true, revokedAt: isoUtc(now!.revoked_at) });
 }
@@ -148,6 +160,8 @@ async function revokeVersion(env: Env, p: Person, id: string, version: number): 
       env.DB.prepare(`UPDATE versions SET revoked_at = datetime('now'), revoked_by = ? WHERE item_id = ? AND version = ? AND revoked_at IS NULL`).bind(p.principalId, id, version),
       audit(env.DB, { workspaceId: p.workspaceId, actor: p.principalId, act: p.act, action: 'version.revoked', itemId: id, version }),
     ]);
+    // Again after the batch, for a manifest rewritten in between (see revokeItem).
+    await deleteManifest(env, id, version);
   }
   const now = await env.DB.prepare(`SELECT revoked_at FROM versions WHERE item_id = ? AND version = ?`).bind(id, version).first<{ revoked_at: string }>();
   return json({ revoked: true, version, revokedAt: isoUtc(now!.revoked_at) });
@@ -165,7 +179,8 @@ async function setExpiry(request: Request, env: Env, p: Person, id: string): Pro
     env.DB.prepare(`UPDATE items SET expires_at = ? WHERE id = ?`).bind(at, id),
     audit(env.DB, { workspaceId: p.workspaceId, actor: p.principalId, act: p.act, action: 'item.expiry_set', itemId: id, detail: { expiresAt: at } }),
   ]);
-  // Plan D7: the content Worker reads the expiry from each manifest. writeManifest skips revoked versions.
+  // Plan D7: the content Worker reads the expiry from each manifest. Only live versions are
+  // rewritten; for a revoked one writeManifest would delete the manifest, never write it.
   const live = (await env.DB.prepare(`SELECT version FROM versions WHERE item_id = ? AND revoked_at IS NULL`).bind(id).all<{ version: number }>()).results;
   for (const v of live) await writeManifest(env, id, v.version);
   return json({ item: summary((await loadItem(env, id))!) });

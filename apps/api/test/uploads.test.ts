@@ -203,3 +203,44 @@ describe('the quota counts each distinct blob once', () => {
     expect(await over.json()).toEqual({ error: 'quota_exceeded', limit: 10, used: 6 });
   });
 });
+
+describe('text that is not valid UTF-8 is still scanned (PR 2 review)', () => {
+  // An AWS access key id, built from fragments so this file never holds one whole.
+  const KEY = 'AK' + 'IA' + 'Q7X2' + 'M9P4' + 'R6T8' + 'W3Z5';
+  const sendRaw = async (path: string, bytes: Uint8Array) => {
+    const sha = await sha256Hex(bytes);
+    const created = await SELF.fetch(`${API}/api/v1/uploads`, { method: 'POST', headers: { ...devHeaders(), 'content-type': 'application/json' }, body: JSON.stringify({ title: 'raw', files: [{ path, bytes: bytes.length, sha256: sha }] }) });
+    const { uploadId } = await created.json<{ uploadId: string }>();
+    const put = await SELF.fetch(`${API}/api/v1/uploads/${uploadId}/files?path=${path}`, { method: 'PUT', headers: devHeaders(), body: bytes });
+    return { uploadId, sha, put: await put.json<{ mediaType: string; findings: Array<{ line: number; rule: string }> }>() };
+  };
+  const latin1 = (s: string) => Uint8Array.from([...s].map((c) => c.charCodeAt(0)));
+
+  it('Windows-1252 bytes with a key are quarantined', async () => {
+    // 0x93/0x94 are cp1252 curly quotes and invalid UTF-8, so this sniffs as octet-stream.
+    const bytes = latin1(`note \x93quoted\x94\nkey = ${KEY}\n`);
+    const r = await sendRaw('notes.txt', bytes);
+    expect(r.put.mediaType).toBe('application/octet-stream');
+    expect(r.put.findings).toEqual([{ line: 2, rule: 'aws-access-key' }]);
+    expect(await env.BLOBS.head(`quarantine/${r.uploadId}/${r.sha}`)).not.toBeNull();
+    expect(await env.BLOBS.head(`blobs/${r.sha}`)).toBeNull();
+  });
+
+  it('BOM-less UTF-16LE with a key is quarantined', async () => {
+    const text = `first line\nkey = ${KEY}\n`;
+    const bytes = new Uint8Array(text.length * 2);
+    [...text].forEach((c, i) => { bytes[i * 2] = c.charCodeAt(0); });
+    const r = await sendRaw('notes16.txt', bytes);
+    expect(r.put.mediaType).toBe('application/octet-stream');
+    expect(r.put.findings).toEqual([{ line: 2, rule: 'aws-access-key' }]);
+    expect(await env.BLOBS.head(`quarantine/${r.uploadId}/${r.sha}`)).not.toBeNull();
+  });
+
+  it('a recognised binary (a PNG) is not scanned, whatever bytes follow its header', async () => {
+    const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, ...latin1(`\nkey = ${KEY}\n`)]);
+    const r = await sendRaw('pic.png', png);
+    expect(r.put.mediaType).toBe('image/png');
+    expect(r.put.findings).toEqual([]);
+    expect(await env.BLOBS.head(`blobs/${r.sha}`)).not.toBeNull();
+  });
+});
