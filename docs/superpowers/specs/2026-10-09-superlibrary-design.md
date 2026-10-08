@@ -260,6 +260,8 @@ The type comes from sniffing the bytes.
    - `default-src 'none'`;
    - scripts, styles, images, fonts and media allowed from `'self'`, `data:` and `blob:`, and from
      `https://cdnjs.cloudflare.com`, `https://cdn.jsdelivr.net` and `https://unpkg.com`;
+   - inline scripts and styles allowed (`'unsafe-inline'`), so single-file pages work; `unsafe-eval`
+     and WebAssembly are not;
    - styles and fonts also allowed from `https://fonts.googleapis.com` and
      `https://fonts.gstatic.com`;
    - **`connect-src 'none'`**;
@@ -485,3 +487,4 @@ Each guard is proven by reverting it and watching its test fail.
 11. CLI name: `suli`.
 12. The viewer can be embedded in other products through a signed content URL and the
     `@superlibrary/embed` host SDK, with **Open in new window** (§9, Embedding).
+13. HTML artifacts may use inline scripts and styles. Eval and WebAssembly stay blocked.

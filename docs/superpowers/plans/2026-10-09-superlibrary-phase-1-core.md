@@ -27,7 +27,7 @@
 - Type is sniffed from the bytes, never taken from the extension (spec §8).
 - Path rules (spec §8): inside the root; `..` refused; denied by default `.env*`, `.ssh/`, `.gnupg/`, `*.pem`, `*.key`, `id_*`, `.git/` internals, `.netrc`, `.npmrc`, `.pypirc`, cloud credential files, harness config/session/token files.
 - Secret scan (spec §8): AWS, GitHub, Slack, OpenAI and Anthropic keys, signed JWTs, PEM blocks, high-entropy assignments; an artifact with a hit is refused naming file and line; a person may override one artifact; the override is recorded.
-- Content origin (spec §9): one subdomain per artifact; frame `<iframe sandbox="allow-scripts allow-popups-to-escape-sandbox" referrerpolicy="no-referrer">`; CSP `default-src 'none'`; scripts, styles, images, fonts, media from `'self' data: blob: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com`; styles and fonts also `https://fonts.googleapis.com https://fonts.gstatic.com`; `connect-src 'none'`; `frame-ancestors` from configuration, initially `https://app.superlibrary.dev https://app.superpipeline.dev https://console.agentpod.dev`; no `form-action`; signed URLs of 5 minutes for one item version, never cookies; `X-Content-Type-Options: nosniff`; `Cross-Origin-Opener-Policy: same-origin`; `Content-Disposition: attachment` for every kind not rendered; `Cross-Origin-Resource-Policy` per decision D2 below.
+- Content origin (spec §9): one subdomain per artifact; frame `<iframe sandbox="allow-scripts allow-popups-to-escape-sandbox" referrerpolicy="no-referrer">`; CSP `default-src 'none'`; scripts, styles, images, fonts, media from `'self' data: blob: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com`, plus `'unsafe-inline'` for scripts and styles (D3); styles and fonts also `https://fonts.googleapis.com https://fonts.gstatic.com`; `connect-src 'none'`; `frame-ancestors` from configuration, initially `https://app.superlibrary.dev https://app.superpipeline.dev https://console.agentpod.dev`; no `form-action`; signed URLs of 5 minutes for one item version, never cookies; `X-Content-Type-Options: nosniff`; `Cross-Origin-Opener-Policy: same-origin`; `Content-Disposition: attachment` for every kind not rendered; `Cross-Origin-Resource-Policy` per decision D2 below.
 - Retention (spec §12): artifacts referenced by a work record, card or collection are kept; any other is deleted after 30 days; deletion removes the D1 rows and the R2 bytes when no other version shares them.
 - Never put local host names or agent names in shipped code, docs or test fixtures. The product word is "workspace".
 - Secrets only through `wrangler secret put`; never in a file.
@@ -45,7 +45,7 @@ Items marked **OPERATOR** need the operator's yes; the plan implements the state
 
 - **D1 — API on the app's origin.** See Global Constraints. Pages serves `app.superlibrary.dev`; Worker routes on the same zone take precedence for `/api/*` and the protected-resource path. Task 21 Step 6 verifies it live.
 - **D2 — OPERATOR: `Cross-Origin-Resource-Policy: same-site` breaks multi-file HTML.** Measured on 2026-10-09 in Chromium (Playwright 1.61) with the spec's sandbox and CSP: with `CORP: same-site` on subresources, a sandboxed (opaque-origin) page loads **none** of its own scripts or stylesheets from its own host; module scripts additionally need `Access-Control-Allow-Origin`. With `same-site` on documents and `cross-origin` + `Access-Control-Allow-Origin: *` on everything else, classic scripts, module scripts and CSS all load. The plan does the latter. Exposure is unchanged: every byte still needs the 5-minute signed path to be fetched at all.
-- **D3 — OPERATOR: the spec's CSP blocks inline `<script>` and `<style>`.** It names no `'unsafe-inline'`, so a single-file HTML artifact with inline code, and Mermaid's injected `<style>`, are blocked. The plan ships the CSP exactly as specified (one constant, `CONTENT_CSP_SOURCES` in `packages/contract`) and the viewer itself uses no inline code. Recommendation: add `'unsafe-inline'` to `script-src` and `style-src` on the content origin — egress is still `connect-src 'none'` and the origin is opaque, so inline code gains nothing an external file from `'self'` does not already have.
+- **D3 — DECIDED (operator, 2026-10-09): inline `<script>` and `<style>` are allowed in artifacts.** `'unsafe-inline'` is added to `script-src` and `style-src` on the content origin, so single-file HTML pages and Mermaid's injected styles work. Containment does not depend on it: the origin is opaque (sandbox without `allow-same-origin`), egress is `connect-src 'none'`, and top navigation, forms and modals are not allowed. `unsafe-eval` and `wasm-unsafe-eval` stay off. The viewer's own bundle still uses no inline code.
 - **D4 — Graphviz without WebAssembly.** The CSP has no `'wasm-unsafe-eval'`, so `@viz-js/viz` cannot run. The viewer uses `viz.js@2.1.2`'s asm.js build (`full.render.js`), which is plain JavaScript.
 - **D5 — PDF through pdf.js on the main thread.** A sandboxed frame without `allow-same-origin` cannot construct a Worker from its host's URL, so `pdfjs-dist` runs its worker in-thread (`globalThis.pdfjsWorker`), with `isEvalSupported: false`.
 - **D6 — Downloads live in the host toolbar.** The sandbox has no `allow-downloads`, so the frame cannot download; `@superlibrary/embed`'s toolbar links to a signed `?download=1` URL. Folder versions have no download in phase 1 (`downloadUrl: null`); a zip of a folder is later work.
@@ -196,8 +196,8 @@ describe('content origin', () => {
     const cdn = "'self' data: blob: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com";
     expect(csp).toBe([
       "default-src 'none'",
-      `script-src ${cdn}`,
-      `style-src ${cdn} https://fonts.googleapis.com https://fonts.gstatic.com`,
+      `script-src ${cdn} 'unsafe-inline'`,
+      `style-src ${cdn} https://fonts.googleapis.com https://fonts.gstatic.com 'unsafe-inline'`,
       `img-src ${cdn}`,
       `font-src ${cdn} https://fonts.googleapis.com https://fonts.gstatic.com`,
       `media-src ${cdn}`,
@@ -205,7 +205,9 @@ describe('content origin', () => {
       'frame-ancestors https://app.superlibrary.dev https://app.superpipeline.dev',
     ].join('; '));
     expect(csp).not.toContain('form-action');
-    expect(csp).not.toContain('unsafe-inline');
+    // Operator decision D3: inline script and style are allowed; eval and WebAssembly are not.
+    expect(csp).not.toContain('unsafe-eval');
+    expect(csp).not.toContain('wasm-unsafe-eval');
   });
   it('encodes each path segment, keeping the slashes', () => {
     expect(encodePath('img/a b#1?.png')).toBe('img/a%20b%231%3F.png');
@@ -459,8 +461,8 @@ export function contentCsp(frameAncestors: string[]): string {
   const withFonts = `${cdn} ${FONTS.join(' ')}`;
   return [
     "default-src 'none'",
-    `script-src ${cdn}`,
-    `style-src ${withFonts}`,
+    `script-src ${cdn} 'unsafe-inline'`,
+    `style-src ${withFonts} 'unsafe-inline'`,
     `img-src ${cdn}`,
     `font-src ${withFonts}`,
     `media-src ${cdn}`,
@@ -3824,7 +3826,7 @@ export default defineConfig({
 import { defineConfig } from 'vite';
 
 // One bundle for every host (spec §9, Embedding), served from the content origin itself so CSP 'self'
-// covers it. No inline script: the CSP has no 'unsafe-inline' (plan D3).
+// covers it. The viewer itself uses no inline script, although the CSP allows it for artifacts (plan D3).
 export default defineConfig({
   base: '/_viewer/',
   build: {
