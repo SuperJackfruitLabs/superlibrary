@@ -1,0 +1,42 @@
+# IDE / editor
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+
+# Node
+node_modules/
+dist/
+build/
+coverage/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-error.log*
+
+# SvelteKit
+.svelte-kit/
+
+# Playwright
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+
+# Cloudflare / Wrangler
+.wrangler/
+.dev.vars
+.dev.vars.*
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# `bun build --compile` scratch files, left in the working directory by the release build.
+*.bun-build
+
+# Release artifacts built by .github/workflows/release.yml.
+/dist/

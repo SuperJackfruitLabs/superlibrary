@@ -1,0 +1,24 @@
+{
+  "name": "@superlibrary/api",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "dev": "wrangler dev --port 8787 --var DEV_AUTH:true --var ORG_PLANE_ISSUER: --var ORG_PLANE_JWKS_URL: --var ORG_PLANE_AUDIENCE: --var APP_URL:http://localhost:5173 --var CONTENT_ORIGIN_TEMPLATE:http://{label}.localhost:8788 --var EMBED_HOSTS:",
+    "deploy": "wrangler deploy",
+    "db:migrate:local": "wrangler d1 migrations apply superlibrary-catalog --local",
+    "db:migrate": "wrangler d1 migrations apply superlibrary-catalog --remote"
+  },
+  "dependencies": {
+    "@superlibrary/contract": "workspace:*",
+    "jose": "^6.2.8",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.16.18",
+    "@cloudflare/workers-types": "^4.20260619.1",
+    "wrangler": "^4.103.0"
+  }
+}

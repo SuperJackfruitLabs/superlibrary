@@ -1,0 +1,41 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "superlibrary-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-11-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true, "logs": { "enabled": true, "invocation_logs": true } },
+  // DEV_AUTH is deliberately NOT set here (Superpipeline's rule): dev headers are a full credential,
+  // opted into by `pnpm dev` and the test runner only.
+  "vars": {
+    // The Organization plane (accounts issuer contract §1). Plain vars, not secrets: they name whom to
+    // believe and grant nothing. Changed only through a merged PR.
+    "ORG_PLANE_ISSUER": "https://accounts.superjackfruit.com",
+    "ORG_PLANE_JWKS_URL": "https://accounts.superjackfruit.com/api/auth/jwks",
+    "ORG_PLANE_AUDIENCE": "https://app.superlibrary.dev",
+    // This deployment's own origin: the audience, the item links, the default frame host.
+    "APP_URL": "https://app.superlibrary.dev",
+    "CONTENT_ORIGIN_TEMPLATE": "https://{label}.superlibrarycontent.dev",
+    // Other products that may mint embed URLs from the browser (spec §9, Embedding). Must equal the
+    // content Worker's FRAME_ANCESTORS minus APP_URL; a test added with the content Worker holds the two together.
+    "EMBED_HOSTS": "https://app.superpipeline.dev https://console.agentpod.dev",
+    // Plan decision D14: "report" until phase 2 brings references; then "enforce".
+    "RETENTION_MODE": "report"
+  },
+  // URL_SIGNING_PRIVATE_KEY is a secret: `wrangler secret put URL_SIGNING_PRIVATE_KEY` (Task 21 Step 4).
+  "d1_databases": [
+    { "binding": "DB", "database_name": "superlibrary-catalog", "database_id": "00000000-0000-0000-0000-000000000000", "migrations_dir": "migrations" }
+  ],
+  "r2_buckets": [{ "binding": "BLOBS", "bucket_name": "superlibrary-blobs" }],
+  "queues": {
+    "producers": [{ "binding": "RETENTION", "queue": "superlibrary-retention" }],
+    "consumers": [{ "queue": "superlibrary-retention", "max_batch_size": 1, "max_retries": 5 }]
+  },
+  // The daily sweep enqueues one message; the consumer does the work (spec §6 `retention` queue).
+  "triggers": { "crons": ["0 3 * * *"] },
+  // Same hostname as the Pages app (plan decision D1). Declared here, not clicked in the dashboard.
+  "routes": [
+    { "pattern": "app.superlibrary.dev/api/*", "zone_name": "superlibrary.dev" },
+    { "pattern": "app.superlibrary.dev/.well-known/oauth-protected-resource", "zone_name": "superlibrary.dev" }
+  ]
+}
