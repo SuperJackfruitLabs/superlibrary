@@ -1,0 +1,146 @@
+import { createMessageBatch, createScheduledController, env, getQueueResult, createExecutionContext } from 'cloudflare:test';
+import { describe, expect, it, vi } from 'vitest';
+import worker from '../src/index';
+import type { RetentionMessage } from '../src/env';
+import { deleteItem, sweep } from '../src/lifecycle/retention';
+import { sha256Hex, upload } from './helpers/upload';
+
+const DAY = 86_400_000;
+const SECRET = 'const t = "' + 'gh' + 'p_' + 'aB3xQ9zK7mP2wR5t'.repeat(3) + '";';
+const age = (itemId: string, days: number) =>
+  env.DB.prepare(`UPDATE items SET created_at = datetime('now', ?) WHERE id = ?`).bind(`-${days} days`, itemId).run();
+const exists = async (itemId: string) => (await env.DB.prepare(`SELECT 1 FROM items WHERE id = ?`).bind(itemId).first()) !== null;
+const asMode = (mode: 'report' | 'enforce') => ({ ...env, RETENTION_MODE: mode });
+const keysUnder = async (prefix: string) => (await env.BLOBS.list({ prefix })).objects.map((o) => o.key);
+
+describe('retention sweep (spec §12, plan D14)', () => {
+  it('in report mode, an unreferenced 31-day-old artifact is kept and reported', async () => {
+    const r = await upload([{ path: 'old.txt', body: 'old report-mode' }]);
+    await age(r.body.itemId, 31);
+    const report = await sweep(asMode('report'), Date.now());
+    expect(report.unreferenced).toContain(r.body.itemId);
+    expect(report.deletedUnreferenced).toBe(false);
+    expect(await exists(r.body.itemId)).toBe(true);
+    const would = await env.DB.prepare(`SELECT actor FROM audit_events WHERE action = 'retention.would_delete' AND item_id = ?`).bind(r.body.itemId).first<{ actor: string }>();
+    expect(would?.actor).toBe('retention');
+  });
+
+  it('in enforce mode it is deleted with its bytes; a referenced one and a young one are kept', async () => {
+    const old = await upload([{ path: 'old.txt', body: 'old enforce' }]);
+    const kept = await upload([{ path: 'kept.txt', body: 'referenced' }]);
+    const young = await upload([{ path: 'young.txt', body: 'young' }]);
+    await age(old.body.itemId, 31);
+    await age(kept.body.itemId, 31);
+    await age(young.body.itemId, 29);
+    await env.DB.prepare(`INSERT INTO item_references (item_id, from_kind, from_id) VALUES (?, 'card', 'crd_0000000000000001')`).bind(kept.body.itemId).run();
+    const report = await sweep(asMode('enforce'), Date.now());
+    expect(report.deletedUnreferenced).toBe(true);
+    expect(await exists(old.body.itemId)).toBe(false);
+    expect(await env.BLOBS.head(`blobs/${old.body.sha256}`)).toBeNull();
+    expect(await env.BLOBS.head(`manifests/${old.body.itemId}/1.json`)).toBeNull();
+    expect(await exists(kept.body.itemId)).toBe(true);
+    expect(await exists(young.body.itemId)).toBe(true);
+  });
+
+  it('deleting one item keeps a blob another item still uses', async () => {
+    const a = await upload([{ path: 'a.txt', body: 'shared bytes' }]);
+    const b = await upload([{ path: 'b.txt', body: 'shared bytes' }]);
+    await env.DB.prepare(`UPDATE items SET expires_at = ? WHERE id = ?`).bind(new Date(Date.now() - 1000).toISOString(), a.body.itemId).run();
+    await sweep(asMode('report'), Date.now());
+    expect(await exists(a.body.itemId)).toBe(false);
+    expect(await env.BLOBS.head(`blobs/${b.body.sha256}`)).not.toBeNull();
+  });
+
+  it('deleteItem removes every row of an item with versions, files and references, children first', async () => {
+    const r = await upload([{ path: 'x/a.txt', body: 'fk one' }, { path: 'x/b.txt', body: 'fk two' }]);
+    await upload([{ path: 'a.txt', body: 'fk three' }], { item: r.body.itemId });
+    await env.DB.prepare(`INSERT INTO item_references (item_id, from_kind, from_id) VALUES (?, 'collection', 'col_0000000000000001')`).bind(r.body.itemId).run();
+    const gone = await deleteItem(env, r.body.itemId, 'retention', 'test');
+    expect(gone).toHaveLength(3);
+    for (const t of ['versions', 'version_files', 'item_references']) {
+      expect(await env.DB.prepare(`SELECT 1 FROM ${t} WHERE item_id = ?`).bind(r.body.itemId).first()).toBeNull();
+    }
+    expect(await exists(r.body.itemId)).toBe(false);
+    expect(await keysUnder(`manifests/${r.body.itemId}/`)).toEqual([]);
+  });
+
+  it('expired items and abandoned uploads go in either mode; a second sweep changes nothing', async () => {
+    const r = await upload([{ path: 'x.txt', body: 'expires' }], { expiresAt: new Date(Date.now() + 60_000).toISOString() });
+    const abandoned = await upload([{ path: 'y.txt', body: 'never committed' }], { commit: false });
+    const report = await sweep(asMode('report'), Date.now() + 2 * DAY);
+    expect(report.expired).toContain(r.body.itemId);
+    expect(report.abandonedUploads).toContain(abandoned.uploadId);
+    expect(await env.DB.prepare(`SELECT 1 FROM upload_sessions WHERE id = ?`).bind(abandoned.uploadId).first()).toBeNull();
+    expect(report.deletedBlobs).toContain(await sha256Hex('never committed'));
+    const again = await sweep(asMode('report'), Date.now() + 2 * DAY);
+    expect(again.expired).toEqual([]);
+    expect(again.abandonedUploads).toEqual([]);
+    const audited = await env.DB.prepare(`SELECT actor FROM audit_events WHERE action = 'item.deleted' AND item_id = ?`).bind(r.body.itemId).first<{ actor: string }>();
+    expect(audited?.actor).toBe('retention');
+  });
+
+  it('the cron enqueues one sweep; the consumer runs it and acks', async () => {
+    const send = vi.fn();
+    const ctl = createScheduledController({ scheduledTime: Date.UTC(2026, 9, 9, 3), cron: '0 3 * * *' });
+    await worker.scheduled!(ctl, { ...env, RETENTION: { send } as unknown as Queue<RetentionMessage> }, createExecutionContext());
+    expect(send).toHaveBeenCalledWith({ type: 'sweep', at: '2026-10-09T03:00:00.000Z' });
+    const batch = createMessageBatch<RetentionMessage>('superlibrary-retention', [{ id: 'm1', timestamp: new Date(), attempts: 1, body: { type: 'sweep', at: '2026-10-09T03:00:00.000Z' } }]);
+    const ctx = createExecutionContext();
+    await worker.queue!(batch, env, ctx);
+    expect((await getQueueResult(batch, ctx)).explicitAcks).toEqual(['m1']);
+  });
+});
+
+describe('quarantine is emptied for every session that is over (rulings T7/T8, T10)', () => {
+  it('an abandoned session’s flagged bytes go with it, its rows too', async () => {
+    const s = await upload([{ path: 'a.ts', body: `abandoned\n${SECRET}` }], { commit: false });
+    expect(await keysUnder(`quarantine/${s.uploadId}/`)).toHaveLength(1);
+    const report = await sweep(asMode('report'), Date.now() + 2 * DAY);
+    expect(report.abandonedUploads).toContain(s.uploadId);
+    expect(await keysUnder(`quarantine/${s.uploadId}/`)).toEqual([]);
+    expect(await env.DB.prepare(`SELECT 1 FROM secret_findings WHERE session_id = ?`).bind(s.uploadId).first()).toBeNull();
+    expect(await env.DB.prepare(`SELECT 1 FROM upload_files WHERE session_id = ?`).bind(s.uploadId).first()).toBeNull();
+  });
+
+  it('a live session’s quarantine is left alone', async () => {
+    const s = await upload([{ path: 'a.ts', body: `live\n${SECRET}` }], { commit: false });
+    const report = await sweep(asMode('report'), Date.now());
+    expect(report.abandonedUploads).not.toContain(s.uploadId);
+    expect(report.clearedQuarantines).not.toContain(s.uploadId);
+    expect(await keysUnder(`quarantine/${s.uploadId}/`)).toHaveLength(1);
+  });
+
+  it('a committed session’s leftover quarantine is cleared without losing the version’s bytes', async () => {
+    const body = `committed\n${SECRET}`;
+    const sha = await sha256Hex(body);
+    const c = await upload([{ path: 'a.ts', body }], { override: 'fixture' });
+    expect(c.status).toBe(201);
+    // A crash between the commit batch and publish: the bytes are still only in quarantine.
+    await env.BLOBS.put(`quarantine/${c.uploadId}/${sha}`, body);
+    await env.BLOBS.delete(`blobs/${sha}`);
+    const report = await sweep(asMode('report'), Date.now());
+    expect(report.clearedQuarantines).toContain(c.uploadId);
+    expect(await keysUnder(`quarantine/${c.uploadId}/`)).toEqual([]);
+    expect(await (await env.BLOBS.get(`blobs/${sha}`))!.text()).toBe(body);
+    // Still committed: the session's record stays.
+    expect(await env.DB.prepare(`SELECT state FROM upload_sessions WHERE id = ?`).bind(c.uploadId).first<{ state: string }>()).toEqual({ state: 'committed' });
+  });
+
+  it('bytes in a committed session’s quarantine that its version does not hold are not published', async () => {
+    const c = await upload([{ path: 'a.txt', body: 'clean committed' }]);
+    const stray = await sha256Hex('stray, never in the version');
+    await env.BLOBS.put(`quarantine/${c.uploadId}/${stray}`, 'stray, never in the version');
+    await sweep(asMode('report'), Date.now());
+    expect(await keysUnder(`quarantine/${c.uploadId}/`)).toEqual([]);
+    expect(await env.BLOBS.head(`blobs/${stray}`)).toBeNull();
+  });
+
+  it('quarantine of a session that no longer exists is deleted', async () => {
+    const key = `quarantine/upl_00000000000000ff/${'0'.repeat(64)}`;
+    await env.BLOBS.put(key, 'orphan');
+    const report = await sweep(asMode('report'), Date.now());
+    expect(report.clearedQuarantines).toContain('upl_00000000000000ff');
+    expect(await env.BLOBS.head(key)).toBeNull();
+    expect(await env.BLOBS.head(`blobs/${'0'.repeat(64)}`)).toBeNull();
+  });
+});

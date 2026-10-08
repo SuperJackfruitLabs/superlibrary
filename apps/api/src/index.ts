@@ -8,6 +8,7 @@ import { protectedResourceMetadata } from './auth/org-plane';
 import { error, json, type Handler } from './http';
 import { uploadRoutes } from './uploads/routes';
 import { itemRoutes } from './items/routes';
+import { sweep } from './lifecycle/retention';
 
 const handlers: Handler[] = [uploadRoutes, itemRoutes];
 
@@ -36,8 +37,16 @@ export default {
       return error(500, 'unexpected');
     }
   },
-  async queue(batch: MessageBatch<RetentionMessage>, _env: Env) {
-    for (const m of batch.messages) m.ack();
+  async queue(batch: MessageBatch<RetentionMessage>, env: Env, _ctx: ExecutionContext) {
+    for (const m of batch.messages) {
+      // Idempotent: a duplicate delivery finds nothing left to do (spec §6). A sweep that throws
+      // is not acked, so the queue retries it.
+      if (m.body?.type === 'sweep') await sweep(env, Date.now());
+      m.ack();
+    }
   },
-  async scheduled(_c: ScheduledController, _env: Env) {},
+  /** The daily cron only enqueues; the consumer does the work (spec §6 `retention` queue). */
+  async scheduled(c: ScheduledController, env: Env, _ctx: ExecutionContext) {
+    await env.RETENTION.send({ type: 'sweep', at: new Date(c.scheduledTime).toISOString() });
+  },
 } satisfies ExportedHandler<Env, RetentionMessage>;

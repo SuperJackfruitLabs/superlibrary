@@ -1,9 +1,11 @@
-import { LIMITS, encodePath, orderFiles, type EmbedGrant, type FileEntry, type ItemSummary, type VersionSummary, type View } from '@superlibrary/contract';
+import { z } from 'zod';
+import { LIMITS, SCOPE_RE, encodePath, orderFiles, type EmbedGrant, type FileEntry, type ItemSummary, type VersionSummary, type View } from '@superlibrary/contract';
 import type { Env } from '../env';
 import { error, json, type Handler } from '../http';
 import { audit } from '../audit';
 import { resolvePerson, type Person } from '../auth/caller';
-import { VISIBLE_SQL, canSee, isExpired, loadItem, type ItemRow } from './visibility';
+import { VISIBLE_SQL, canManage, canSee, isExpired, loadItem, type ItemRow } from './visibility';
+import { deleteManifest, writeManifest } from '../storage/blobs';
 import { contentOrigin, signContent } from './sign';
 import { isoUtc } from '../time';
 
@@ -103,7 +105,93 @@ async function embed(request: Request, env: Env, p: Person, id: string): Promise
   return json(grant);
 }
 
-const ITEM = /^\/api\/v1\/items\/(itm_[0-9a-f]{16})(\/embed)?$/;
+const RevokeBody = z.object({ reason: z.string().trim().max(500).optional() });
+const PatchBody = z.object({ expiresAt: z.iso.datetime().nullable() });
+const ScopeBody = z.object({ scope: z.string().regex(SCOPE_RE) });
+
+/**
+ * The item the caller may revoke, expire or widen (plan D12: the uploader or an owner), or the
+ * refusal. Not `readable`: an expired item can still be managed. Invisible is 404 (plan D11).
+ */
+async function manageable(env: Env, p: Person, id: string): Promise<ItemRow | Response> {
+  const item = await loadItem(env, id);
+  if (!item || !canSee(p, item)) return error(404, 'not_found');
+  if (!canManage(p, item)) return error(403, 'not_permitted');
+  if (item.revoked_at) return error(410, 'revoked');
+  return item;
+}
+
+async function revokeItem(request: Request, env: Env, p: Person, id: string): Promise<Response> {
+  const item = await manageable(env, p, id);
+  if (item instanceof Response) return item;
+  const body = RevokeBody.safeParse(await request.json().catch(() => ({})));
+  const reason = body.success ? (body.data.reason || null) : null;
+  const versions = (await env.DB.prepare(`SELECT version FROM versions WHERE item_id = ?`).bind(id).all<{ version: number }>()).results;
+  // Manifests first: the moment the API says "revoked", the content origin already refuses (plan D7).
+  for (const v of versions) await deleteManifest(env, id, v.version);
+  await env.DB.batch([
+    env.DB.prepare(`UPDATE items SET revoked_at = datetime('now'), revoked_by = ?, revoke_reason = ? WHERE id = ? AND revoked_at IS NULL`).bind(p.principalId, reason, id),
+    audit(env.DB, { workspaceId: p.workspaceId, actor: p.principalId, act: p.act, action: 'item.revoked', itemId: id, detail: reason ? { reason } : {} }),
+  ]);
+  const now = await loadItem(env, id);
+  return json({ revoked: true, revokedAt: isoUtc(now!.revoked_at) });
+}
+
+async function revokeVersion(env: Env, p: Person, id: string, version: number): Promise<Response> {
+  const item = await manageable(env, p, id);
+  if (item instanceof Response) return item;
+  const v = await env.DB.prepare(`SELECT revoked_at FROM versions WHERE item_id = ? AND version = ?`).bind(id, version).first<{ revoked_at: string | null }>();
+  if (!v) return error(404, 'not_found');
+  await deleteManifest(env, id, version);
+  if (!v.revoked_at) {
+    await env.DB.batch([
+      env.DB.prepare(`UPDATE versions SET revoked_at = datetime('now'), revoked_by = ? WHERE item_id = ? AND version = ? AND revoked_at IS NULL`).bind(p.principalId, id, version),
+      audit(env.DB, { workspaceId: p.workspaceId, actor: p.principalId, act: p.act, action: 'version.revoked', itemId: id, version }),
+    ]);
+  }
+  const now = await env.DB.prepare(`SELECT revoked_at FROM versions WHERE item_id = ? AND version = ?`).bind(id, version).first<{ revoked_at: string }>();
+  return json({ revoked: true, version, revokedAt: isoUtc(now!.revoked_at) });
+}
+
+async function setExpiry(request: Request, env: Env, p: Person, id: string): Promise<Response> {
+  const item = await manageable(env, p, id);
+  if (item instanceof Response) return item;
+  const body = PatchBody.safeParse(await request.json().catch(() => null));
+  if (!body.success) return error(400, 'invalid');
+  // One stored form, as upload declare stores it.
+  const at = body.data.expiresAt === null ? null : new Date(body.data.expiresAt).toISOString();
+  if (at !== null && Date.parse(at) <= Date.now()) return error(400, 'invalid', { detail: 'expiresAt must be in the future' });
+  await env.DB.batch([
+    env.DB.prepare(`UPDATE items SET expires_at = ? WHERE id = ?`).bind(at, id),
+    audit(env.DB, { workspaceId: p.workspaceId, actor: p.principalId, act: p.act, action: 'item.expiry_set', itemId: id, detail: { expiresAt: at } }),
+  ]);
+  // Plan D7: the content Worker reads the expiry from each manifest. writeManifest skips revoked versions.
+  const live = (await env.DB.prepare(`SELECT version FROM versions WHERE item_id = ? AND revoked_at IS NULL`).bind(id).all<{ version: number }>()).results;
+  for (const v of live) await writeManifest(env, id, v.version);
+  return json({ item: summary((await loadItem(env, id))!) });
+}
+
+/**
+ * Spec §4: widening to `workspace` is a person's act, recorded (agents and services never get
+ * here, plan D13). Narrowing is refused in phase 1: who already saw it cannot be undone, and a
+ * board check needs phase 3. Manifests carry no scope, so none is rewritten.
+ */
+async function widenScope(request: Request, env: Env, p: Person, id: string): Promise<Response> {
+  const item = await manageable(env, p, id);
+  if (item instanceof Response) return item;
+  const body = ScopeBody.safeParse(await request.json().catch(() => null));
+  if (!body.success) return error(400, 'invalid');
+  if (body.data.scope !== 'workspace') return error(400, 'invalid', { detail: 'scope can only be widened to workspace' });
+  if (item.scope !== 'workspace') {
+    await env.DB.batch([
+      env.DB.prepare(`UPDATE items SET scope = 'workspace' WHERE id = ?`).bind(id),
+      audit(env.DB, { workspaceId: p.workspaceId, actor: p.principalId, act: p.act, action: 'item.scope_changed', itemId: id, detail: { from: item.scope, to: 'workspace' } }),
+    ]);
+  }
+  return json({ item: summary((await loadItem(env, id))!) });
+}
+
+const ITEM = /^\/api\/v1\/items\/(itm_[0-9a-f]{16})(\/embed|\/revoke|\/scope|\/versions\/([1-9][0-9]{0,8})\/revoke)?$/;
 
 export const itemRoutes: Handler = async (request, env, _ctx, url) => {
   if (url.pathname === '/api/v1/items' && request.method === 'GET') {
@@ -130,5 +218,9 @@ export const itemRoutes: Handler = async (request, env, _ctx, url) => {
     for (const [k, v] of Object.entries(corsFor(request, env))) res.headers.set(k, v);
     return res;
   }
+  if (!sub && request.method === 'PATCH') return setExpiry(request, env, p, id);
+  if (sub === '/revoke' && request.method === 'POST') return revokeItem(request, env, p, id);
+  if (sub === '/scope' && request.method === 'POST') return widenScope(request, env, p, id);
+  if (sub?.startsWith('/versions/') && request.method === 'POST') return revokeVersion(env, p, id, Number(m[3]));
   return null;
 };
