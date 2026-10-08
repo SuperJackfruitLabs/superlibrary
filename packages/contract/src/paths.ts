@@ -7,7 +7,7 @@
 export type PathRefusal = 'empty' | 'too_long' | 'control_character' | 'backslash' | 'absolute' | 'parent' | 'denied';
 export type PathCheck = { ok: true; path: string } | { ok: false; path: string; reason: PathRefusal; rule?: string };
 
-const lower = (s: string) => s.toLowerCase();
+const lower = (s: string) => s.toLowerCase().replace(/[. ]+$/, '');
 const anySeg = (pred: (s: string) => boolean) => (segs: string[]) => segs.some((s) => pred(lower(s)));
 const dirSeg = (name: string) => (segs: string[]) => segs.slice(0, -1).some((s) => lower(s) === name);
 const base = (pred: (s: string) => boolean) => (segs: string[]) => pred(lower(segs[segs.length - 1]!));

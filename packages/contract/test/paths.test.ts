@@ -32,4 +32,18 @@ describe('checkPath (spec §8 path rules)', () => {
       expect(checkPath(p), p).toMatchObject({ ok: false, reason: 'denied' });
     }
   });
+
+  it('refuses trailing dots and spaces that defeat exact-name and suffix rules', () => {
+    // Trailing dots and spaces match secret files on Windows/NTFS
+    expect(checkPath('.npmrc.'), '.npmrc.').toMatchObject({ ok: false, reason: 'denied', rule: '.npmrc' });
+    expect(checkPath('x.pem '), 'x.pem ').toMatchObject({ ok: false, reason: 'denied', rule: '*.pem' });
+    expect(checkPath('.git./config'), '.git./config').toMatchObject({ ok: false, reason: 'denied', rule: '.git/' });
+    expect(checkPath('.ssh /k'), '.ssh /k').toMatchObject({ ok: false, reason: 'denied', rule: '.ssh/' });
+  });
+
+  it('accepts ordinary names with trailing dots or spaces', () => {
+    // Non-secret files are accepted even with trailing dots/spaces
+    expect(checkPath('notes.'), 'notes.').toMatchObject({ ok: true });
+    expect(checkPath('report .md'), 'report .md').toMatchObject({ ok: true });
+  });
 });
