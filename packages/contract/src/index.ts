@@ -3,3 +3,4 @@ export * from './model';
 export * from './limits';
 export * from './content';
 export * from './paths';
+export * from './viewer';

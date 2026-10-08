@@ -1,0 +1,15 @@
+{
+  // Local dev and e2e (`pnpm dev`): wrangler.jsonc without "routes", so `itm-<hex>.localhost` reaches
+  // the Worker under its own name. Keep everything else identical (packages/contract/test/repo-invariants.test.ts).
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "superlibrary-content",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-11-01",
+  "observability": { "enabled": true, "logs": { "enabled": true, "invocation_logs": true } },
+  "vars": {
+    "FRAME_ANCESTORS": "https://app.superlibrary.dev https://app.superpipeline.dev https://console.agentpod.dev",
+    "CONTENT_DOMAIN": "superlibrarycontent.dev"
+  },
+  "r2_buckets": [{ "binding": "BLOBS", "bucket_name": "superlibrary-blobs" }],
+  "assets": { "directory": "./viewer-dist", "binding": "VIEWER", "run_worker_first": true }
+}

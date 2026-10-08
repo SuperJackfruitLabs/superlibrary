@@ -1,0 +1,23 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "superlibrary-content",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-11-01",
+  "observability": { "enabled": true, "logs": { "enabled": true, "invocation_logs": true } },
+  // Spec §6: R2 read-only and the verification half of the signing key. No D1, no secrets, no API.
+  "vars": {
+    // Who may frame the content origin (spec §9, Embedding): configuration, not code. Must equal the
+    // API's APP_URL + EMBED_HOSTS (packages/contract/test/repo-invariants.test.ts).
+    "FRAME_ANCESTORS": "https://app.superlibrary.dev https://app.superpipeline.dev https://console.agentpod.dev",
+    "CONTENT_DOMAIN": "superlibrarycontent.dev"
+  },
+  // URL_SIGNING_PUBLIC_KEY (the verification half) is set with `wrangler secret put` by Task 21
+  // Step 4, together with the API's private half. It is not a credential, but a var and a secret
+  // cannot share a name, and keeping both halves on one path means one rotation command.
+  "r2_buckets": [{ "binding": "BLOBS", "bucket_name": "superlibrary-blobs" }],
+  // The viewer bundle (Tasks 12-13). The Worker runs first for every request and adds its own headers.
+  "assets": { "directory": "./viewer-dist", "binding": "VIEWER", "run_worker_first": true },
+  // wrangler.dev.jsonc is this file without "routes" (a repo invariant holds them equal): under
+  // `wrangler dev` a route rewrites every local host to the zone, which would 404 every itm-* host.
+  "routes": [{ "pattern": "*.superlibrarycontent.dev/*", "zone_name": "superlibrarycontent.dev" }]
+}

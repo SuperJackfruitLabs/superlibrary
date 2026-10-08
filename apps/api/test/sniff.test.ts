@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { sniff } from '../src/guard/sniff';
+import { decodeText, sniff } from '../src/guard/sniff';
 
 const bytes = (...xs: number[]) => new Uint8Array(xs);
 const text = (s: string) => new TextEncoder().encode(s);
@@ -72,4 +72,30 @@ describe('text', () => {
     ['run.log', 'text', 'text/plain; charset=utf-8'],
     ['frag.html', 'code', 'text/plain; charset=utf-8'],
   ])('%s → %s', (path, view, mediaType) => expect(sniff(text('plain words\n'), path)).toMatchObject({ view, mediaType }));
+});
+
+// Ruling T11: this file runs in workerd, so it answers whether its TextDecoder knows utf-16be.
+describe('decodeText in the Workers runtime', () => {
+  const s = 'héllo ✓ 𝄞 – done\n';
+  const utf16 = (bom: number[], order: 'le' | 'be') => {
+    const b = new Uint8Array(2 + s.length * 2);
+    b.set(bom);
+    for (let i = 0; i < s.length; i++) {
+      const c = s.charCodeAt(i);
+      b.set(order === 'le' ? [c & 0xff, c >> 8] : [c >> 8, c & 0xff], 2 + i * 2);
+    }
+    return b;
+  };
+  it('round-trips UTF-16LE, dropping the BOM', () => expect(decodeText(utf16([0xff, 0xfe], 'le'), 'utf-16le')).toBe(s));
+  it('round-trips UTF-16BE, dropping the BOM', () => expect(decodeText(utf16([0xfe, 0xff], 'be'), 'utf-16be')).toBe(s));
+  it('round-trips UTF-8 with and without a BOM', () => {
+    expect(decodeText(new Uint8Array([0xef, 0xbb, 0xbf, ...text(s)]), 'utf-8')).toBe(s);
+    expect(decodeText(text(s), 'utf-8')).toBe(s);
+  });
+  it('sniff and decodeText agree on a UTF-16BE file', () => {
+    const b = utf16([0xfe, 0xff], 'be');
+    const k = sniff(b, 'a.txt');
+    expect(k).toMatchObject({ text: true, encoding: 'utf-16be', mediaType: 'text/plain; charset=utf-16be' });
+    expect(decodeText(b, k.encoding!)).toBe(s);
+  });
 });

@@ -40,3 +40,6 @@ playwright/.cache/
 
 # Release artifacts built by .github/workflows/release.yml.
 /dist/
+
+# The content Worker's built viewer bundle (apps/content: pnpm build:viewer).
+viewer-dist/

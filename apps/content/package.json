@@ -1,0 +1,20 @@
+{
+  "name": "@superlibrary/content",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:viewer": "vite build -c viewer/vite.config.ts",
+    "test": "pnpm build:viewer && vitest run",
+    "typecheck": "tsc --noEmit",
+    "dev": "pnpm build:viewer && wrangler dev -c wrangler.dev.jsonc --port 8788 --var CONTENT_DOMAIN:localhost --var FRAME_ANCESTORS:http://localhost:5173",
+    "deploy": "pnpm build:viewer && wrangler deploy"
+  },
+  "dependencies": { "@superlibrary/contract": "workspace:*" },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.16.18",
+    "@cloudflare/workers-types": "^4.20260619.1",
+    "vite": "^8.0.16",
+    "wrangler": "^4.103.0"
+  }
+}
