@@ -5,16 +5,23 @@
   "type": "module",
   "scripts": {
     "build:viewer": "vite build -c viewer/vite.config.ts",
-    "test": "pnpm build:viewer && vitest run",
-    "typecheck": "tsc --noEmit",
+    "test": "pnpm build:viewer && vitest run && vitest run -c viewer/vitest.config.ts",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p viewer",
     "dev": "pnpm build:viewer && wrangler dev -c wrangler.dev.jsonc --port 8788 --var CONTENT_DOMAIN:localhost --var FRAME_ANCESTORS:http://localhost:5173",
     "deploy": "pnpm build:viewer && wrangler deploy"
   },
-  "dependencies": { "@superlibrary/contract": "workspace:*" },
+  "dependencies": {
+    "@superlibrary/contract": "workspace:*",
+    "highlight.js": "^11.12.0",
+    "smol-toml": "^1.9.0",
+    "yaml": "^2.9.1"
+  },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.16.18",
     "@cloudflare/workers-types": "^4.20260619.1",
+    "jsdom": "^30.1.2",
     "vite": "^8.0.16",
+    "vitest": "^4.1.11",
     "wrangler": "^4.103.0"
   }
 }

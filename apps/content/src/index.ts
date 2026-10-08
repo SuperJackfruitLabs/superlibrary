@@ -3,7 +3,7 @@
  * valid signed URL only. No credentials of any kind, no API, no database (spec §6). R2 is read
  * through a type that has no write methods (plan D8).
  */
-import { TEXT_VIEWS, encodePath, itemIdFromLabel, parseToken, signingMessage, type Manifest, type ViewerData } from '@superlibrary/contract';
+import { SOURCE_VIEWS, TEXT_VIEWS, encodePath, itemIdFromLabel, parseToken, signingMessage, type Manifest, type ViewerData } from '@superlibrary/contract';
 import { cacheUntil, documentHeaders, frameAncestors, subresourceHeaders, unconfiguredHeaders } from './headers';
 import { viewerPage } from './viewer-page';
 
@@ -87,9 +87,11 @@ function base64(bytes: ArrayBuffer): string {
   return btoa(s);
 }
 
-async function viewerData(env: Env, f: ManifestFile, path: string, baseUrl: string, host: string): Promise<ViewerData | Response> {
+/** `source`: the caller has checked SOURCE_VIEWS; the text is inlined to be shown as source. */
+async function viewerData(env: Env, f: ManifestFile, path: string, baseUrl: string, host: string, source: boolean): Promise<ViewerData | Response> {
   const d: ViewerData = { view: f.view, path, name: nameOf(path), mediaType: f.mediaType, bytes: f.bytes, sha256: f.sha256, rawUrl: baseUrl + encodePath(path), baseUrl, host };
-  if (TEXT_VIEWS.has(f.view) || f.view === 'pdf') {
+  if (source) d.source = true;
+  if (source || TEXT_VIEWS.has(f.view) || f.view === 'pdf') {
     const obj = await env.BLOBS.get(`blobs/${f.sha256}`);
     if (!obj) return refuse(env, 410, 'gone');
     const bytes = await obj.arrayBuffer();
@@ -191,15 +193,21 @@ async function serve(request: Request, env: Env): Promise<Response> {
     if (g instanceof Response) return g;
     const m = await manifestOf(env, itemId, g.version);
     if (m instanceof Response) return m;
-    const entry = fileOf(m, m.entry);
-    if (!entry) return refuse(env, 404, 'not_found');
-    if (entry.view === 'html') {
+    // Operator: the host's Files list opens any file of the version (`path`, decoded once by
+    // URLSearchParams, own keys only), and its toolbar can ask for the source of a text-backed one.
+    const path = url.searchParams.get('path') ?? m.entry;
+    const source = url.searchParams.get('source') === '1';
+    const f = fileOf(m, path);
+    if (!f) return refuse(env, 404, 'not_found');
+    if (source) {
+      if (!SOURCE_VIEWS.has(f.view)) return refuse(env, 404, 'not_found');
+    } else if (f.view === 'html') {
       // Plan D9: the artifact's own page, under the signed path so its relative files resolve.
       const headers = documentHeaders(env, 'text/plain; charset=utf-8');
-      headers.set('Location', `/s/${token}/${encodePath(m.entry)}`);
+      headers.set('Location', `/s/${token}/${encodePath(path)}`);
       return new Response(null, { status: 302, headers });
     }
-    const d = await viewerData(env, entry, m.entry, `${url.origin}/s/${token}/`, g.host);
+    const d = await viewerData(env, f, path, `${url.origin}/s/${token}/`, g.host, source);
     if (d instanceof Response) return d;
     return new Response(request.method === 'HEAD' ? null : viewerPage(d), { headers: cacheUntil(documentHeaders(env, 'text/html; charset=utf-8'), g.exp) });
   }

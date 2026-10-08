@@ -359,3 +359,70 @@ describe('the content origin never serves anything with a login (operator)', () 
     }
   });
 });
+
+describe('the host toolbar drives the frame (operator)', () => {
+  const PNG = { body: new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), mediaType: 'image/png', view: 'image' as const };
+  const CODE = { body: 'const a = 1;\n', mediaType: 'text/plain; charset=utf-8', view: 'code' as const };
+  const view = async (itemId: string, q: string) => get(itemId, `/_view?${q}`, { redirect: 'manual' });
+
+  it('?path= renders that file of the version, by the same view rules', async () => {
+    await seed(ITEM, 40, { 'README.md': MD, 'src/a b#1.ts': CODE, 'site/index.html': HTML, 'p.png': PNG }, 'README.md');
+    const t = await token(ITEM, 40);
+    const base = `https://${contentLabel(ITEM)}.content.test/s/${t}/`;
+    const code = await view(ITEM, `sig=${t}&path=${encodeURIComponent('src/a b#1.ts')}`);
+    expect(code.status).toBe(200);
+    expect(code.headers.get('content-security-policy')).toBe(DOCUMENT_CSP);
+    expect(dataOf(await code.text())).toMatchObject({ view: 'code', path: 'src/a b#1.ts', name: 'a b#1.ts', text: CODE.body, rawUrl: `${base}src/a%20b%231.ts` });
+    const png = dataOf(await (await view(ITEM, `sig=${t}&path=p.png`)).text());
+    expect(png).toMatchObject({ view: 'image', path: 'p.png', rawUrl: `${base}p.png` });
+    expect(png.text).toBeUndefined();
+    // No path is the entry, as before.
+    expect(dataOf(await (await view(ITEM, `sig=${t}`)).text()).path).toBe('README.md');
+  });
+
+  it('?path= to an HTML file redirects into the signed path, like an HTML entry', async () => {
+    const t = await token(ITEM, 40);
+    const res = await view(ITEM, `sig=${t}&path=site%2Findex.html`);
+    expect(res.status).toBe(302);
+    expect(res.headers.get('location')).toBe(`/s/${t}/site/index.html`);
+  });
+
+  it('?path= is decoded once and must be an own file of the version; anything else is 404', async () => {
+    await seed(ITEM, 41, { 'A.md': { ...MD, body: 'plain A' }, '%41.md': { ...MD, body: 'literal percent' } }, 'A.md');
+    const t = await token(ITEM, 41);
+    expect(dataOf(await (await view(ITEM, `sig=${t}&path=%2541.md`)).text())).toMatchObject({ path: '%41.md', text: 'literal percent' });
+    for (const p of ['nope.md', '', 'constructor', '__proto__', 'toString', '..%2FA.md', '%2FA.md']) {
+      const res = await view(ITEM, `sig=${t}&path=${p}`);
+      expect(res.status, p).toBe(404);
+      expect(await res.json(), p).toEqual({ error: 'not_found' });
+    }
+  });
+
+  it('?source=1 shows the raw text of a text-backed kind in the viewer, HTML included, still sandboxed', async () => {
+    await seed(ITEM, 42, { 'index.html': HTML, 'd.svg': SVG, 'n.md': MD, 'd.csv': { body: 'a,b\n1,2\n', mediaType: 'text/csv; charset=utf-8', view: 'csv' } }, 'index.html');
+    const t = await token(ITEM, 42);
+    const html = await view(ITEM, `sig=${t}&source=1`);
+    expect(html.status).toBe(200); // not the 302 an HTML entry otherwise gets
+    expect(html.headers.get('content-type')).toBe('text/html; charset=utf-8');
+    expect(html.headers.get('content-security-policy')).toBe(DOCUMENT_CSP);
+    const body = await html.text();
+    expect(dataOf(body)).toMatchObject({ view: 'html', path: 'index.html', source: true, text: HTML.body });
+    expect(body).not.toContain('<p>app</p>'); // the page's markup travels only inside the JSON data block
+    for (const [p, text] of [['d.svg', SVG.body], ['n.md', MD.body], ['d.csv', 'a,b\n1,2\n']]) {
+      expect(dataOf(await (await view(ITEM, `sig=${t}&source=1&path=${p}`)).text()), p).toMatchObject({ path: p, source: true, text });
+    }
+  });
+
+  it('?source=1 on a kind with no text is 404; any other source value is the normal view', async () => {
+    await seed(ITEM, 43, { 'p.png': PNG, 'a.pdf': { body: '%PDF-1.4\n', mediaType: 'application/pdf', view: 'pdf' }, 'a.docx': DOCX, 'n.md': MD }, 'n.md');
+    const t = await token(ITEM, 43);
+    for (const p of ['p.png', 'a.pdf', 'a.docx']) {
+      const res = await view(ITEM, `sig=${t}&source=1&path=${p}`);
+      expect(res.status, p).toBe(404);
+    }
+    for (const q of ['source=0', 'source=true', 'source=']) {
+      const d = dataOf(await (await view(ITEM, `sig=${t}&${q}`)).text());
+      expect(d.source, q).toBeUndefined();
+    }
+  });
+});

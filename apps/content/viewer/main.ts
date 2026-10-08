@@ -1,9 +1,18 @@
+import 'highlight.js/styles/github.css';
 import './viewer.css';
+import type { ViewerData } from '@superlibrary/contract';
+import { h } from './dom';
+import { applyTheme, listenForTheme, reportHeight, themeFromQuery } from './protocol';
+import { render } from './render';
 
-const data = JSON.parse(document.getElementById('sl-data')!.textContent!) as { name: string; mediaType: string; bytes: number; sha256: string };
-const card = document.createElement('dl');
-card.className = 'card';
-for (const [k, v] of [['Name', data.name], ['Type', data.mediaType], ['Size', `${data.bytes} bytes`], ['SHA-256', data.sha256]]) {
-  card.append(Object.assign(document.createElement('dt'), { textContent: k }), Object.assign(document.createElement('dd'), { textContent: v }));
-}
-document.getElementById('app')!.replaceChildren(card);
+const data = JSON.parse(document.getElementById('sl-data')!.textContent!) as ViewerData;
+const app = document.getElementById('app')!;
+// No theme in the URL and no message from the host: the system's (the stylesheet's default).
+const initial = themeFromQuery(location.search);
+if (initial) applyTheme(initial);
+listenForTheme(data.host, (theme) => applyTheme(theme));
+render(app, data)
+  .catch((e: unknown) => {
+    app.replaceChildren(h('p', { class: 'note' }, `This file could not be shown: ${e instanceof Error ? e.message : String(e)}`));
+  })
+  .finally(() => reportHeight(data.host));
