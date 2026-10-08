@@ -22,7 +22,7 @@ describe('ids', () => {
 describe('model', () => {
   it('accepts workspace and board scopes only', () => {
     expect(SCOPE_RE.test('workspace')).toBe(true);
-    expect(SCOPE_RE.test('board:brd_f47143722126442c')).toBe(true);
+    expect(SCOPE_RE.test('board:brd_00000000000000b1')).toBe(true);
     expect(SCOPE_RE.test('board:anything')).toBe(false);
     expect(SCOPE_RE.test('public')).toBe(false);
   });

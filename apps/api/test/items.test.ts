@@ -27,7 +27,7 @@ describe('visibility (spec §4 as it applies to people in phase 1)', () => {
   });
 
   it('a board-scoped item is visible only to its uploader until phase 3 (plan D11)', async () => {
-    const r = await upload([{ path: 'b.md', body: '# b' }], { scope: 'board:brd_f47143722126442c' });
+    const r = await upload([{ path: 'b.md', body: '# b' }], { scope: 'board:brd_00000000000000b1' });
     expect((await SELF.fetch(`${API}/api/v1/items/${r.body.itemId}`)).status).toBe(401);
     expect((await SELF.fetch(`${API}/api/v1/items/${r.body.itemId}`, { headers: devHeaders() })).status).toBe(200);
     expect((await SELF.fetch(`${API}/api/v1/items/${r.body.itemId}`, { headers: devHeaders(HUMAN_2) })).status).toBe(404);
@@ -82,6 +82,16 @@ describe('the embed URL', () => {
     expect(parseToken(new URL((await evil.json<{ url: string }>()).url).searchParams.get('sig')!)!.host).toBe(API);
     const evilPre = await SELF.fetch(`${API}/api/v1/items/${r.body.itemId}/embed`, { method: 'OPTIONS', headers: { Origin: 'https://evil.test', 'Access-Control-Request-Method': 'POST' } });
     expect(evilPre.headers.get('access-control-allow-origin')).toBeNull();
+  });
+
+  it('an allowed host can read the refusals too, not an opaque failure', async () => {
+    const r = await upload([{ path: 'f.md', body: '# f' }]);
+    const fromHost = { ...devHeaders(), Origin: 'https://host.test' };
+    for (const res of [await embed(r.body.itemId, { version: 9 }, fromHost), await embed('itm_00000000000000ff', {}, fromHost)]) {
+      expect(res.status).toBe(404);
+      expect(res.headers.get('access-control-allow-origin')).toBe('https://host.test');
+    }
+    expect((await embed(r.body.itemId, { version: 9 }, { ...devHeaders(), Origin: 'https://evil.test' })).headers.get('access-control-allow-origin')).toBeNull();
   });
 
   it('names a version, refuses one that does not exist, and has no download for a folder', async () => {
@@ -160,5 +170,22 @@ describe('item listing and detail', () => {
     const detail = await (await SELF.fetch(`${API}/api/v1/items/${b.body.itemId}`, { headers: h })).json<{ item: { latestVersion: number }; versions: { version: number }[] }>();
     expect(detail.item.latestVersion).toBe(2);
     expect(detail.versions.map((v) => v.version)).toEqual([2, 1]);
+  });
+});
+
+describe('timestamps', () => {
+  const ISO_Z = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/;
+  it('are ISO 8601 UTC with Z in the list and the detail, though D1 stores SQLite time', async () => {
+    const expiresAt = new Date(Date.now() + 86_400_000).toISOString();
+    const r = await upload([{ path: 't.md', body: '# t' }], { expiresAt });
+    const stored = await env.DB.prepare(`SELECT created_at FROM items WHERE id = ?`).bind(r.body.itemId).first<{ created_at: string }>();
+    expect(stored!.created_at).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
+    const d = await (await SELF.fetch(`${API}/api/v1/items/${r.body.itemId}`, { headers: devHeaders() })).json<{ item: { createdAt: string; expiresAt: string }; versions: { createdAt: string }[] }>();
+    expect(d.item.createdAt).toBe(stored!.created_at.replace(' ', 'T') + 'Z');
+    expect(d.versions[0]!.createdAt).toMatch(ISO_Z);
+    expect(d.item.expiresAt).toMatch(ISO_Z);
+    expect(Date.parse(d.item.expiresAt)).toBe(Date.parse(expiresAt));
+    const listed = await (await SELF.fetch(`${API}/api/v1/items?limit=100`, { headers: devHeaders() })).json<{ items: { id: string; createdAt: string }[] }>();
+    expect(listed.items.find((i) => i.id === r.body.itemId)!.createdAt).toBe(d.item.createdAt);
   });
 });

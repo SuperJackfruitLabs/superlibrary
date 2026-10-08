@@ -5,13 +5,14 @@ import { audit } from '../audit';
 import { resolvePerson, type Person } from '../auth/caller';
 import { VISIBLE_SQL, canSee, isExpired, loadItem, type ItemRow } from './visibility';
 import { contentOrigin, signContent } from './sign';
+import { isoUtc } from '../time';
 
 const hostsOf = (s: string) => s.split(/\s+/).filter((x) => x !== '');
 
 export function summary(i: ItemRow): ItemSummary {
   return {
     id: i.id, kind: i.kind, title: i.title, scope: i.scope as ItemSummary['scope'], outcome: i.outcome as ItemSummary['outcome'],
-    createdBy: i.created_by, createdAt: i.created_at, latestVersion: i.latest_version, expiresAt: i.expires_at, revokedAt: i.revoked_at,
+    createdBy: i.created_by, createdAt: isoUtc(i.created_at), latestVersion: i.latest_version, expiresAt: isoUtc(i.expires_at), revokedAt: isoUtc(i.revoked_at),
   };
 }
 
@@ -62,7 +63,7 @@ async function detail(env: Env, p: Person, id: string): Promise<Response> {
   await audit(env.DB, { workspaceId: p.workspaceId, actor: p.principalId, act: p.act, action: 'item.read', itemId: id }).run();
   const out: VersionSummary[] = versions.results.map((v) => ({
     version: v.version, entry: v.entry, view: v.view, mediaType: v.media_type, totalBytes: v.total_bytes, fileCount: v.file_count,
-    sha256: v.sha256, createdAt: v.created_at, revokedAt: v.revoked_at, scanOverride: v.scan_override === 1, files: files.get(v.version)!,
+    sha256: v.sha256, createdAt: isoUtc(v.created_at), revokedAt: isoUtc(v.revoked_at), scanOverride: v.scan_override === 1, files: files.get(v.version)!,
   }));
   return json({ item: summary(item), versions: out });
 }
@@ -99,7 +100,7 @@ async function embed(request: Request, env: Env, p: Person, id: string): Promise
     files: (await filesByVersion(env, id, [v])).get(v.version)!,
   };
   await audit(env.DB, { workspaceId: p.workspaceId, actor: p.principalId, act: p.act, action: 'item.viewed', itemId: id, version: v.version, detail: { host } }).run();
-  return json(grant, 200, corsFor(request, env));
+  return json(grant);
 }
 
 const ITEM = /^\/api\/v1\/items\/(itm_[0-9a-f]{16})(\/embed)?$/;
@@ -123,6 +124,11 @@ export const itemRoutes: Handler = async (request, env, _ctx, url) => {
     return p;
   }
   if (!sub && request.method === 'GET') return detail(env, p, id);
-  if (sub === '/embed' && request.method === 'POST') return embed(request, env, p, id);
+  if (sub === '/embed' && request.method === 'POST') {
+    // An allowed host must be able to read every answer, refusals included, not an opaque failure.
+    const res = await embed(request, env, p, id);
+    for (const [k, v] of Object.entries(corsFor(request, env))) res.headers.set(k, v);
+    return res;
+  }
   return null;
 };
