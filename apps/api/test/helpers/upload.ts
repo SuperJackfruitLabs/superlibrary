@@ -4,8 +4,8 @@ import { devHeaders } from './org-plane';
 export const API = 'https://api.test';
 const enc = (b: string | Uint8Array) => (typeof b === 'string' ? new TextEncoder().encode(b) : b);
 
-export async function sha256Hex(b: Uint8Array): Promise<string> {
-  return [...new Uint8Array(await crypto.subtle.digest('SHA-256', b))].map((x) => x.toString(16).padStart(2, '0')).join('');
+export async function sha256Hex(b: Uint8Array | string): Promise<string> {
+  return [...new Uint8Array(await crypto.subtle.digest('SHA-256', enc(b)))].map((x) => x.toString(16).padStart(2, '0')).join('');
 }
 
 export interface UploadOpts {

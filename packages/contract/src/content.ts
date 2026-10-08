@@ -1,3 +1,5 @@
+import type { View } from './model';
+
 /** Spec §9: the hosts the content origin may load from. Change it here and nowhere else (plan D3). */
 const CDN = ["'self'", 'data:', 'blob:', 'https://cdnjs.cloudflare.com', 'https://cdn.jsdelivr.net', 'https://unpkg.com'];
 const FONTS = ['https://fonts.googleapis.com', 'https://fonts.gstatic.com'];
@@ -68,4 +70,14 @@ export function parseToken(token: string): { version: number; exp: number; host:
   const sig = fromB64url(s);
   if (!hostBytes || !sig || sig.length !== 64) return null;
   return { version: Number(v), exp: Number(e), host: new TextDecoder().decode(hostBytes), sig };
+}
+
+/** One version as the content Worker sees it: R2 `manifests/<itemId>/<version>.json` (plan D7). */
+export interface Manifest {
+  itemId: string;
+  version: number;
+  entry: string;
+  /** ISO time after which the content Worker refuses to serve it. */
+  expiresAt: string | null;
+  files: Record<string, { sha256: string; bytes: number; mediaType: string; view: View }>;
 }

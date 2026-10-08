@@ -24,7 +24,7 @@ export const UploadCreate = z.object({
   scope: z.string().regex(SCOPE_RE).default('workspace'),
   /** Upload a new version of this item (plan decision D17). */
   item: z.string().regex(/^itm_[0-9a-f]{16}$/).optional(),
-  /** The file a folder opens on. Defaults to index.html, then README.md, then the first path. */
+  /** The file a folder opens on. Defaults to the shallowest index.html, then the shallowest README.md, then the first path. */
   entry: z.string().min(1).max(1024).optional(),
   /** ISO 8601; the item is deleted at this time (spec §12). */
   expiresAt: z.iso.datetime().optional(),
