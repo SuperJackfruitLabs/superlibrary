@@ -288,19 +288,52 @@ open it in a new window.
   HTML artifact renders its own entry file. The renderer bundle is served from the content origin
   itself (CSP `'self'`). The library app has no renderers of its own: it embeds the same frame, so
   every host gets one renderer.
-- **Embed API:** `POST /api/v1/items/:id/embed { version? }` → `{ url, expiresAt }`: a 5-minute
-  signed URL for one item version, minted only after checking the caller's own access with a
-  person's token for the audience `https://app.superlibrary.dev`. The visibility rules are the
-  same as viewing on Superlibrary.
+- **Embed API:** `POST /api/v1/items/:id/embed { version? }` →
+  `{ url, expiresAt, version, entry, files, downloadUrl, itemUrl }`: a 5-minute signed URL for one
+  item version, minted only after checking the caller's own access with a person's token for the
+  audience `https://app.superlibrary.dev`. The visibility rules are the same as viewing on
+  Superlibrary. `files` is the version's file list (`path`, `mediaType`, `view`, `bytes`; entry
+  first, then tree order); `downloadUrl` is `null` for a folder.
+- **Viewer URL parameters.** The token signs only the item, version, expiry and host, so the host
+  adds `/_view` parameters without a new grant: `path=` (one file of the version; an HTML file
+  redirects to `/s/<token>/<path>`, so its relative links keep working), `source=1` (a text-backed
+  file shown as highlighted source, still sandboxed) and `theme=light|dark|system` (the initial
+  theme, so the frame does not flash the system theme).
 - **Who may frame it** is the content origin's `frame-ancestors` allowlist, which is
   configuration, not code. Supermessage desktop joins it later. Framing from an origin that is not
   listed is refused.
 - **Frame protocol** (`postMessage`, checked on both sides): the frame reports
   `{ type: "superlibrary:resize", height }` so the host can size it to its content, and the host
-  may send `{ type: "superlibrary:theme", theme }`.
-- **Host SDK** `@superlibrary/embed`: `mountArtifact(el, { itemId, version?, getEmbedUrl })`
-  renders the sandboxed frame and a toolbar with the version label, **Open in new window**
-  (`https://app.superlibrary.dev/a/<id>[/v/<n>]`), **Download** and **Copy link**.
+  may send `{ type: "superlibrary:theme", theme: "light" | "dark" | "system" }`, which the frame
+  accepts only from the host signed into its URL. Without a message the frame follows the system.
+- **Host SDK** `@superlibrary/embed`: `mountArtifact(el, { itemId, version?, getEmbedUrl, … })`
+  renders the sandboxed frame and, outside the sandbox, a toolbar. Amended 2026-10-09 (operator):
+  1. **Version** label (from the grant, never the item's latest number), with a menu of the live
+     versions that switches through `getEmbedUrl(version)`.
+  2. **Share** panel: who can see the item in words: "Only you", "This board" or "Everyone in the
+     workspace". In phase 1 a board item reads "Only you" (§4: only its uploader sees it until
+     the board check exists); "This board" appears once the API reports board visibility. A
+     person allowed to (the uploader or an owner; agents never) can widen it to the workspace
+     after an explicit confirmation; this calls `POST /api/v1/items/:id/scope`, audited.
+     **Copy link** copies the app link (`https://app.superlibrary.dev/a/<id>[/v/<n>]`), never a
+     content URL; **Share…** opens the system share sheet with the title and that link, or copies
+     it where there is none. There are no public links.
+  3. **Open in new window** (the app link).
+  4. **Full screen**: the Fullscreen API on the whole embed, or a fixed overlay where there is
+     none (iPhone Safari) or it is refused. The same button and Escape exit; focus stays on the
+     control.
+  5. **Theme**: System (default), Light or Dark, remembered per device, sent to the frame by the
+     theme message and in the first URL.
+  6. **Download** of a single-file version (a folder has none; §9 sandbox has no downloads).
+  7. **Files** for folder artifacts: the version's file list, entry first, then tree order, with
+     sizes; choosing one opens it in the frame.
+  8. **View source** for text-backed kinds (HTML, SVG, Markdown, code, JSON, CSV…), rendered by
+     the content viewer in source mode.
+
+  The host supplies callbacks for what only it can know with the person's token: the grant
+  (`getEmbedUrl`), the live versions (`getVersions`), who can see the item (`getShareInfo`) and the
+  widening (`setScope`). Every control works at phone and desktop widths. The package README
+  documents them.
 - **Accounts:** Superpipeline's and the AgentPod console's web clients may obtain a token for the
   Superlibrary audience for the signed-in person (per-client resources, issuer contract §3.1).
   Superpipeline's card-drawer integration remains a later phase (§14, phase 4).
@@ -355,7 +388,8 @@ ahead.
   - collections.
 - **Views by outcome,** for example "everything rejected on Marketing & Community this month".
 - **Moderation:**
-  - change an item's scope to `workspace`;
+  - change an item's scope to `workspace` (the viewer's Share panel, §9, for the uploader or an
+    owner; audited; narrowing is not offered in phase 1);
   - mark an item `superseded` by another;
   - revoke an item or a single version;
   - edit a caption;

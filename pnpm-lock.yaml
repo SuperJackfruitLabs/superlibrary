@@ -96,6 +96,16 @@ importers:
         specifier: ^22.0.0
         version: 22.20.5
 
+  packages/embed:
+    dependencies:
+      '@superlibrary/contract':
+        specifier: workspace:*
+        version: link:../contract
+    devDependencies:
+      jsdom:
+        specifier: ^30.1.2
+        version: 30.1.2
+
 packages:
 
   '@antfu/install-pkg@2.1.0':
