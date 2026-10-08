@@ -179,14 +179,19 @@ async function resultOf(env: Env, itemId: string, version: number): Promise<Comm
  * manifest (what makes a version servable) is written last. Each step is idempotent, so a commit
  * that failed between them is finished by its retry.
  */
-async function publish(env: Env, uploadId: string, itemId: string, version: number): Promise<void> {
-  await releaseQuarantine(env, uploadId);
-  await writeManifest(env, itemId, version);
+async function publish(env: Env, s: SessionRow, itemId: string, version: number): Promise<void> {
+  await releaseQuarantine(env, s.id);
+  // A new version that sets an expiry changes the item's, so every version's manifest is rewritten
+  // (plan D7: "changing an expiry rewrites it"); writeManifest skips revoked ones.
+  const versions = s.item_id && s.item_expires_at
+    ? (await env.DB.prepare(`SELECT version FROM versions WHERE item_id = ? ORDER BY version`).bind(itemId).all<{ version: number }>()).results.map((r) => r.version)
+    : [version];
+  for (const v of versions) await writeManifest(env, itemId, v);
 }
 
 async function committed(env: Env, s: SessionRow): Promise<Response> {
   // Idempotent: a retried commit answers the first one's result and repairs what it left undone.
-  await publish(env, s.id, s.result_item_id!, s.result_version!);
+  await publish(env, s, s.result_item_id!, s.result_version!);
   return json(await resultOf(env, s.result_item_id!, s.result_version!), 200);
 }
 
@@ -223,7 +228,7 @@ async function commit(env: Env, p: Person, id: string): Promise<Response> {
   // First in the batch: a second commit of this same session fails here (migration 0003).
   statements.push(env.DB.prepare(`UPDATE upload_sessions SET state = 'committed', result_item_id = ?, result_version = ? WHERE id = ?`).bind(itemId, version, id));
   if (s.item_id) {
-    statements.push(env.DB.prepare(`UPDATE items SET latest_version = ?, title = ? WHERE id = ? AND latest_version = ?`).bind(version, s.title, itemId, version - 1));
+    statements.push(env.DB.prepare(`UPDATE items SET latest_version = ?, title = ?, expires_at = COALESCE(?, expires_at) WHERE id = ? AND latest_version = ?`).bind(version, s.title, s.item_expires_at, itemId, version - 1));
   } else {
     statements.push(
       env.DB.prepare(`INSERT INTO items (id, workspace_id, kind, title, scope, created_by, latest_version, expires_at) VALUES (?, ?, 'artifact', ?, ?, ?, 1, ?)`)
@@ -260,6 +265,6 @@ async function commit(env: Env, p: Person, id: string): Promise<Response> {
   }
   // After D1, never before: a manifest written for a version that then failed to commit would
   // overwrite the winner's. A failure from here on is repaired by the idempotent retry above.
-  await publish(env, id, itemId, version);
+  await publish(env, s, itemId, version);
   return json(await resultOf(env, itemId, version), 201);
 }

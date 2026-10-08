@@ -195,6 +195,21 @@ describe('commit re-checks the quota (ruling T8)', () => {
 });
 
 describe('commit against an item', () => {
+  it('a new version that sets expiresAt sets the item expiry, and every version manifest carries it', async () => {
+    const r = await upload([{ path: 'a.txt', body: 'v1 without expiry' }]);
+    const at = new Date(Date.now() + 86_400_000).toISOString();
+    const v2 = await upload([{ path: 'a.txt', body: 'v2 with expiry' }], { item: r.body.itemId, expiresAt: at });
+    expect(v2.status).toBe(201);
+    expect(await env.DB.prepare(`SELECT expires_at FROM items WHERE id = ?`).bind(r.body.itemId).first()).toEqual({ expires_at: at });
+    for (const v of [1, 2]) {
+      const m = await (await env.BLOBS.get(`manifests/${r.body.itemId}/${v}.json`))!.json<{ expiresAt: string | null }>();
+      expect(m.expiresAt).toBe(at);
+    }
+    // A later version without expiresAt leaves it as it is.
+    await upload([{ path: 'a.txt', body: 'v3 no expiry given' }], { item: r.body.itemId });
+    expect(await env.DB.prepare(`SELECT expires_at FROM items WHERE id = ?`).bind(r.body.itemId).first()).toEqual({ expires_at: at });
+  });
+
   it('a revoked item takes no new version', async () => {
     const r = await upload([{ path: 'a.txt', body: 'v1 of revoked' }]);
     const next = await upload([{ path: 'a.txt', body: 'v2 of revoked' }], { item: r.body.itemId, commit: false });
