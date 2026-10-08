@@ -7,8 +7,9 @@ import { resolvePerson } from './auth/caller';
 import { protectedResourceMetadata } from './auth/org-plane';
 import { error, json, type Handler } from './http';
 import { uploadRoutes } from './uploads/routes';
+import { itemRoutes } from './items/routes';
 
-const handlers: Handler[] = [uploadRoutes];
+const handlers: Handler[] = [uploadRoutes, itemRoutes];
 
 async function route(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
   const url = new URL(request.url);

@@ -43,12 +43,42 @@ export interface CommitResult {
   bytes: number;
 }
 
+/** One file of a version, as the host toolbar's Files list shows it. */
+export interface FileEntry {
+  path: string;
+  mediaType: string;
+  view: View;
+  bytes: number;
+}
+
+/**
+ * Tree order: segment by segment, by code unit, so a folder's files stay together
+ * (`a/x` before `a-b` and `a.css`, which plain string order would put first).
+ */
+export function compareTreePaths(a: string, b: string): number {
+  const sa = a.split('/');
+  const sb = b.split('/');
+  for (let i = 0; i < Math.min(sa.length, sb.length); i++) {
+    if (sa[i] !== sb[i]) return sa[i]! < sb[i]! ? -1 : 1;
+  }
+  return sa.length - sb.length;
+}
+
+/** A version's files as every reader lists them: the entry first, then tree order. */
+export function orderFiles<T extends { path: string }>(entry: string, files: T[]): T[] {
+  return [...files].sort((x, y) => (x.path === entry ? -1 : y.path === entry ? 1 : compareTreePaths(x.path, y.path)));
+}
+
 export interface EmbedGrant {
   url: string;
   downloadUrl: string | null;
   expiresAt: string;
   version: number;
   itemUrl: string;
+  /** The file the frame opens on. */
+  entry: string;
+  /** Every file of the version, `orderFiles` order. */
+  files: FileEntry[];
 }
 
 export interface VersionSummary {
@@ -62,6 +92,8 @@ export interface VersionSummary {
   createdAt: string;
   revokedAt: string | null;
   scanOverride: boolean;
+  /** Every file of the version, `orderFiles` order. */
+  files: FileEntry[];
 }
 
 export interface ItemSummary {
