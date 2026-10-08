@@ -175,3 +175,31 @@ describe('a file whose secret scan hits is quarantined, never stored in the libr
     expect(findings.results).toEqual([{ path: 'leak.ts', line: 1, rule: 'github-token' }]);
   });
 });
+
+describe('names people actually use', () => {
+  it.each(['my notes.md', 'a#b.txt', 'what?.txt', '100%.txt', 'a+b.txt', 'résumé/日本.md'])('%s uploads under its own name', async (path) => {
+    const r = await upload([{ path, body: `body of ${path}` }], { commit: false });
+    expect(r.status).toBe(200);
+    expect(r.body.puts[0].path).toBe(path);
+    const row = await env.DB.prepare(`SELECT received FROM upload_files WHERE session_id = ? AND path = ?`).bind(r.uploadId, path).first<{ received: number }>();
+    expect(row?.received).toBe(1);
+  });
+});
+
+describe('the quota counts each distinct blob once', () => {
+  it('the same bytes under two paths, or in a second session, cost their size once', async () => {
+    const org = 'org_00000000000000000e06';
+    const h = devHeaders(HUMAN_2, org);
+    await SELF.fetch(`${API}/api/v1/me`, { headers: h });
+    await env.DB.prepare(`UPDATE workspaces SET quota_bytes = 10 WHERE external_id = ?`).bind(org).run();
+    const same = (path: string) => ({ path, bytes: 6, sha256: 'd'.repeat(64) });
+    // 12 bytes declared, 6 distinct: within a quota of 10.
+    expect((await declare([same('a.bin'), same('b.bin')], {}, h)).status).toBe(201);
+    // A second open session with the same bytes adds nothing.
+    expect((await declare([same('c.bin')], {}, h)).status).toBe(201);
+    // 6 held + 5 new = 11: over.
+    const over = await declare([{ path: 'd.bin', bytes: 5, sha256: 'e'.repeat(64) }], {}, h);
+    expect(over.status).toBe(413);
+    expect(await over.json()).toEqual({ error: 'quota_exceeded', limit: 10, used: 6 });
+  });
+});
