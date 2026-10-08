@@ -1,0 +1,17 @@
+{
+  "name": "superlibrary",
+  "version": "0.0.1",
+  "private": true,
+  "description": "The memory of the stack: artifacts and work history, labelled with how each turned out.",
+  "packageManager": "pnpm@11.5.2",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck",
+    "build": "pnpm -r build"
+  },
+  "devDependencies": {
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.9"
+  }
+}

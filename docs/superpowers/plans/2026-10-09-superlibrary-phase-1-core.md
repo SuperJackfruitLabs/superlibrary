@@ -529,11 +529,11 @@ export function parseToken(token: string): { version: number; exp: number; host:
 pnpm --filter @superlibrary/contract test && pnpm --filter @superlibrary/contract typecheck
 ```
 
-Expected: PASS (5 describe blocks, 11 tests).
+Expected: PASS (3 describe blocks, 10 tests).
 
 - [ ] **Step 5: Add the CI test job**
 
-`.github/workflows/ci.yml` (Superpipeline's `test` job, minus bun until Task 20 adds it):
+`.github/workflows/ci.yml` (Superpipeline's `test` job, minus bun until Task 19 adds it):
 
 ```yaml
 name: CI
