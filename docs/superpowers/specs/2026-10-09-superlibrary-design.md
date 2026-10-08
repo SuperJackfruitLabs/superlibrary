@@ -127,7 +127,7 @@ The same rule applies to search, to `get`, to `related` and to the prompt contex
    record links it.
 
 **People** can link station files with `fleet artifacts link` or the console's **Link this file**,
-and can upload directly through the app or `slib upload`. Agents cannot upload directly in v1:
+and can upload directly through the app or `suli upload`. Agents cannot upload directly in v1:
 everything an agent stores comes from its own workspace, with provenance.
 
 ## 6. Architecture
@@ -138,8 +138,9 @@ Superlibrary is Cloudflare-native, like Superpipeline:
 |---|---|---|---|
 | `apps/api` | Worker `superlibrary-api` | D1 (read and write), R2 (read and write), Vectorize, Workers AI, the URL-signing key | REST and MCP API. Verifies organization-plane tokens offline (audience `https://app.superlibrary.dev`). Runs the ingest and indexing queues. |
 | `apps/web` | Pages `superlibrary-web` | — | The library and viewer at `app.superlibrary.dev`. Signs in through accounts.superjackfruit.com, with PKCE and tokens held in memory. |
-| `apps/content` | Worker `superlibrary-content` on `*.superlibrarycontent.dev` | **R2 read-only**, and the signing key's verification half | Serves artifact bytes for one valid signed URL. No cookies, no API, no database. |
+| `apps/content` | Worker `superlibrary-content` on `*.superlibrarycontent.dev` | **R2 read-only**, and the signing key's verification half | Serves artifact bytes and **the viewer for every kind** (§9) for one valid signed URL. No cookies, no API, no database. |
 | `packages/contract` | — | — | Zod schemas shared with AgentPod and Superpipeline. |
+| `packages/embed` | — | — | `@superlibrary/embed`, the host SDK that mounts the sandboxed viewer frame and its toolbar in any product (§9, Embedding). |
 
 **Two Workers on purpose.** The content Worker serves agent-written pages. A bug there can at most
 read artifact bytes. It cannot reach the database, a write permission or a key, and the API cannot
@@ -262,7 +263,8 @@ The type comes from sniffing the bytes.
    - styles and fonts also allowed from `https://fonts.googleapis.com` and
      `https://fonts.gstatic.com`;
    - **`connect-src 'none'`**;
-   - `frame-ancestors https://app.superlibrary.dev`;
+   - `frame-ancestors` set from configuration to the embedding hosts (§9, Embedding): initially
+     `https://app.superlibrary.dev https://app.superpipeline.dev https://console.agentpod.dev`;
    - no `form-action`.
 5. **Signed URLs, never cookies.** Each URL lasts 5 minutes, covers one item version, and is minted
    only after the viewer's permission has been checked.
@@ -271,6 +273,39 @@ The type comes from sniffing the bytes.
    - `Cross-Origin-Resource-Policy: same-site`;
    - `Cross-Origin-Opener-Policy: same-origin`;
    - `Content-Disposition: attachment` for every kind that is not rendered.
+
+### Embedding
+
+Amended 2026-10-09 (operator): the viewer can be embedded in other products, with an option to
+open it in a new window.
+
+- **All rendering lives on the content origin.** `https://<itemId>.superlibrarycontent.dev/_view?sig=…`
+  is a small viewer page that renders every kind in the table above: Markdown sanitized, code
+  highlighted, CSV as a table, JSON/YAML/TOML structured, notebooks read-only, Mermaid and
+  Graphviz, images, SVG as an `<img>`, PDF, audio and video, and a download card for the rest. An
+  HTML artifact renders its own entry file. The renderer bundle is served from the content origin
+  itself (CSP `'self'`). The library app has no renderers of its own: it embeds the same frame, so
+  every host gets one renderer.
+- **Embed API:** `POST /api/v1/items/:id/embed { version? }` → `{ url, expiresAt }`: a 5-minute
+  signed URL for one item version, minted only after checking the caller's own access with a
+  person's token for the audience `https://app.superlibrary.dev`. The visibility rules are the
+  same as viewing on Superlibrary.
+- **Who may frame it** is the content origin's `frame-ancestors` allowlist, which is
+  configuration, not code. Supermessage desktop joins it later. Framing from an origin that is not
+  listed is refused.
+- **Frame protocol** (`postMessage`, checked on both sides): the frame reports
+  `{ type: "superlibrary:resize", height }` so the host can size it to its content, and the host
+  may send `{ type: "superlibrary:theme", theme }`.
+- **Host SDK** `@superlibrary/embed`: `mountArtifact(el, { itemId, version?, getEmbedUrl })`
+  renders the sandboxed frame and a toolbar with the version label, **Open in new window**
+  (`https://app.superlibrary.dev/a/<id>[/v/<n>]`), **Download** and **Copy link**.
+- **Accounts:** Superpipeline's and the AgentPod console's web clients may obtain a token for the
+  Superlibrary audience for the signed-in person (per-client resources, issuer contract §3.1).
+  Superpipeline's card-drawer integration remains a later phase (§14, phase 4).
+- **Why a signed content URL, not the whole app in a frame.** Embedding the Superlibrary app would
+  need a sign-in inside a third-party frame, which storage partitioning and Safari's Intelligent
+  Tracking Prevention break. A signed content URL needs no sign-in inside the frame, so it works
+  on iOS too.
 
 ### Availability
 
@@ -323,7 +358,7 @@ ahead.
   - revoke an item or a single version;
   - edit a caption;
   - remove an item from memory, with a recorded reason.
-- **`slib` CLI:** `search`, `get`, `upload`, `collect`, `revoke`, `scope`.
+- **`suli` CLI:** `search`, `get`, `upload`, `collect`, `revoke`, `scope`.
 - **Superpipeline:** card drawers preview linked artifacts inline for images, Markdown, text and
   code, and have a "Related prior work" panel.
 
@@ -346,6 +381,8 @@ ahead.
 
 - **accounts:**
   - product registry entry, audience, and web and CLI clients;
+  - Superpipeline's and the AgentPod console's web clients may request the Superlibrary audience
+    (§9, Embedding);
   - the `superlibrary` entitlement and `library:*` scopes;
   - the hub's service grant;
   - the Superlibrary audience in agents' station tokens.
@@ -445,3 +482,6 @@ Each guard is proven by reverting it and watching its test fail.
 8. HTML artifacts may load libraries from trusted CDNs only, and have no network access.
 9. Unreferenced artifacts are deleted after 30 days.
 10. Removing a station keeps its artifacts. Revoking them is a separate act.
+11. CLI name: `suli`.
+12. The viewer can be embedded in other products through a signed content URL and the
+    `@superlibrary/embed` host SDK, with **Open in new window** (§9, Embedding).
