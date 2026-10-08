@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   ITEM_ID, newId, contentLabel, itemIdFromLabel, SCOPE_RE, LIMITS, UploadCreate,
   contentCsp, encodePath, formatToken, parseToken, signingMessage, b64url, fromB64url,
+  compareTreePaths, orderFiles,
 } from '../src/index';
 
 describe('ids', () => {
@@ -21,7 +22,7 @@ describe('ids', () => {
 describe('model', () => {
   it('accepts workspace and board scopes only', () => {
     expect(SCOPE_RE.test('workspace')).toBe(true);
-    expect(SCOPE_RE.test('board:brd_f47143722126442c')).toBe(true);
+    expect(SCOPE_RE.test('board:brd_00000000000000b1')).toBe(true);
     expect(SCOPE_RE.test('board:anything')).toBe(false);
     expect(SCOPE_RE.test('public')).toBe(false);
   });
@@ -82,5 +83,14 @@ describe('content origin', () => {
     const bytes = new Uint8Array([0, 255, 62, 63]);
     expect(fromB64url(b64url(bytes))).toEqual(bytes);
     expect(fromB64url('***')).toBeNull();
+  });
+});
+
+describe('file order', () => {
+  it('sorts by path segment, so a folder stays together, and puts the entry first', () => {
+    const paths = ['s/a.css', 's/a-b.css', 'z.txt', 's/a/x.css', 's/index.html', 'readme.txt', 's/a/b/c.txt'];
+    expect([...paths].sort(compareTreePaths)).toEqual(['readme.txt', 's/a/b/c.txt', 's/a/x.css', 's/a-b.css', 's/a.css', 's/index.html', 'z.txt']);
+    expect(orderFiles('s/index.html', paths.map((path) => ({ path }))).map((f) => f.path))
+      .toEqual(['s/index.html', 'readme.txt', 's/a/b/c.txt', 's/a/x.css', 's/a-b.css', 's/a.css', 'z.txt']);
   });
 });
