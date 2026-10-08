@@ -61,6 +61,14 @@ BEGIN
   SELECT RAISE(ABORT, 'versions are immutable');
 END;
 
+-- Revocation is one-way: once set, revoked_at and revoked_by never change or clear.
+CREATE TRIGGER versions_revocation_one_way
+  BEFORE UPDATE OF revoked_at, revoked_by ON versions
+  WHEN OLD.revoked_at IS NOT NULL AND (NEW.revoked_at IS NOT OLD.revoked_at OR NEW.revoked_by IS NOT OLD.revoked_by)
+BEGIN
+  SELECT RAISE(ABORT, 'revocation is permanent');
+END;
+
 CREATE TABLE version_files (
   item_id TEXT NOT NULL,
   version INTEGER NOT NULL,

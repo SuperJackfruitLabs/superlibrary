@@ -1,6 +1,7 @@
 import { SELF, env } from 'cloudflare:test';
+import { SignJWT } from 'jose';
 import { describe, expect, it } from 'vitest';
-import { AGENT, APP_AUD, HUMAN, HUMAN_2, ORG, OTHER_ORG, PLANE, devHeaders, planeToken, withOrgPlane } from './helpers/org-plane';
+import { AGENT, APP_AUD, HUMAN, HUMAN_2, ORG, OTHER_ORG, PLANE, KID, devHeaders, planeKeys, planeToken, withOrgPlane } from './helpers/org-plane';
 
 const me = (headers: Record<string, string>) => SELF.fetch(`${APP_AUD}/api/v1/me`, { headers });
 const bearer = (t: string) => ({ Authorization: `Bearer ${t}` });
@@ -33,6 +34,24 @@ describe('the organization plane, offline', () => {
         expect(await res.json()).toEqual({ error: 'sign_in_required' });
       }
       expect((await me({})).status).toBe(401);
+    });
+  });
+
+  it('refuses a token without jti or without iat', async () => {
+    await withOrgPlane(async () => {
+      expect((await me(bearer(await planeToken({ jti: undefined })))).status).toBe(401);
+      const { privateKey } = await planeKeys();
+      const noIat = await new SignJWT({ sub: HUMAN, principalKind: 'human', org: ORG, ent: ['superlibrary'], jti: 'x' })
+        .setProtectedHeader({ alg: 'EdDSA', kid: KID }).setIssuer(PLANE).setAudience(APP_AUD).setExpirationTime('5m').sign(privateKey);
+      expect((await me(bearer(noIat))).status).toBe(401);
+    });
+  });
+
+  it('a 401 points the caller at the protected-resource metadata', async () => {
+    await withOrgPlane(async () => {
+      const res = await me({});
+      expect(res.status).toBe(401);
+      expect(res.headers.get('WWW-Authenticate')).toBe(`Bearer resource_metadata="${APP_AUD}/.well-known/oauth-protected-resource"`);
     });
   });
 

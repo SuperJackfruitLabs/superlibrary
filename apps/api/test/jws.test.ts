@@ -77,4 +77,26 @@ describe('the key-set cache', () => {
     expect(await verifyJws(await b.sign(), opts(fetchFn))).toBeNull();
     expect(calls()).toBe(2);
   });
+
+  it('an issuer that hangs: the stale set is served within the timeout, and the next request makes no new fetch', async () => {
+    const a = await keyed('kid-a');
+    let n = 0;
+    const fetchFn = (async () => {
+      if (n++ === 0) return new Response(JSON.stringify({ keys: [a.jwk] }));
+      return new Promise<Response>(() => {}); // never answers
+    }) as unknown as typeof fetch;
+    const o = { ...opts(fetchFn), timeoutMs: 50 };
+    expect(await verifyJws(await a.sign(), o)).not.toBeNull();
+    vi.setSystemTime(Date.now() + TTL + 1000);
+    expect(await verifyJws(await a.sign(), o)).not.toBeNull();
+    expect(n).toBe(2);
+    // Inside the backoff window: no new attempt.
+    vi.setSystemTime(Date.now() + 5000);
+    expect(await verifyJws(await a.sign(), o)).not.toBeNull();
+    expect(n).toBe(2);
+    // After it: one more attempt.
+    vi.setSystemTime(Date.now() + 30_000);
+    expect(await verifyJws(await a.sign(), o)).not.toBeNull();
+    expect(n).toBe(3);
+  });
 });

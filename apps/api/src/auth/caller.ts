@@ -78,5 +78,5 @@ export async function resolvePerson(request: Request, env: Env): Promise<Person 
   }
   const workspaceId = await ensureWorkspace(env.DB, claims.org);
   const role = await ensureMember(env.DB, workspaceId, claims.sub);
-  return { principalId: claims.sub, org: claims.org, workspaceId, role, act: claims.act?.sub ?? null };
+  return { principalId: claims.sub, org: claims.org, workspaceId, role, act: typeof claims.act?.sub === 'string' ? claims.act.sub : null };
 }

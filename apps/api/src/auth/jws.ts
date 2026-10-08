@@ -13,6 +13,8 @@ export interface JwsOptions {
   audience: string;
   requiredClaims: string[];
   fetch?: typeof fetch;
+  /** Key-set fetch timeout; default 3 s. An issuer that hangs must not stall every request. */
+  timeoutMs?: number;
 }
 
 interface CachedSet {
@@ -23,12 +25,16 @@ interface CachedSet {
 
 const cache = new Map<string, CachedSet>();
 const inflight = new Map<string, Promise<CachedSet | null>>();
+/** When the last refresh of each URL failed; no new attempt for BACKOFF_MS, so a down issuer costs one try per window. */
+const failedAt = new Map<string, number>();
+const BACKOFF_MS = 30 * 1000;
 /** Issuer contract §1: cache ≤ 10 minutes. */
 const JWKS_TTL_MS = 10 * 60 * 1000;
 
 export function __resetJwksCacheForTests(): void {
   cache.clear();
   inflight.clear();
+  failedAt.clear();
 }
 
 function hasKid(set: CachedSet | undefined, kid: string): boolean {
@@ -38,17 +44,31 @@ function hasKid(set: CachedSet | undefined, kid: string): boolean {
 function fetchFresh(opts: JwsOptions): Promise<CachedSet | null> {
   const existing = inflight.get(opts.jwksUrl);
   if (existing) return existing;
+  const failed = failedAt.get(opts.jwksUrl);
+  if (failed !== undefined && Date.now() - failed < BACKOFF_MS) return Promise.resolve(null);
+  const timeoutMs = opts.timeoutMs ?? 3000;
   const promise = (async (): Promise<CachedSet | null> => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
     try {
-      const res = await (opts.fetch ?? fetch)(opts.jwksUrl);
-      if (!res.ok) return null;
+      // The signal aborts a well-behaved fetch; the race bounds one that ignores it.
+      const res = await Promise.race([
+        (opts.fetch ?? fetch)(opts.jwksUrl, { signal: AbortSignal.timeout(timeoutMs) }),
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(() => reject(new Error('timeout')), timeoutMs);
+        }),
+      ]);
+      if (!res.ok) throw new Error('status');
       const keys = (await res.json()) as JSONWebKeySet;
-      if (!Array.isArray(keys?.keys) || keys.keys.length === 0) return null;
+      if (!Array.isArray(keys?.keys) || keys.keys.length === 0) throw new Error('empty');
       const fresh: CachedSet = { keys, verify: createLocalJWKSet(keys), fetchedAt: Date.now() };
       cache.set(opts.jwksUrl, fresh);
+      failedAt.delete(opts.jwksUrl);
       return fresh;
     } catch {
+      failedAt.set(opts.jwksUrl, Date.now());
       return null;
+    } finally {
+      if (timer !== undefined) clearTimeout(timer);
     }
   })();
   inflight.set(opts.jwksUrl, promise);

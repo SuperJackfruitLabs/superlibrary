@@ -26,6 +26,13 @@ describe('schema', () => {
     expect(row?.sha256).toBe('a'.repeat(64));
   });
 
+  it('revocation is one-way: it cannot be cleared or changed once set', async () => {
+    await seedVersion('itm_00000000000000a2');
+    await db().prepare(`UPDATE versions SET revoked_at = datetime('now'), revoked_by = 'prn_000000000000000000a1' WHERE item_id = 'itm_00000000000000a2'`).run();
+    await expect(db().prepare(`UPDATE versions SET revoked_at = NULL, revoked_by = NULL WHERE item_id = 'itm_00000000000000a2'`).run()).rejects.toThrow(/revocation is permanent/);
+    await expect(db().prepare(`UPDATE versions SET revoked_at = '2030-01-01' WHERE item_id = 'itm_00000000000000a2'`).run()).rejects.toThrow(/revocation is permanent/);
+  });
+
   it('the audit log is append-only', async () => {
     await audit(db(), { workspaceId: 'wsp_0000000000000001', actor: 'prn_000000000000000000a1', action: 'item.read', itemId: 'itm_00000000000000a1' }).run();
     await expect(db().prepare(`UPDATE audit_events SET action = 'x'`).run()).rejects.toThrow(/append-only/);
