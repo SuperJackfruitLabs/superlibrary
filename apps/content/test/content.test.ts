@@ -170,7 +170,9 @@ describe('the viewer document', () => {
   });
 
   it('a path that is an Object prototype key is no file of the version', async () => {
-    const t = await token(ITEM, 1);
+    await seed(ITEM, 16, { 'notes.md': MD }, 'notes.md');
+    const t = await token(ITEM, 16);
+    expect((await get(ITEM, `/s/${t}/notes.md`)).status).toBe(200);
     for (const p of ['constructor', 'toString', '__proto__', 'hasOwnProperty']) {
       const res = await get(ITEM, `/s/${t}/${p}`);
       expect(res.status, p).toBe(404);
@@ -212,6 +214,16 @@ describe('signed URLs', () => {
     for (const alg of ['Ed25519', 'EdDSA', undefined]) {
       const res = await get(ITEM, `/_view?sig=${t}`, undefined, testEnv({ URL_SIGNING_PUBLIC_KEY: JSON.stringify(alg ? { ...bare, alg } : bare) }));
       expect(res.status, String(alg)).toBe(200);
+    }
+  });
+  it('a manifest whose expiry cannot be read is gone, not served', async () => {
+    for (const [version, expiresAt] of [[17, 'not-a-date'], [18, ''], [19, 123]] as const) {
+      await seed(ITEM, version, { 'a.md': MD }, 'a.md');
+      const m = (await (await env.BLOBS.get(`manifests/${ITEM}/${version}.json`))!.json()) as Record<string, unknown>;
+      await env.BLOBS.put(`manifests/${ITEM}/${version}.json`, JSON.stringify({ ...m, expiresAt }));
+      const t = await token(ITEM, version);
+      expect((await get(ITEM, `/_view?sig=${t}`)).status, String(expiresAt)).toBe(410);
+      expect((await get(ITEM, `/s/${t}/a.md`)).status, String(expiresAt)).toBe(410);
     }
   });
   it('revoked (no manifest) or expired items are gone, at once', async () => {
@@ -257,6 +269,54 @@ describe('the content origin serves nothing else', () => {
   it('without the verification key it refuses plainly', async () => {
     const res = await get(ITEM, `/_view?sig=${await token(ITEM, 1)}`, undefined, testEnv({ URL_SIGNING_PUBLIC_KEY: '' }));
     expect([res.status, await res.json()]).toEqual([503, { error: 'not_configured' }]);
+  });
+});
+
+describe('caching never outlives the signed URL (plan D7)', () => {
+  const now = () => Math.floor(Date.now() / 1000);
+  const maxAge = (res: Response) => Number(/^private, max-age=(\d+)$/.exec(res.headers.get('cache-control') ?? '')?.[1] ?? NaN);
+  it('served content may be cached only until its token expires', async () => {
+    await seed(ITEM, 1, { 'notes.md': MD }, 'notes.md');
+    await seed(ITEM, 5, { 'v.txt': TXT }, 'v.txt');
+    for (const ttl of [120, 7]) {
+      const t1 = await token(ITEM, 1, { exp: now() + ttl });
+      const t5 = await token(ITEM, 5, { exp: now() + ttl });
+      for (const res of [
+        await get(ITEM, `/_view?sig=${t1}`),
+        await get(ITEM, `/_view?sig=${t1}`, { method: 'HEAD' }),
+        await get(ITEM, `/s/${t1}/notes.md`),
+        await get(ITEM, `/s/${t1}/notes.md?download=1`),
+        await get(ITEM, `/s/${t5}/v.txt`, { headers: { Range: 'bytes=0-1' } }),
+        await get(ITEM, `/s/${t5}/v.txt`, { method: 'HEAD' }),
+      ]) {
+        await res.arrayBuffer();
+        expect(maxAge(res)).toBeGreaterThanOrEqual(ttl - 2);
+        expect(maxAge(res)).toBeLessThanOrEqual(ttl);
+      }
+    }
+  });
+  it('refusals and the redirect are never stored; the token-independent bundle keeps a short cache', async () => {
+    await seed(ITEM, 1, { 'notes.md': MD }, 'notes.md');
+    await seed(ITEM, 2, { 'index.html': HTML, 'style.css': CSS }, 'index.html');
+    await seed(ITEM, 5, { 'v.txt': TXT }, 'v.txt');
+    const t1 = await token(ITEM, 1);
+    const noStore: [string, Promise<Response>][] = [
+      ['302', get(ITEM, `/_view?sig=${await token(ITEM, 2)}`, { redirect: 'manual' })],
+      ['403', get(ITEM, '/_view?sig=garbage')],
+      ['404', get(ITEM, `/s/${t1}/missing.md`)],
+      ['405', get(ITEM, '/_view', { method: 'POST' })],
+      ['410', get(ITEM, `/_view?sig=${await token(ITEM, 99)}`)],
+      ['416', get(ITEM, `/s/${await token(ITEM, 5)}/v.txt`, { headers: { Range: 'bytes=99-' } })],
+      ['500', get(ITEM, `/_view?sig=${t1}`, undefined, testEnv({ FRAME_ANCESTORS: '' }))],
+      ['503', get(ITEM, `/_view?sig=${t1}`, undefined, testEnv({ URL_SIGNING_PUBLIC_KEY: '' }))],
+      ['404 viewer asset', get(ITEM, '/_viewer/missing.js')],
+    ];
+    for (const [name, pending] of noStore) {
+      const res = await pending;
+      await res.arrayBuffer();
+      expect(res.headers.get('cache-control'), name).toBe('no-store');
+    }
+    expect((await get(ITEM, '/_viewer/viewer.js')).headers.get('cache-control')).toBe('private, max-age=300');
   });
 });
 

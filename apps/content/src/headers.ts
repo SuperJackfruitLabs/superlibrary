@@ -17,7 +17,8 @@ function common(env: HeaderEnv, contentType: string, disposition: string): Heade
     'X-Content-Type-Options': 'nosniff',
     'Cross-Origin-Opener-Policy': 'same-origin',
     'Referrer-Policy': 'no-referrer',
-    'Cache-Control': 'private, max-age=300',
+    // Never stored by default: content that a valid token served says how long it may be kept (cacheUntil).
+    'Cache-Control': 'no-store',
   });
 }
 
@@ -52,4 +53,13 @@ export function unconfiguredHeaders(): Headers {
     'Cross-Origin-Resource-Policy': 'same-site',
     'Cache-Control': 'no-store',
   });
+}
+
+/**
+ * Served content may be kept only while its token is valid: revocation is immediate (plan D7), so
+ * no cache may outlive the URL that fetched it.
+ */
+export function cacheUntil(headers: Headers, exp: number): Headers {
+  headers.set('Cache-Control', `private, max-age=${Math.max(0, exp - Math.floor(Date.now() / 1000))}`);
+  return headers;
 }

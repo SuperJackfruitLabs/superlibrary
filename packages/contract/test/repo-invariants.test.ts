@@ -39,6 +39,14 @@ describe('repository invariants', () => {
     expect(frame).toEqual(['https://app.superlibrary.dev', 'https://app.superpipeline.dev', 'https://console.agentpod.dev']);
   });
 
+  it('no Worker test suite reads a developer\'s .dev.vars (wrangler loads it beside any configPath it is given)', () => {
+    for (const app of ['api', 'content']) {
+      const cfg = read(`apps/${app}/vitest.config.ts`);
+      expect(cfg, app).not.toMatch(/configPath\s*:/);
+      expect(cfg, app).toContain("readFileSync(new URL('./wrangler.jsonc', import.meta.url)");
+    }
+  });
+
   it('the dev configuration is the deployed one without its routes (ruling T11)', () => {
     const { routes, ...deployed } = jsonc('apps/content/wrangler.jsonc');
     expect(routes).toBeDefined();

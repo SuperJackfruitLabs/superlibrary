@@ -4,7 +4,7 @@
  * through a type that has no write methods (plan D8).
  */
 import { TEXT_VIEWS, encodePath, itemIdFromLabel, parseToken, signingMessage, type Manifest, type ViewerData } from '@superlibrary/contract';
-import { documentHeaders, frameAncestors, subresourceHeaders, unconfiguredHeaders } from './headers';
+import { cacheUntil, documentHeaders, frameAncestors, subresourceHeaders, unconfiguredHeaders } from './headers';
 import { viewerPage } from './viewer-page';
 
 export type ReadOnlyBucket = Pick<R2Bucket, 'get' | 'head'>;
@@ -37,7 +37,7 @@ function verifyKey(env: Env): Promise<CryptoKey> {
   return keyCache.key;
 }
 
-async function verify(env: Env, itemId: string, token: string): Promise<{ version: number; host: string } | Response> {
+async function verify(env: Env, itemId: string, token: string): Promise<{ version: number; host: string; exp: number } | Response> {
   // Before Task 21 Step 4 sets the key, refuse plainly rather than throw.
   if (!env.URL_SIGNING_PUBLIC_KEY) return refuse(env, 503, 'not_configured');
   const t = parseToken(token);
@@ -48,14 +48,19 @@ async function verify(env: Env, itemId: string, token: string): Promise<{ versio
   if (!frameAncestors(env).includes(t.host)) return refuse(env, 403, 'host_not_allowed');
   // The item comes from the hostname, never from the token: a URL opens only its own item.
   const ok = await crypto.subtle.verify('Ed25519', await verifyKey(env), t.sig, signingMessage({ itemId, version: t.version, exp: t.exp, host: t.host }));
-  return ok ? { version: t.version, host: t.host } : refuse(env, 403, 'invalid_signature');
+  return ok ? { version: t.version, host: t.host, exp: t.exp } : refuse(env, 403, 'invalid_signature');
 }
 
 async function manifestOf(env: Env, itemId: string, version: number): Promise<Manifest | Response> {
   const obj = await env.BLOBS.get(`manifests/${itemId}/${version}.json`);
   if (!obj) return refuse(env, 410, 'gone'); // revoked, deleted, or never existed
   const m = await obj.json<Manifest>();
-  if (m.expiresAt && Date.parse(m.expiresAt) <= Date.now()) return refuse(env, 410, 'gone');
+  // Only null means "no expiry". Anything else must be a time still ahead: an expiry that cannot be
+  // read fails closed (Date.parse gives NaN, and NaN <= now is false).
+  if (m.expiresAt !== null) {
+    const at = typeof m.expiresAt === 'string' ? Date.parse(m.expiresAt) : NaN;
+    if (!(at > Date.now())) return refuse(env, 410, 'gone');
+  }
   return m;
 }
 
@@ -138,6 +143,7 @@ async function raw(request: Request, env: Env, itemId: string, url: URL): Promis
   const headers = f.mediaType.startsWith('text/html') ? documentHeaders(env, f.mediaType, disposition) : subresourceHeaders(env, f.mediaType, disposition);
   headers.set('Accept-Ranges', 'bytes');
   headers.set('ETag', `"${f.sha256}"`);
+  cacheUntil(headers, g.exp);
   const key = `blobs/${f.sha256}`;
   if (request.method === 'HEAD') {
     if (!(await env.BLOBS.head(key))) return refuse(env, 410, 'gone');
@@ -174,7 +180,10 @@ async function serve(request: Request, env: Env): Promise<Response> {
     // Unconditional: a 304 from the asset store would otherwise read as "not ok" and become a 404.
     const res = await env.VIEWER.fetch(new Request(url, { method: request.method }));
     if (!res.ok) return refuse(env, 404, 'not_found');
-    return new Response(res.body, { headers: subresourceHeaders(env, res.headers.get('content-type') ?? 'application/octet-stream') });
+    // The bundle is the same for every token and holds no artifact bytes: a short cache of its own.
+    const headers = subresourceHeaders(env, res.headers.get('content-type') ?? 'application/octet-stream');
+    headers.set('Cache-Control', 'private, max-age=300');
+    return new Response(res.body, { headers });
   }
   if (url.pathname === '/_view') {
     const token = url.searchParams.get('sig') ?? '';
@@ -192,7 +201,7 @@ async function serve(request: Request, env: Env): Promise<Response> {
     }
     const d = await viewerData(env, entry, m.entry, `${url.origin}/s/${token}/`, g.host);
     if (d instanceof Response) return d;
-    return new Response(request.method === 'HEAD' ? null : viewerPage(d), { headers: documentHeaders(env, 'text/html; charset=utf-8') });
+    return new Response(request.method === 'HEAD' ? null : viewerPage(d), { headers: cacheUntil(documentHeaders(env, 'text/html; charset=utf-8'), g.exp) });
   }
   if (url.pathname.startsWith('/s/')) return raw(request, env, itemId, url);
   return refuse(env, 404, 'not_found');
