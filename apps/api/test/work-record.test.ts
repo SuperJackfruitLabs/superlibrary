@@ -194,6 +194,56 @@ describe('review fixes', () => {
   });
 });
 
+describe('the guarantee: nothing scanText flags survives', () => {
+  const V = 'Zx9kQ2vL8pW4mN7rT1aB5cD6';
+  const SECRETS = [
+    'AKIAABCDEFGHIJKLMNOP', 'aws_secret_access_key = ' + 'A1b2'.repeat(10), 'ghp_' + 'a'.repeat(36),
+    'xoxb-1234567890-abcdef', 'https://hooks.slack.com/services/T0000/B0000/abcdef123',
+    'sk-ant-' + 'a1B2'.repeat(5), 'sk-proj-' + 'a1B2'.repeat(5), 'eyJhbGciOiJIUzI1.eyJzdWIiOiIxMjM0.' + 'abcdEFGH12345678',
+    '-----BEGIN PRIVATE KEY-----\nMIIEabc\n-----END PRIVATE KEY-----', `password = "${V}"`,
+  ];
+  const all = SECRETS.join('\n');
+  it('holds for every rule in every text-bearing field', () => {
+    const b = bundle(
+      { title: all, spec: { api_key: V, owner: { token: V, list: SECRETS }, notes: all, [`k_${SECRETS[2]}`]: 1, steps: [{ secret: V }] } },
+      {
+        attempts: [{ ...attempt(1, { api_key: V, text: all, deep: [{ client_secret: V }] }), failureReason: all }, { ...attempt(2, all), failureReason: null }],
+        comments: [cmt(1, all)],
+        references: [{ cardId: C, url: 'https://x.example/?' + SECRETS[2] + '&' + SECRETS[0], title: all, provider: 'url', externalId: null }],
+      },
+    );
+    const { record, text } = buildWorkRecord(b, APP);
+    expect(scanText(JSON.stringify(record))).toEqual([]);
+    expect(scanText(text)).toEqual([]);
+    expect(record.redactions.length).toBeGreaterThan(0);
+    const rules = new Set(record.redactions.map((r) => r.rule));
+    for (const r of ['aws-access-key', 'aws-secret-key', 'github-token', 'slack-token', 'slack-webhook', 'anthropic-key', 'openai-key', 'jwt', 'pem-private-key', 'high-entropy-assignment']) expect(rules).toContain(r);
+  });
+  it('a secret split between a key and its value is redacted, including nested keys', () => {
+    const { record, text } = buildWorkRecord(bundle({ spec: { api_key: V, owner: { token: V } } }), APP);
+    expect(JSON.stringify(record)).not.toContain(V);
+    expect(text).not.toContain(V);
+    expect(record.spec).toEqual({ api_key: REDACTED, owner: { token: REDACTED } });
+  });
+  it('array items inherit their key as context', () => {
+    const { record, text } = buildWorkRecord(bundle({ spec: { tokens: [V] } }), APP);
+    expect(JSON.stringify(record)).not.toContain(V);
+    expect(text).not.toContain(V);
+  });
+  it('a value that only looks like an assignment in the indexing text is caught by the final pass', () => {
+    const b = bundle({}, { comments: [{ id: 'cmt_1', author: { kind: 'agent', id: 'a', name: 'my_token' }, body: V, createdAt: 't', deletedAt: null }] });
+    const { record, text } = buildWorkRecord(b, APP);
+    expect(scanText(text)).toEqual([]);
+    expect(text).not.toContain(V);
+    expect(record.redactions).toContainEqual({ field: 'text', rule: 'high-entropy-assignment' });
+  });
+  it('keys that redact to the same text do not overwrite each other', () => {
+    const k1 = 'AKIAABCDEFGHIJKLMNOP', k2 = 'AKIAQRSTUVWXYZABCDEF';
+    const { record } = buildWorkRecord(bundle({ spec: { [k1]: 'one', [k2]: 'two' } }), APP);
+    expect(Object.values(record.spec as object).sort()).toEqual(['one', 'two']);
+  });
+});
+
 describe('flattenSpec', () => {
   it('turns structured fields into readable lines', () => {
     expect(flattenSpec({ goal: 'Launch', steps: ['a', 'b'], owner: { team: 'web' } })).toBe('goal: Launch\nsteps: a; b\nowner.team: web');

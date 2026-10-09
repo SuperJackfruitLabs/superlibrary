@@ -1,5 +1,5 @@
 import { ITEM_ID, WORK_RECORD_SCHEMA, type Outcome, type WorkRecord } from '@superlibrary/contract';
-import { redactSecrets } from '../guard/secrets';
+import { REDACTED, redactSecrets } from '../guard/secrets';
 import type { CardBundle } from '../sources/superpipeline';
 
 /** Plan P16: a stored record is capped at 900 KB, measured in UTF-8 bytes. */
@@ -47,12 +47,26 @@ export function buildWorkRecord(b: CardBundle, appUrl: string): { record: WorkRe
   };
   // Structured values are walked and every string leaf and key is redacted as text: scanning the
   // JSON form would see newlines as `\\n` and quotes as `\\"`, and miss line-anchored matches.
-  const cleanValue = (field: string, v: unknown): unknown => {
-    if (typeof v === 'string') return clean(field, v);
-    if (Array.isArray(v)) return v.map((x) => cleanValue(field, x));
+  // A leaf is tested with its key path as context ("api_key: <value>"), so a secret split between a
+  // key and its value is caught the way scanText would see it in the flattened text.
+  const cleanLeaf = (field: string, path: string, v: string): string => {
+    if (!path) return clean(field, v);
+    const prefix = `${path}: `;
+    const r = redactSecrets(prefix + v);
+    if (r.rules.length === 0) return v;
+    for (const rule of r.rules) redactions.push({ field, rule });
+    return r.text.startsWith(prefix) ? r.text.slice(prefix.length) : REDACTED;
+  };
+  const cleanValue = (field: string, v: unknown, path = ''): unknown => {
+    if (typeof v === 'string') return cleanLeaf(field, path, v);
+    if (Array.isArray(v)) return v.map((x) => cleanValue(field, x, path));
     if (v !== null && typeof v === 'object') {
       const o: Record<string, unknown> = {};
-      for (const [k, x] of Object.entries(v)) o[clean(field, k)] = cleanValue(field, x);
+      for (const [k, x] of Object.entries(v)) {
+        let ck = clean(field, k);
+        for (let n = 2; ck in o; n++) ck = `${clean(field, k)}#${n}`;
+        o[ck] = cleanValue(field, x, path ? `${path}.${ck}` : ck);
+      }
       return o;
     }
     return v ?? null;
@@ -132,5 +146,8 @@ export function buildWorkRecord(b: CardBundle, appUrl: string): { record: WorkRe
     ...record.comments.map((c) => `Comment by ${c.author.name ?? c.author.kind}:\n${c.body}`),
     ...record.references.map((r) => `Reference: ${r.title ?? r.url}`),
   ].filter((s) => s.trim() !== '').join('\n\n');
-  return { record, text };
+  // Final safety pass over what indexing reads.
+  const safe = redactSecrets(text);
+  for (const rule of safe.rules) if (!record.redactions.some((r) => r.field === 'text' && r.rule === rule)) record.redactions.push({ field: 'text', rule });
+  return { record, text: safe.text };
 }
