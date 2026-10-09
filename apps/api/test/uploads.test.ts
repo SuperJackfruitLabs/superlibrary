@@ -244,3 +244,22 @@ describe('text that is not valid UTF-8 is still scanned (PR 2 review)', () => {
     expect(await env.BLOBS.head(`blobs/${r.sha}`)).not.toBeNull();
   });
 });
+
+describe('an owner managing another person\'s item on a known board (plan P4)', () => {
+  it('may upload its next version once the workspace knows the board; not before', async () => {
+    const org = 'org_00000000000000000c03';
+    const owner = devHeaders('prn_000000000000000000c1', org);
+    const member = devHeaders('prn_000000000000000000c2', org);
+    await SELF.fetch(`${API}/api/v1/me`, { headers: owner }); // first seen: the owner
+    const made = await upload([{ path: 'a.md', body: 'one' }], { headers: member });
+    expect(made.status).toBe(201);
+    const BOARD = 'brd_00000000000000b3';
+    await env.DB.prepare(`UPDATE items SET scope = ? WHERE id = ?`).bind(`board:${BOARD}`, made.body.itemId).run();
+    const next = () => upload([{ path: 'a.md', body: 'two' }], { headers: owner, item: made.body.itemId, scope: `board:${BOARD}` });
+    expect((await next()).status).toBe(404); // an unknown board: not confirmed to exist
+    const ws = (await env.DB.prepare(`SELECT workspace_id FROM members WHERE principal_id = 'prn_000000000000000000c1'`).first<{ workspace_id: string }>())!.workspace_id;
+    await env.DB.prepare(`INSERT OR REPLACE INTO source_boards (workspace_id, board_id, name, last_seen_at) VALUES (?, ?, 'B', 't')`).bind(ws, BOARD).run();
+    const r = await next();
+    expect([r.status, r.body.version]).toEqual([201, 2]);
+  });
+});

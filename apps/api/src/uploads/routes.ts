@@ -17,7 +17,7 @@ import { decodeText, sniff } from '../guard/sniff';
 import { scanText, scanUndecodedText } from '../guard/secrets';
 import { committedUsage, newBytes, newCommittedBytes, workspaceUsage } from '../guard/limits';
 import { blobKey, quarantineKey, releaseQuarantine, sha256Hex, writeManifest } from '../storage/blobs';
-import { canManage, isExpired, loadItem } from '../items/visibility';
+import { canManage, isExpired, loadItem, viewerScopes } from '../items/visibility';
 
 export interface SessionRow {
   id: string; workspace_id: string; created_by: string; item_id: string | null; title: string; scope: string;
@@ -92,9 +92,9 @@ async function create(request: Request, env: Env, p: Uploader): Promise<Response
     // checkLinkSource has refused an agent's `item`; only a person names one.
     if (p.kind !== 'human') return error(400, 'invalid', { detail: 'an agent cannot choose the item' });
     // The same rule as revoke, expiry and scope (plan D11/D12): an item the caller may not manage,
-    // including another person's board item an owner cannot see, is not confirmed to exist.
+    // including another person's item on a board the workspace does not know, is not confirmed to exist.
     const item = await loadItem(env, body.item);
-    if (!item || !canManage(p, item)) return error(404, 'not_found');
+    if (!item || !canManage(p, item, await viewerScopes(env, p))) return error(404, 'not_found');
     if (item.revoked_at) return error(410, 'revoked');
     // Expired but not yet swept: only an upload that sets a new (future, checked above) expiry revives it.
     if (isExpired(item) && !itemExpiresAt) return error(410, 'expired');
