@@ -2,6 +2,7 @@
 <script lang="ts">
   import type { WorkRecordView } from '@superlibrary/contract';
   import { specRows, timelineOf, toneVar } from '$lib/record';
+  import Button from '$kit/Button.svelte';
   import Toast from '$kit/Toast.svelte';
   import { when } from '$lib/item';
 
@@ -17,7 +18,7 @@
     <span>{view.boardName ?? r.boardId}</span>
     {#if r.stage}<span>Now at {r.stage}</span>{/if}
   </p>
-  {#if card}<p><a class="kit-button" href={card} target="_blank" rel="noopener noreferrer">Open the card in Superpipeline</a></p>{/if}
+  {#if card}<p><Button href={card} target="_blank" rel="noopener noreferrer">Open the card in Superpipeline</Button></p>{/if}
   {#if r.redactions.length}<Toast tone="info" message="Some text was hidden because it looked like a secret." />{/if}
   {#if r.truncated}<Toast tone="info" message="This record is long: its oldest comments and handoffs were shortened." />{/if}
   {#if spec.length}

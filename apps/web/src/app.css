@@ -45,8 +45,6 @@ summary { padding: 11px 0; cursor: pointer; }
 .danger, .danger:hover { background: var(--color-danger); border-color: var(--color-danger); color: var(--color-surface); }
 .danger-outline { border-color: var(--color-danger); color: var(--color-danger); }
 .danger-text { color: var(--color-danger); }
-.item-head h1 { margin-bottom: 0; overflow-wrap: anywhere; }
-.item-head p { margin-top: var(--space-1); }
 .viewer { margin: var(--space-4) 0; }
 .frame-error { margin: -8px 0 var(--space-4); }
 .panel { padding: 0 var(--space-4) var(--space-4); border: 1px solid var(--color-border); border-radius: var(--radius-control); min-width: 0; }

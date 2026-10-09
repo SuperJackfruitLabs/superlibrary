@@ -65,9 +65,13 @@
       item = r.item;
       versions = r.versions;
       if (r.item.kind === 'work-record') {
-        const res = await api(`/api/v1/items/${itemId}/record`).catch(() => null);
+        let rec: RecordView | null = null;
+        try {
+          const res = await api(`/api/v1/items/${itemId}/record`);
+          if (res.ok) rec = (await res.json()) as RecordView;
+        } catch { /* unreachable, or not JSON: the record could not be loaded */ }
         if (mine !== loads) return;
-        record = res?.ok ? ((await res.json()) as RecordView) : null;
+        record = rec;
       } else record = null;
       phase = 'ok';
       return;
@@ -274,7 +278,8 @@
   {:else if record}
     <WorkRecordView view={record} />
   {:else}
-    <p class="muted">The record could not be loaded.</p>
+    <p class="error" role="alert">The record could not be loaded.</p>
+    <p><button type="button" onclick={load}>Try again</button></p>
   {/if}
 
   <section aria-labelledby="provenance-h">
