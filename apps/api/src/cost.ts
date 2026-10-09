@@ -56,7 +56,10 @@ export function counted(env: Env): { env: Env; cost: Cost } {
 }
 
 export function withCost(res: Response, cost: Cost, startedAt: number): Response {
-  const value = `d1q;desc="${cost.d1q}", d1rt;desc="${cost.d1rt}", r2;desc="${cost.r2}", app;dur=${Date.now() - startedAt}`;
+  const spent = `d1q;desc="${cost.d1q}", d1rt;desc="${cost.d1rt}", r2;desc="${cost.r2}", app;dur=${Date.now() - startedAt}`;
+  // Keep what a route already said (stage timings), then the request cost.
+  const prior = res.headers.get('Server-Timing');
+  const value = prior ? `${prior}, ${spent}` : spent;
   try {
     res.headers.set('Server-Timing', value);
     return res;

@@ -6,6 +6,7 @@ import { viewerScopes, visibleBinds, visibleSql, type ItemRow } from '../items/v
 import { embedderFor } from '../indexing/embedder';
 import { audit } from '../audit';
 import { indexFor, readSlots } from '../indexing/vector-index';
+import type { Stage, Timer } from '../timing';
 import { extraFilterBind, extraFilterSql } from '../library/filters';
 
 /** Words only: FTS5 syntax a person types is never syntax (Review Focus). */
@@ -91,8 +92,13 @@ export function fuse(ranks: Ranks, outcome: Outcome): number {
 
 const live = `AND i.revoked_at IS NULL AND (i.expires_at IS NULL OR i.expires_at > ?4)`;
 
-export async function search(env: Env, v: Viewer, q: SearchQuery, precomputedScopes?: string[]): Promise<SearchResult[]> {
-  const scopes = precomputedScopes ?? (await viewerScopes(env, v));
+/** Later tasks add fields here; `timer` records each stage's wait (gap S4). */
+export interface SearchOptions { timer?: Timer }
+
+export async function search(env: Env, v: Viewer, q: SearchQuery, precomputedScopes?: string[], opts: SearchOptions = {}): Promise<SearchResult[]> {
+  const t = opts.timer;
+  const timed = <T>(stage: Stage, f: () => Promise<T>): Promise<T> => (t ? t.time(stage, f) : f());
+  const scopes = precomputedScopes ?? (await timed('scopes', () => viewerScopes(env, v)));
   const boardScope = q.board ? `board:${q.board}` : null;
   // The vector filter only ever carries scopes the viewer can see; a board filter narrows it to that one board.
   const vectorScopes = boardScope ? scopes.filter((s) => s === boardScope) : scopes;
@@ -112,11 +118,11 @@ export async function search(env: Env, v: Viewer, q: SearchQuery, precomputedSco
   const match = ftsQuery(q.query);
   if (match) {
     try {
-      fts.push(...(await env.DB.prepare(
+      fts.push(...(await timed('fts', () => env.DB.prepare(
         `SELECT f.item_id, f.chunk_id FROM chunks_fts f JOIN items i ON i.id = f.item_id
           WHERE chunks_fts MATCH ?8 AND ${visibleSql('i')} ${live} ${kindSql} ${outcomeSql} ${boardSql} ${extraSql}
           ORDER BY bm25(chunks_fts) LIMIT 60`,
-      ).bind(...binds, match, filters).all<{ item_id: string; chunk_id: string }>()).results);
+      ).bind(...binds, match, filters).all<{ item_id: string; chunk_id: string }>())).results);
     } catch (e) {
       console.error('full-text search failed; treated as no hits', e instanceof Error ? e.message : String(e));
     }
@@ -126,16 +132,19 @@ export async function search(env: Env, v: Viewer, q: SearchQuery, precomputedSco
   let semantic: Array<{ item_id: string; chunk_id: string }> = [];
   try {
     if (vectorScopes.length === 0) throw new Error('no visible scope for the vector query');
-    const { active } = await readSlots(env);
-    const [values] = await embedderFor(env, active.embedder_id!).embed([q.query]);
-    const matches = await indexFor(env, active).query(values!, {
+    const { active, values } = await timed('embed', async () => {
+      const { active } = await readSlots(env);
+      const [values] = await embedderFor(env, active.embedder_id!).embed([q.query]);
+      return { active, values };
+    });
+    const matches = await timed('vector', () => indexFor(env, active).query(values!, {
       namespace: v.workspaceId, topK: 50,
       filter: { scope: { $in: vectorScopes }, ...(q.kinds ? { kind: { $in: q.kinds } } : {}), ...(q.outcomes ? { outcome: { $in: q.outcomes } } : {}) },
-    });
+    }));
     const ids = [...new Set(matches.map((m) => m.itemId))];
-    const visible = new Set(ids.length === 0 ? [] : (await env.DB.prepare(
+    const visible = new Set(ids.length === 0 ? [] : (await timed('recheck', () => env.DB.prepare(
       `SELECT i.id FROM items i WHERE i.id IN (SELECT value FROM json_each(?8)) AND ${visibleSql('i')} ${live} ${kindSql} ${outcomeSql} ${boardSql} ${extraSql}`,
-    ).bind(...binds, JSON.stringify(ids), filters).all<{ id: string }>()).results.map((r) => r.id));
+    ).bind(...binds, JSON.stringify(ids), filters).all<{ id: string }>())).results.map((r) => r.id));
     semantic = matches.filter((m) => visible.has(m.itemId)).map((m) => ({ item_id: m.itemId, chunk_id: m.id }));
   } catch (e) {
     console.error('vector search unavailable; full-text only', e instanceof Error ? e.message : String(e));
@@ -147,9 +156,11 @@ export async function search(env: Env, v: Viewer, q: SearchQuery, precomputedSco
   for (const list of [fts, semantic]) for (const r of list) if (!hit.has(r.item_id)) hit.set(r.item_id, r.chunk_id);
   if (ranks.size === 0) return [];
   const ids = [...ranks.keys()];
-  const rows = (await env.DB.prepare(`SELECT * FROM items WHERE id IN (SELECT value FROM json_each(?))`).bind(JSON.stringify(ids)).all<ItemRow>()).results;
-  const [sources, rawSuperseded, chunks] = await Promise.all([sourcesOf(env, ids), supersededByMap(env, ids), bestChunks(env, ids, hit)]);
-  const superseded = await visibleSupersededBy(env, v, scopes, rawSuperseded);
+  const { rows, sources, chunks, superseded } = await timed('hydrate', async () => {
+    const rows = (await env.DB.prepare(`SELECT * FROM items WHERE id IN (SELECT value FROM json_each(?))`).bind(JSON.stringify(ids)).all<ItemRow>()).results;
+    const [sources, rawSuperseded, chunks] = await Promise.all([sourcesOf(env, ids), supersededByMap(env, ids), bestChunks(env, ids, hit)]);
+    return { rows, sources, chunks, superseded: await visibleSupersededBy(env, v, scopes, rawSuperseded) };
+  });
   return rows
     .map((i) => ({
       itemId: i.id, kind: i.kind, title: i.title, outcome: i.outcome as Outcome, scope: i.scope,
@@ -161,8 +172,9 @@ export async function search(env: Env, v: Viewer, q: SearchQuery, precomputedSco
 }
 
 /** The audited entry for every caller (REST, MCP): one `items.searched` row, never the query text. */
-export async function searchAudited(env: Env, v: Viewer, q: SearchQuery): Promise<SearchResult[]> {
-  const results = await search(env, v, q);
-  await audit(env.DB, { workspaceId: v.workspaceId, actor: v.principalId, act: v.act, action: 'items.searched', detail: { count: results.length, queryLength: q.query.length } }).run();
+export async function searchAudited(env: Env, v: Viewer, q: SearchQuery, timer?: Timer): Promise<SearchResult[]> {
+  const results = await search(env, v, q, undefined, { timer });
+  const write = () => audit(env.DB, { workspaceId: v.workspaceId, actor: v.principalId, act: v.act, action: 'items.searched', detail: { count: results.length, queryLength: q.query.length } }).run();
+  await (timer ? timer.time('audit', write) : write());
   return results;
 }

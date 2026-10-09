@@ -5,6 +5,7 @@ import type { Viewer } from '../auth/caller';
 import { audit } from '../audit';
 import { canSee, isExpired, loadItem, viewerScopes, type ItemRow } from '../items/visibility';
 import { extractText, TEXT_VIEWS } from '../indexing/extract';
+import type { Stage, Timer } from '../timing';
 import { search, sourcesOf, supersededByMap, visibleSupersededBy } from './search';
 
 const GET_CAP = 100_000;
@@ -43,45 +44,48 @@ export async function getForViewer(env: Env, v: Viewer, itemId: string, version?
 }
 
 /** Audited here, not in the route, so every caller (REST, MCP) leaves a row. Never the query text. */
-export async function related(env: Env, v: Viewer, q: RelatedQuery): Promise<RelatedItem[]> {
-  const items = await relatedItems(env, v, q);
-  await audit(env.DB, { workspaceId: v.workspaceId, actor: v.principalId, act: v.act, action: 'items.related', detail: { count: items.length, itemIds: items.map((x) => x.itemId) } }).run();
+export async function related(env: Env, v: Viewer, q: RelatedQuery, timer?: Timer): Promise<RelatedItem[]> {
+  const items = await relatedItems(env, v, q, timer);
+  const write = () => audit(env.DB, { workspaceId: v.workspaceId, actor: v.principalId, act: v.act, action: 'items.related', detail: { count: items.length, itemIds: items.map((x) => x.itemId) } }).run();
+  await (timer ? timer.time('audit', write) : write());
   return items;
 }
 
-async function relatedItems(env: Env, v: Viewer, q: RelatedQuery): Promise<RelatedItem[]> {
-  const scopes = await viewerScopes(env, v);
-  let selfId: string | null = null;
-  let basis = '';
-  if ('cardId' in q) {
-    const w = await env.DB.prepare(`SELECT item_id, text FROM work_records WHERE workspace_id = ? AND card_id = ?`).bind(v.workspaceId, q.cardId).first<{ item_id: string; text: string }>();
-    if (!w || !(await visibleItem(env, v, w.item_id, scopes))) return [];
-    selfId = w.item_id;
-    basis = w.text;
-  } else {
-    const i = await visibleItem(env, v, q.itemId, scopes);
-    if (!i) return [];
-    selfId = i.id;
-    basis = (await extractText(env, i))?.text ?? i.title;
-  }
-  const hits = (await search(env, v, { query: basis.slice(0, 2000), limit: Math.min(25, q.limit * 3) }, scopes)).filter((r) => r.itemId !== selfId);
-  const out: RelatedItem[] = [];
-  let used = 0;
-  for (const r of hits) {
-    if (out.length === q.limit) break;
-    const chunk = (await env.DB.prepare(`SELECT text FROM chunks WHERE item_id = ? ORDER BY position LIMIT 1`).bind(r.itemId).first<{ text: string }>())?.text ?? r.snippet;
-    const room = q.maxTokens - used;
-    if (room < 60) break;
-    // Fit the block to the room left: trim the body until the wrapped block's estimate fits.
-    let body = chunk;
-    let wrapped = wrapItem(r, body);
-    while (estimateTokens(wrapped) > room && body.length > 0) {
-      body = body.slice(0, Math.max(0, body.length - Math.max(40, (estimateTokens(wrapped) - room) * 4))).trimEnd();
-      wrapped = wrapItem(r, body ? `${body}…` : '');
+async function relatedItems(env: Env, v: Viewer, q: RelatedQuery, timer?: Timer): Promise<RelatedItem[]> {
+  const timed = <T>(stage: Stage, f: () => Promise<T>): Promise<T> => (timer ? timer.time(stage, f) : f());
+  const scopes = await timed('scopes', () => viewerScopes(env, v));
+  const found = await timed('basis', async (): Promise<{ selfId: string; basis: string } | null> => {
+    if ('cardId' in q) {
+      const w = await env.DB.prepare(`SELECT item_id, text FROM work_records WHERE workspace_id = ? AND card_id = ?`).bind(v.workspaceId, q.cardId).first<{ item_id: string; text: string }>();
+      if (!w || !(await visibleItem(env, v, w.item_id, scopes))) return null;
+      return { selfId: w.item_id, basis: w.text };
     }
-    if (estimateTokens(wrapped) > room) break;
-    out.push({ ...r, wrapped, tokens: estimateTokens(wrapped) });
-    used += estimateTokens(wrapped);
-  }
+    const i = await visibleItem(env, v, q.itemId, scopes);
+    if (!i) return null;
+    return { selfId: i.id, basis: (await extractText(env, i))?.text ?? i.title };
+  });
+  if (!found) return [];
+  const { selfId, basis } = found;
+  const hits = (await search(env, v, { query: basis.slice(0, 2000), limit: Math.min(25, q.limit * 3) }, scopes, { timer })).filter((r) => r.itemId !== selfId);
+  const out: RelatedItem[] = [];
+  await timed('fit', async () => {
+    let used = 0;
+    for (const r of hits) {
+      if (out.length === q.limit) break;
+      const chunk = (await env.DB.prepare(`SELECT text FROM chunks WHERE item_id = ? ORDER BY position LIMIT 1`).bind(r.itemId).first<{ text: string }>())?.text ?? r.snippet;
+      const room = q.maxTokens - used;
+      if (room < 60) break;
+      // Fit the block to the room left: trim the body until the wrapped block's estimate fits.
+      let body = chunk;
+      let wrapped = wrapItem(r, body);
+      while (estimateTokens(wrapped) > room && body.length > 0) {
+        body = body.slice(0, Math.max(0, body.length - Math.max(40, (estimateTokens(wrapped) - room) * 4))).trimEnd();
+        wrapped = wrapItem(r, body ? `${body}…` : '');
+      }
+      if (estimateTokens(wrapped) > room) break;
+      out.push({ ...r, wrapped, tokens: estimateTokens(wrapped) });
+      used += estimateTokens(wrapped);
+    }
+  });
   return out;
 }
