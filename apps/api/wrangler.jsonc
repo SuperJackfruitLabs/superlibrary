@@ -43,6 +43,12 @@
     { "binding": "DB", "database_name": "superlibrary-catalog", "database_id": "baecb101-9eb3-4e84-bbe2-8037b1ab2b3f", "migrations_dir": "migrations" }
   ],
   "r2_buckets": [{ "binding": "BLOBS", "bucket_name": "superlibrary-blobs" }],
+  // Spec §7 / plan P9. Slot b is idle until a re-index fills it (Task B8).
+  "ai": { "binding": "AI" },
+  "vectorize": [
+    { "binding": "VEC_A", "index_name": "superlibrary-chunks-a" },
+    { "binding": "VEC_B", "index_name": "superlibrary-chunks-b" }
+  ],
   "queues": {
     "producers": [
       { "binding": "RETENTION", "queue": "superlibrary-retention" },
