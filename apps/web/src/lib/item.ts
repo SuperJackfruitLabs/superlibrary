@@ -103,6 +103,8 @@ export function provenanceRows(item: ItemSummary, me: Me | null): Row[] {
   const rows: Row[] = [{ label: 'Created by', value: who }];
   if (s.station) rows.push({ label: 'Station', value: s.station, mono: true });
   if (s.path) rows.push({ label: 'Source path', value: s.path, mono: true });
+  if (s.board) rows.push({ label: 'Board', value: s.board, mono: true });
+  if (s.stage) rows.push({ label: 'Stage', value: s.stage });
   if (s.card) rows.push({ label: 'Card', value: s.card, mono: true });
   if (s.run) rows.push({ label: 'Run', value: s.run, mono: true });
   rows.push({ label: 'Created', value: when(item.createdAt) });

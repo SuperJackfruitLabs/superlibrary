@@ -7,6 +7,10 @@
   import { deleteOnToIso } from '$lib/upload';
   import ConfirmDialog from '$kit/ConfirmDialog.svelte';
   import Toast from '$kit/Toast.svelte';
+  import type { WorkRecordView as RecordView } from '@superlibrary/contract';
+  import ItemHeader from '$lib/ItemHeader.svelte';
+  import WorkRecordView from '$lib/WorkRecordView.svelte';
+  import RelatedList from '$lib/RelatedList.svelte';
   import { themeState } from '$kit/theme.svelte';
   import {
     ItemError, askRevokeItem, askRevokeVersion, change, day, embedUrlGetter, explain, mayManage, provenanceRows, readItem,
@@ -28,6 +32,7 @@
   $effect(() => { const t = themeState.value; mounted?.setTheme(t); });
   /** Bumped to mount the viewer again (after a version is revoked, or on Try again). */
   let mountKey = $state(0);
+  let record = $state<RecordView | null>(null);
   let notice = $state<string | null>(null);
   let noticeEl = $state<HTMLElement | null>(null);
   let refusalEl = $state<HTMLElement | null>(null);
@@ -56,7 +61,17 @@
       r = { state: 'refused', code: 'unreachable' };
     }
     if (mine !== loads) return;
-    if (r.state === 'ok') { item = r.item; versions = r.versions; phase = 'ok'; return; }
+    if (r.state === 'ok') {
+      item = r.item;
+      versions = r.versions;
+      if (r.item.kind === 'work-record') {
+        const res = await api(`/api/v1/items/${itemId}/record`).catch(() => null);
+        if (mine !== loads) return;
+        record = res?.ok ? ((await res.json()) as RecordView) : null;
+      } else record = null;
+      phase = 'ok';
+      return;
+    }
     item = null;
     versions = [];
     phase = r.state;
@@ -78,7 +93,7 @@
   $effect(() => {
     const el = frame;
     void mountKey;
-    if (!el || phase !== 'ok') return;
+    if (!el || phase !== 'ok' || item?.kind !== 'artifact') return;
     const id = itemId;
     const [v, title] = untrack(() => [shown, item?.title] as const);
     let live = true;
@@ -191,13 +206,10 @@
   <p class="error" role="alert" tabindex="-1" bind:this={refusalEl}>{refusal}</p>
   <div class="actions"><a class="button" href="/">Back to the library</a>{#if refusal.startsWith('The library could not')}<button type="button" onclick={load}>Try again</button>{/if}</div>
 {:else if item}
-  <header class="item-head">
-    <h1>{item.title}</h1>
-    <p class="muted">
-      {current ? `Version ${current.version}${current.version === latestLive ? ' (latest)' : ''} · ` : ''}{item.outcome}{item.expiresAt ? ` · to be deleted on ${day(item.expiresAt)}` : ''}
-    </p>
-  </header>
+  <ItemHeader {item} version={current?.version} latest={latestLive}
+    actions={manage && item.kind === 'artifact' ? [{ label: 'Upload a new version', icon: 'upload', href: `/upload?item=${itemId}`, primary: true }] : []} />
 
+  {#if item.kind === 'artifact'}
   <div class="viewer" bind:this={frame}></div>
   {#if frameError}
     <div class="frame-error">
@@ -235,7 +247,6 @@
           </li>
         {/each}
       </ul>
-      {#if manage}<p><a class="button" href={`/upload?item=${itemId}`}>Upload a new version</a></p>{/if}
     </section>
 
     <section class="panel" aria-labelledby="details-h">
@@ -260,6 +271,11 @@
       {/if}
     </section>
   </div>
+  {:else if record}
+    <WorkRecordView view={record} />
+  {:else}
+    <p class="muted">The record could not be loaded.</p>
+  {/if}
 
   <section aria-labelledby="provenance-h">
     <h2 id="provenance-h">Provenance</h2>
@@ -269,6 +285,8 @@
       {/each}
     </dl>
   </section>
+
+  <RelatedList {itemId} />
 
   {#if manage}
     <section class="manage" aria-labelledby="manage-h">
