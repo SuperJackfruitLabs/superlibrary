@@ -108,7 +108,7 @@ export async function ingestBatch(batch: MessageBatch<IngestMessage>, env: Env):
         if (!done.has(key!)) done.set(key!, syncCard(env, m, snapshots));
         await done.get(key!);
       } else if (m.type === 'board.backfill') {
-        await backfillBoard(env, m.workspaceId, m.boardId);
+        await backfillBoard(env, m.workspaceId, m.boardId, m.after ?? null);
       }
       msg.ack();
     } catch (e) {
@@ -125,7 +125,29 @@ export async function ingestBatch(batch: MessageBatch<IngestMessage>, env: Env):
   }
 }
 
-/** Task A14 replaces this with the real backfill; until then it refuses loudly so a stray message retries. */
-export async function backfillBoard(_env: Env, _workspaceId: string, _boardId: string): Promise<void> {
-  throw new Error('backfill arrives in Task A14');
+/**
+ * Spec §5: memory starts with history. Every card on the board, archived ones included, plus a
+ * delete hint for every record whose card is no longer listed. The messages go through the same
+ * `syncCard` the live events use (plan P5), so backfill equals live.
+ *
+ * Bounded work: one invocation reads one snapshot (1 subrequest), one D1 read, and sends at most
+ * BACKFILL_PAGE messages in sendBatch calls of <= 100 (<= 5 calls), so about 7 subrequests. The
+ * rest of the board follows as a `board.backfill` carrying a cursor. The expensive part, about 6
+ * subrequests per card (cardBundle), happens later in the consumer, 10 messages per invocation.
+ */
+export const BACKFILL_PAGE = 500;
+
+export async function backfillBoard(env: Env, workspaceId: string, boardId: string, after: string | null = null): Promise<void> {
+  const snap = await pipelineFor(env, await orgOf(env, workspaceId)).snapshot(boardId);
+  const listed = new Set(snap.cards.map((c) => c.id));
+  const recorded = (await env.DB.prepare(`SELECT card_id FROM work_records WHERE workspace_id = ? AND board_id = ?`).bind(workspaceId, boardId).all<{ card_id: string }>()).results.map((r) => r.card_id);
+  const gone = recorded.filter((id) => !listed.has(id));
+  const all: Array<readonly [string, boolean]> = [...[...listed].map((id) => [id, true] as const), ...gone.map((id) => [id, false] as const)].sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+  const rest = after === null ? all : all.filter(([id]) => id > after);
+  const page = rest.slice(0, BACKFILL_PAGE);
+  const msgs: Array<{ body: IngestMessage }> = page.map(([cardId, present]) => ({
+    body: present ? { type: 'card.sync', workspaceId, boardId, cardId, reason: 'backfill' } : { type: 'card.deleted', workspaceId, boardId, cardId },
+  }));
+  if (rest.length > page.length) msgs.push({ body: { type: 'board.backfill', workspaceId, boardId, after: page[page.length - 1]![0] } });
+  for (let i = 0; i < msgs.length; i += 100) await env.INGEST.sendBatch(msgs.slice(i, i + 100));
 }

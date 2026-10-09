@@ -23,4 +23,4 @@ export type IndexMessage = ItemChanged | ReindexPage;
 export type IngestMessage =
   | { type: 'card.sync'; workspaceId: string; boardId: string; cardId: string; reason: string }
   | { type: 'card.deleted'; workspaceId: string; boardId: string; cardId: string }
-  | { type: 'board.backfill'; workspaceId: string; boardId: string };
+  | { type: 'board.backfill'; workspaceId: string; boardId: string; /** Card id cursor: the page after it. */ after?: string };
