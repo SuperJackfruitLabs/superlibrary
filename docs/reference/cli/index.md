@@ -27,6 +27,18 @@ suli help <verb>
 | [`suli get`](artifacts.md#suli-get) | Show an item and its versions |
 | [`suli revoke`](artifacts.md#suli-revoke) | Revoke an item or one version |
 
+## Finding and curating
+
+| command | what it does |
+|---|---|
+| [`suli search`](library.md#suli-search) | Search the library |
+| [`suli collect list`](library.md#suli-collect-list) | Every collection in the workspace |
+| [`suli collect create`](library.md#suli-collect-create) | Start a collection |
+| [`suli collect show`](library.md#suli-collect-show) | The items in a collection |
+| [`suli collect add`](library.md#suli-collect-add) | Add an item to a collection |
+| [`suli collect remove`](library.md#suli-collect-remove) | Take an item out of a collection |
+| [`suli scope`](library.md#suli-scope) | Show an item to the whole workspace |
+
 ## Flags every command takes
 
 | flag | type | default | meaning |

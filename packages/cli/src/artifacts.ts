@@ -3,7 +3,7 @@ import { basename, join, relative, resolve, sep } from 'node:path';
 import { createHash } from 'node:crypto';
 import { ITEM_ID, LIMITS, NOTHING_ADDED, checkPath, sendFiles, isTransient, describeRefusal, pathRefusalSentence, refusalSentence, sizeRefusal, type UploadRefusal, type CommitResult, type EmbedGrant } from '@superlibrary/contract';
 import { baseUrl, tokenSource, type TokenSource } from './credential.ts';
-
+import { oneLine } from './args.ts';
 export interface LocalFile { path: string; bytes: Uint8Array }
 export type Client = (method: string, path: string, body?: unknown) => Promise<Response>;
 /** Files accounted for so far, of the total. */
@@ -68,16 +68,25 @@ export function makeClient(base: string, token: TokenSource['token'], fetchImpl:
   };
 }
 
+/** What a 400 says is wrong (zod issues, detail or message), on one line without control characters. */
+function reasonOf(b: { issues?: unknown; detail?: unknown; message?: unknown }): string {
+  const v = b.issues ?? b.detail ?? b.message;
+  if (v === undefined || v === null) return '';
+  const s = typeof v === 'string' ? v : JSON.stringify(v);
+  return oneLine(s).slice(0, 300);
+}
+
 /**
  * A refusal as a sentence. `shared` (the upload requests) uses the contract's wording, the same the
  * web app shows; other requests name the code, since those sentences speak of uploads.
  */
-async function refused(res: Response, what: string, shared = false): Promise<never> {
+export async function refused(res: Response, what: string, shared = false): Promise<never> {
   const body = (await res.json().catch(() => ({}))) as { error?: string; path?: string; rule?: string; org?: string; findings?: UploadRefusal['findings'] } & NonNullable<UploadRefusal['detail']>;
   if (body.error === 'product_not_enabled') throw new Error(`Superlibrary is not enabled for workspace ${body.org}. An owner can enable it in the account settings.`);
   const { error = `http_${res.status}`, findings, ...detail } = body;
   const sentence = shared ? refusalSentence({ ok: false, status: res.status, error, findings, detail }) : null;
-  throw new Error(sentence ?? `${what} was refused (${res.status} ${body.error ?? ''}${body.path ? `: ${body.path}` : ''}${body.rule ? ` matches ${body.rule}` : ''}).`);
+  const why = res.status === 400 ? reasonOf(body as { issues?: unknown; detail?: unknown; message?: unknown }) : '';
+  throw new Error(sentence ?? `${what} was refused (${res.status} ${body.error ?? ''}${body.path ? `: ${body.path}` : ''}${body.rule ? ` matches ${body.rule}` : ''})${why ? `: ${why}` : ''}.`);
 }
 
 /** `--expires` is a calendar date, read as the start of that day in UTC. */
@@ -87,7 +96,7 @@ function expiryIso(date: string): string {
   return at.toISOString();
 }
 
-const itemId = (id: string | undefined, verb: string): string => {
+export const itemId = (id: string | undefined, verb: string): string => {
   if (!id) throw new Error(`name an item: suli ${verb} <itm_…>`);
   if (!ITEM_ID.test(id)) throw new Error(`${id} is not an item id (itm_ and 16 hex digits).`);
   return id;
@@ -165,7 +174,7 @@ export function progressLine(write: (s: string) => void, tty: boolean): Progress
   };
 }
 
-const client = () => {
+export const client = () => {
   const src = tokenSource();
   return makeClient(baseUrl(), (o) => src.token(o), fetch, src.kind);
 };

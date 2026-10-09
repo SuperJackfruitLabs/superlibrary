@@ -40,3 +40,8 @@ export function positionals(args: string[]): string[] {
   }
   return out;
 }
+
+/** One line, no control characters: what may be written to a terminal when the text came from a server. */
+export function oneLine(s: string): string {
+  return s.replace(/[\u0000-\u001f\u007f-\u009f]+/g, " ").replace(/\s+/g, " ").trim();
+}
