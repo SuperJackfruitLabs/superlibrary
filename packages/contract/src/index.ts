@@ -7,3 +7,7 @@ export * from './viewer';
 export * from './protocol';
 export * from './refusals';
 export * from './send';
+export * from './provenance';
+export * from './work-record';
+export * from './events';
+export * from './retrieval';

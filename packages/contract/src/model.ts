@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { LinkSource } from './provenance';
 
 export const OUTCOMES = ['approved', 'completed', 'rejected', 'failed', 'abandoned', 'superseded', 'in-progress'] as const;
 export type Outcome = (typeof OUTCOMES)[number];
@@ -28,6 +29,8 @@ export const UploadCreate = z.object({
   entry: z.string().min(1).max(1024).optional(),
   /** ISO 8601; the item is deleted at this time (spec §12). */
   expiresAt: z.iso.datetime().optional(),
+  /** Set only by a trusted service linking a station's file (plan P1, Task A10). */
+  source: LinkSource.optional(),
   files: z
     .array(z.object({ path: z.string().min(1).max(1024), bytes: z.number().int().min(0), sha256: z.string().regex(SHA256) }))
     .min(1),
@@ -104,10 +107,21 @@ export interface VersionSummary {
 export interface ItemSource {
   /** The creator is an agent, not a person. */
   agent?: boolean;
+  /** Which source made it (`upload` is a person's direct upload). */
+  sourceKind?: 'upload' | 'agentpod' | 'superpipeline';
+  agentPrincipal?: string;
   station?: string;
+  /** The station was removed; the item stays (spec §12). */
+  stationRemoved?: boolean;
   path?: string;
+  board?: string;
   card?: string;
+  stage?: string;
   run?: string;
+  sourceId?: string;
+  sourceUrl?: string;
+  /** The service principal (the hub) that acted for the agent. */
+  via?: string;
 }
 
 export interface ItemSummary {
@@ -123,4 +137,8 @@ export interface ItemSummary {
   revokedAt: string | null;
   /** Absent for a person's upload (phase 1). */
   source?: ItemSource;
+  /** Who can see it, in the Share panel's terms (plan P4; phase-1 ruling T14). */
+  audience?: 'uploader' | 'board' | 'workspace';
+  /** A superseded item's replacement (spec §15). */
+  supersededBy?: string | null;
 }
