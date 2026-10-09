@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { LIMITS, SCOPE_RE, encodePath, orderFiles, type EmbedGrant, type FileEntry, type ItemSource, type ItemSummary, type VersionSummary, type View } from '@superlibrary/contract';
 import type { Env } from '../env';
-import { corsFor as corsForOrigins, error, json, preflight, type Handler } from '../http';
+import { error, json, preflight, withCors, type Handler } from '../http';
 import { audit } from '../audit';
 import { resolvePerson, type Person } from '../auth/caller';
 import { itemChanged } from '../events';
@@ -135,8 +135,6 @@ async function detail(env: Env, p: Person, id: string): Promise<Response> {
   }));
   return json({ item: summary(item, (await extrasFor(env, p, [item])).get(id)), versions: out });
 }
-
-const corsFor = (request: Request, env: Env) => corsForOrigins(request, env.EMBED_HOSTS);
 
 async function embed(request: Request, env: Env, p: Person, id: string): Promise<Response> {
   const item = await readable(env, p, id);
@@ -290,22 +288,16 @@ export const itemRoutes: Handler = async (request, env, _ctx, url) => {
   const m = ITEM.exec(url.pathname);
   if (!m) return null;
   const [, id, sub] = m as unknown as [string, string, string | undefined];
-  if (sub === '/embed' && request.method === 'OPTIONS') return preflight(request, env.EMBED_HOSTS, 'POST');
+  // Embedding hosts (spec §9) read the item, mint the grant and widen it with the person's own token.
+  const hostRead = !sub || sub === '/embed' || sub === '/scope';
+  if (request.method === 'OPTIONS') return hostRead ? preflight(request, env.EMBED_HOSTS, sub ? 'POST' : 'GET') : null;
   const p = await resolvePerson(request, env);
-  if (p instanceof Response) {
-    for (const [k, v] of Object.entries(corsFor(request, env))) p.headers.set(k, v);
-    return p;
-  }
-  if (!sub && request.method === 'GET') return detail(env, p, id);
-  if (sub === '/embed' && request.method === 'POST') {
-    // An allowed host must be able to read every answer, refusals included, not an opaque failure.
-    const res = await embed(request, env, p, id);
-    for (const [k, v] of Object.entries(corsFor(request, env))) res.headers.set(k, v);
-    return res;
-  }
+  if (p instanceof Response) return hostRead ? withCors(request, env.EMBED_HOSTS, p) : p;
+  if (!sub && request.method === 'GET') return withCors(request, env.EMBED_HOSTS, await detail(env, p, id));
+  if (sub === '/embed' && request.method === 'POST') return withCors(request, env.EMBED_HOSTS, await embed(request, env, p, id));
   if (!sub && request.method === 'PATCH') return setExpiry(request, env, p, id);
   if (sub === '/revoke' && request.method === 'POST') return revokeItem(request, env, p, id);
-  if (sub === '/scope' && request.method === 'POST') return widenScope(request, env, p, id);
+  if (sub === '/scope' && request.method === 'POST') return withCors(request, env.EMBED_HOSTS, await widenScope(request, env, p, id));
   if (sub?.startsWith('/versions/') && request.method === 'POST') return revokeVersion(env, p, id, Number(m[3]));
   return null;
 };

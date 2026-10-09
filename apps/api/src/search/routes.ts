@@ -1,6 +1,6 @@
 // apps/api/src/search/routes.ts (created here; B5 and B6 add the search, get and related routes)
 import type { Handler } from '../http';
-import { error, json } from '../http';
+import { error, json, preflight, withCors } from '../http';
 import { resolvePerson, resolveViewer, serviceCaller } from '../auth/caller';
 import { RelatedQuery, SearchQuery } from '@superlibrary/contract';
 import { searchAudited } from './search';
@@ -71,13 +71,14 @@ export const searchRoutes: Handler = async (request, env, _ctx, url) => {
     const g = await getForViewer(env, v, lib[1]!, version);
     return g ? json({ item: g.result, text: g.text, wrapped: g.wrapped }) : error(404, 'not_found');
   }
-  if (url.pathname === '/api/v1/related' && request.method === 'POST') {
+  if (url.pathname === '/api/v1/related') {
+    if (request.method === 'OPTIONS') return preflight(request, env.EMBED_HOSTS, 'POST');
+    if (request.method !== 'POST') return null;
     const v = await resolveViewer(request, env);
-    if (v instanceof Response) return v;
+    if (v instanceof Response) return withCors(request, env.EMBED_HOSTS, v);
     const q = RelatedQuery.safeParse(await request.json().catch(() => null));
-    if (!q.success) return error(400, 'invalid');
-    const items = await related(env, v, q.data);
-    return json({ items });
+    if (!q.success) return withCors(request, env.EMBED_HOSTS, error(400, 'invalid'));
+    return withCors(request, env.EMBED_HOSTS, json({ items: await related(env, v, q.data) }));
   }
   return null;
 };
