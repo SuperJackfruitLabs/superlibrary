@@ -65,6 +65,7 @@ export function scanUndecodedText(bytes: Uint8Array): Finding[] {
 }
 
 export const REDACTED = '[redacted secret]';
+const PEM_BLOCK = /-----BEGIN (?:[A-Z0-9]+ )*PRIVATE KEY(?: BLOCK)?-----[\s\S]*?(?:-----END (?:[A-Z0-9]+ )*PRIVATE KEY(?: BLOCK)?-----|$)/g;
 
 /**
  * Spec §8: a work record is stored with each match replaced. The same rules as scanText, matched
@@ -72,7 +73,9 @@ export const REDACTED = '[redacted secret]';
  */
 export function redactSecrets(text: string): { text: string; rules: SecretRule[] } {
   const fired = new Set<SecretRule>();
-  let out = text;
+  // A private key is redacted whole, through its END line (or the end of the text); scanText only
+  // needs the header to refuse an upload.
+  let out = text.replace(PEM_BLOCK, () => { fired.add('pem-private-key'); return REDACTED; });
   for (const [rule, re] of RULES) {
     const g = new RegExp(re.source, re.flags.includes('g') ? re.flags : re.flags + 'g');
     out = out.replace(g, () => { fired.add(rule); return REDACTED; });

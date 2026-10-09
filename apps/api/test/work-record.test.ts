@@ -13,7 +13,7 @@ function bundle(over: Partial<CardBundle['card']> = {}, extra: Partial<CardBundl
 }
 const gate = (decision: 'approve' | 'reject' | 'request_changes' | null) => ({ id: 'gate_1', cardId: C, stageKey: 'review', status: decision ? 'resolved' : 'pending', decision, resolvedAt: decision ? '2026-10-03T00:00:00Z' : null });
 const sup = { fromCardId: 'card_00000000000000c9', toCardId: C, kind: 'supersedes' };
-const cmt = (i: number, body: string) => ({ id: `cmt_${i}`, author: { kind: 'human' as const, id: 'u', name: null }, body, createdAt: `2026-10-02T00:00:${String(i % 60).padStart(2, '0')}Z`, deletedAt: null });
+const cmt = (i: number, body: string) => ({ id: `cmt_${i}`, author: { kind: 'human' as const, id: 'u', name: null }, body, createdAt: new Date(Date.UTC(2026, 9, 2) + i * 1000).toISOString(), deletedAt: null });
 const attempt = (n: number, handoff: unknown) => ({ runId: `run_000000000000000${n}`, stageKey: 'build', agentId: 'agt_1', status: 'completed', outcome: 'completed', startedAt: `2026-10-01T0${n}:00:00Z`, endedAt: null, handoff, failureReason: null });
 
 describe('outcomeOf: every row of the P6 table', () => {
@@ -121,6 +121,76 @@ describe('buildWorkRecord', () => {
     expect(new TextEncoder().encode(JSON.stringify(record)).length).toBeLessThanOrEqual(BODY_CAP);
     expect(record.truncated).toBe(true);
     expect(typeof record.spec).toBe('string');
+  });
+});
+
+describe('review fixes', () => {
+  const K = 'AKIAABCDEFGHIJKLMNOP';
+  const V = 'Zx9kQ2vL8pW4mN7rT1aB5cD6';
+  it('redacts a token that starts a line or follows a tab inside a handoff', () => {
+    const { record, text } = buildWorkRecord(bundle({}, { attempts: [attempt(1, { a: 'x\n' + K, b: 'x\t' + K, [K]: 1 })] }), APP);
+    expect(JSON.stringify(record)).not.toContain(K);
+    expect(text).not.toContain(K);
+    expect(record.redactions).toContainEqual({ field: 'handoffs.run_0000000000000001', rule: 'aws-access-key' });
+  });
+  it('redacts a quoted assignment inside a handoff and a spec', () => {
+    const { record, text } = buildWorkRecord(bundle({ spec: { n: `api_key = "${V}"` } }, { attempts: [attempt(1, { n: `api_key = "${V}"` })] }), APP);
+    expect(JSON.stringify(record)).not.toContain(V);
+    expect(text).not.toContain(V);
+    expect(text).toContain(`api_key = "${REDACTED}"`);
+  });
+  it('redacts a reference url, after the item link is read from the original', () => {
+    const url = `https://app.superlibrary.dev/a/itm_0000000000000001?t=${K}`;
+    const { record, text } = buildWorkRecord(bundle({}, { references: [{ cardId: C, url, title: null, provider: 'url', externalId: null }] }), APP);
+    expect(JSON.stringify(record)).not.toContain(K);
+    expect(text).not.toContain(K);
+    expect(record.references[0]!.itemId).toBe('itm_0000000000000001');
+  });
+  it('redacts a private key body, not only its header', () => {
+    const pem = '-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEAxyz\nabcdefg\n-----END RSA PRIVATE KEY-----';
+    const r = redactSecrets(`before\n${pem}\nafter`);
+    expect(r).toEqual({ text: `before\n${REDACTED}\nafter`, rules: ['pem-private-key'] });
+    expect(redactSecrets('-----BEGIN PRIVATE KEY-----\nMIIEabc').text).toBe(REDACTED);
+    expect(scanText(pem)).toEqual([{ line: 1, rule: 'pem-private-key' }]);
+  });
+  it('stays under the cap when the spec inflates under JSON escaping', () => {
+    const { record } = buildWorkRecord(bundle({ spec: { s: '\u0001'.repeat(900_000) } }), APP);
+    expect(new TextEncoder().encode(JSON.stringify(record)).length).toBeLessThanOrEqual(BODY_CAP);
+    expect(record.truncated).toBe(true);
+  });
+  it('stays under the cap with many large failure reasons and titles', () => {
+    const attempts = Array.from({ length: 9 }, (_, i) => ({ ...attempt(i + 1, null), failureReason: 'f'.repeat(200_000) }));
+    const refs = Array.from({ length: 5 }, () => ({ cardId: C, url: 'https://x.example/' + 'u'.repeat(100_000), title: 't'.repeat(100_000), provider: 'url', externalId: null }));
+    const { record } = buildWorkRecord(bundle({ title: 'T'.repeat(300_000) }, { attempts, references: refs }), APP);
+    expect(new TextEncoder().encode(JSON.stringify(record)).length).toBeLessThanOrEqual(BODY_CAP);
+    expect(record.truncated).toBe(true);
+  });
+  it('re-measures after the first spec cut: escaped characters inflate and other fields share the budget', () => {
+    const b = bundle({ spec: { s: '\u0001'.repeat(300_000) } }, { attempts: [{ ...attempt(1, null), failureReason: 'f'.repeat(500_000) }] });
+    const { record } = buildWorkRecord(b, APP);
+    expect(new TextEncoder().encode(JSON.stringify(record)).length).toBeLessThanOrEqual(BODY_CAP);
+    expect(record.handoffs[0]!.failureReason!.length).toBe(500_000);
+  });
+  it('clips an oversized title and drops surplus references as a last resort', () => {
+    const t = buildWorkRecord(bundle({ title: 'T'.repeat(950_000) }), APP).record;
+    expect(new TextEncoder().encode(JSON.stringify(t)).length).toBeLessThanOrEqual(BODY_CAP);
+    const refs = Array.from({ length: 1500 }, (_, i) => ({ cardId: C, url: 'https://x.example/' + 'u'.repeat(1000) + i, title: 't'.repeat(1000), provider: 'url', externalId: null }));
+    const r = buildWorkRecord(bundle({}, { references: refs }), APP).record;
+    expect(new TextEncoder().encode(JSON.stringify(r)).length).toBeLessThanOrEqual(BODY_CAP);
+    expect(r.truncated).toBe(true);
+  });
+  it('no app host means no item links, even for a hostless url', () => {
+    const b = bundle({}, { references: [{ cardId: C, url: 'file:///a/itm_0000000000000001', title: null, provider: 'url', externalId: null }] });
+    expect(buildWorkRecord(b, 'not a url').record.references[0]!.itemId).toBeNull();
+  });
+  it('drops oldest by time even when the bundle is out of order, and skips deleted comments', () => {
+    const comments = [cmt(5, 'x'.repeat(500_000)), cmt(1, 'x'.repeat(500_000)), { ...cmt(9, 'gone'), deletedAt: '2026-10-03T00:00:00Z' }];
+    const { record } = buildWorkRecord(bundle({}, { comments }), APP);
+    expect(record.comments.map((c) => c.id)).toEqual(['cmt_5']);
+  });
+  it('a malformed app url yields no item links instead of throwing', () => {
+    const b = bundle({}, { references: [{ cardId: C, url: 'https://app.superlibrary.dev/a/itm_0000000000000001', title: null, provider: 'url', externalId: null }] });
+    expect(buildWorkRecord(b, 'not a url').record.references[0]!.itemId).toBeNull();
   });
 });
 

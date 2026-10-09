@@ -45,9 +45,20 @@ export function buildWorkRecord(b: CardBundle, appUrl: string): { record: WorkRe
     for (const rule of r.rules) redactions.push({ field, rule });
     return r.text;
   };
-  // Structured values are redacted through their JSON form, so no field escapes the scan.
-  const cleanValue = (field: string, v: unknown): unknown => JSON.parse(clean(field, JSON.stringify(v ?? null)));
-  const host = new URL(appUrl).host;
+  // Structured values are walked and every string leaf and key is redacted as text: scanning the
+  // JSON form would see newlines as `\\n` and quotes as `\\"`, and miss line-anchored matches.
+  const cleanValue = (field: string, v: unknown): unknown => {
+    if (typeof v === 'string') return clean(field, v);
+    if (Array.isArray(v)) return v.map((x) => cleanValue(field, x));
+    if (v !== null && typeof v === 'object') {
+      const o: Record<string, unknown> = {};
+      for (const [k, x] of Object.entries(v)) o[clean(field, k)] = cleanValue(field, x);
+      return o;
+    }
+    return v ?? null;
+  };
+  let host = '';
+  try { host = new URL(appUrl).host; } catch { /* no app url: no item links */ }
   const attempts = [...b.attempts].sort((x, y) => (x.startedAt ?? '').localeCompare(y.startedAt ?? ''));
   const record: WorkRecord = {
     schema: WORK_RECORD_SCHEMA,
@@ -65,15 +76,15 @@ export function buildWorkRecord(b: CardBundle, appUrl: string): { record: WorkRe
       status: a.status, handoff: cleanValue(`handoffs.${a.runId}`, a.handoff),
       failureReason: a.failureReason === null ? null : clean(`handoffs.${a.runId}`, a.failureReason),
     })),
-    comments: b.comments.map((c) => ({ id: c.id, author: { kind: c.author.kind, name: c.author.name }, body: clean(`comments.${c.id}`, c.body), createdAt: c.createdAt })),
+    comments: [...b.comments].filter((c) => !c.deletedAt).sort((x, y) => x.createdAt.localeCompare(y.createdAt)).map((c) => ({ id: c.id, author: { kind: c.author.kind, name: c.author.name }, body: clean(`comments.${c.id}`, c.body), createdAt: c.createdAt })),
     references: b.references.map((r) => {
       let itemId: string | null = null;
       try {
         const u = new URL(r.url);
-        const id = u.host === host ? ITEM_PATH.exec(u.pathname)?.[1] : undefined;
+        const id = host && u.host === host ? ITEM_PATH.exec(u.pathname)?.[1] : undefined;
         if (id && ITEM_ID.test(id)) itemId = id;
       } catch { /* not a URL */ }
-      return { url: r.url, title: r.title === null ? null : clean('references', r.title), provider: r.provider, itemId };
+      return { url: clean('references', r.url), title: r.title === null ? null : clean('references', r.title), provider: r.provider, itemId };
     }),
     gates: b.gates.map((g) => ({ id: g.id, stage: g.stageKey, decision: g.decision, resolvedAt: g.resolvedAt })),
     supersededByCard: supersededByOf(b),
@@ -81,11 +92,16 @@ export function buildWorkRecord(b: CardBundle, appUrl: string): { record: WorkRe
     redactions: [...new Map(redactions.map((r) => [`${r.field} ${r.rule}`, r])).values()],
     truncated: false,
   };
-  // Plan P16, in this order: oldest comments, then oldest handoff bodies, then the spec text.
+  // Plan P16, in this order: oldest comments, then oldest handoff bodies, then the spec text, then
+  // the other free-text fields. The last step always ends under the cap.
   let size = bytes(record);
-  while (size > BODY_CAP && record.comments.length > 0) {
-    size -= bytes(record.comments.shift()) + 1;
-    record.truncated = true;
+  for (;;) {
+    while (size > BODY_CAP && record.comments.length > 0) {
+      size -= bytes(record.comments.shift()) + 1;
+      record.truncated = true;
+    }
+    size = bytes(record);
+    if (size <= BODY_CAP || record.comments.length === 0) break;
   }
   for (const h of record.handoffs) {
     if (size <= BODY_CAP) break;
@@ -94,8 +110,20 @@ export function buildWorkRecord(b: CardBundle, appUrl: string): { record: WorkRe
     size = bytes(record);
   }
   if (size > BODY_CAP) {
-    record.spec = asText(record.spec).slice(0, 100_000);
     record.truncated = true;
+    const full = asText(record.spec);
+    let n = Math.min(full.length, 100_000);
+    record.spec = full.slice(0, n);
+    while (bytes(record) > BODY_CAP && n > 0) { n = Math.floor(n / 2); record.spec = full.slice(0, n); }
+    if (bytes(record) > BODY_CAP) {
+      const clip = (s: string | null) => (s === null ? null : s.slice(0, 1000));
+      record.title = record.title.slice(0, 1000);
+      for (const h of record.handoffs) h.failureReason = clip(h.failureReason);
+      for (const r of record.references) { r.title = clip(r.title); r.url = r.url.slice(0, 1000); }
+      while (bytes(record) > BODY_CAP && record.references.length > 0) record.references.pop();
+      while (bytes(record) > BODY_CAP && record.handoffs.length > 0) record.handoffs.pop();
+      while (bytes(record) > BODY_CAP && record.gates.length > 0) record.gates.pop();
+    }
   }
   const text = [
     record.title,
