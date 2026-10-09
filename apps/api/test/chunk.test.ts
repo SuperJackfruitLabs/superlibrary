@@ -29,9 +29,12 @@ describe('chunkText', () => {
       expect(shared).toBeLessThanOrEqual(CHUNK.overlap);
     }
   });
-  it('prefers paragraph boundaries', () => {
-    const text = `${'a '.repeat(1400)}\n\n${'b '.repeat(1400)}`;
-    expect(chunkText(text)[0]!.trim().endsWith('a')).toBe(true);
+  it('prefers paragraph boundaries over a later single newline in the window', () => {
+    // The paragraph break is at ~2,000; single-newline lines follow up to ~3,100, inside the 3,200 window.
+    const first = 'a '.repeat(1000).trim();
+    const lines = Array.from({ length: 22 }, () => 'b'.repeat(48)).join('\n');
+    const text = `${first}\n\n${lines}\n${'c '.repeat(800)}`;
+    expect(chunkText(text)[0]).toBe(first);
   });
   it('cuts a single huge line hard instead of looping', () => {
     const chunks = chunkText('x'.repeat(10_000));

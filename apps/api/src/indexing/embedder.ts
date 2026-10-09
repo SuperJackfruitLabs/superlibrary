@@ -12,6 +12,8 @@ export class WorkersAiEmbedder implements Embedder {
     const out: number[][] = [];
     for (let i = 0; i < texts.length; i += this.batch) {
       const r = (await this.ai.run(this.model as keyof AiModels, { text: texts.slice(i, i + this.batch) } as never)) as unknown as { data: number[][] };
+      const want = Math.min(this.batch, texts.length - i);
+      if (!Array.isArray(r.data) || r.data.length !== want) throw new Error(`embedder returned ${r.data?.length} vectors for ${want} texts`);
       for (const v of r.data) {
         if (v.length !== this.dims) throw new Error(`embedding dimension ${v.length}, expected ${this.dims}`);
         out.push(v);

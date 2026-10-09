@@ -6,7 +6,7 @@
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "dev": "wrangler dev --port 8787 --var DEV_AUTH:true --var ORG_PLANE_ISSUER: --var ORG_PLANE_JWKS_URL: --var ORG_PLANE_AUDIENCE: --var APP_URL:http://localhost:5173 --var CONTENT_ORIGIN_TEMPLATE:http://{label}.localhost:8788 --var EMBED_HOSTS:",
+    "dev": "wrangler dev --local --port 8787 --var DEV_AUTH:true --var ORG_PLANE_ISSUER: --var ORG_PLANE_JWKS_URL: --var ORG_PLANE_AUDIENCE: --var APP_URL:http://localhost:5173 --var CONTENT_ORIGIN_TEMPLATE:http://{label}.localhost:8788 --var EMBED_HOSTS:",
     "deploy": "wrangler deploy",
     "db:migrate:local": "wrangler d1 migrations apply superlibrary-catalog --local",
     "db:migrate": "wrangler d1 migrations apply superlibrary-catalog --remote"

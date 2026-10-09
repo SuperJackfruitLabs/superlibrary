@@ -72,6 +72,10 @@ describe('WorkersAiEmbedder', () => {
     const ai = { run: async () => ({ shape: [1, 768], data: [new Array(768).fill(0)] }) };
     await expect(new WorkersAiEmbedder(ai as unknown as Ai).embed(['x'])).rejects.toThrow(/dimension/);
   });
+  it('refuses an answer with a different number of vectors than texts', async () => {
+    const ai = { run: async () => ({ shape: [1, 1024], data: [new Array(1024).fill(0)] }) };
+    await expect(new WorkersAiEmbedder(ai as unknown as Ai).embed(['a', 'b'])).rejects.toThrow(/2 texts/);
+  });
   it('embedderFor knows bge-m3 and refuses an unknown id', () => {
     setIndexingForTests({ embedders: { 'workers-ai/bge-m3': fakeEmbedder() } });
     expect(embedderFor(env, 'workers-ai/bge-m3').dims).toBe(1024);

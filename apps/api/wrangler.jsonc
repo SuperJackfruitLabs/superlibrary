@@ -57,7 +57,7 @@
     ],
     "consumers": [
       { "queue": "superlibrary-retention", "max_batch_size": 1, "max_retries": 5 },
-      { "queue": "superlibrary-index", "max_batch_size": 2, "max_batch_timeout": 5, "max_retries": 8 }
+      { "queue": "superlibrary-index", "max_batch_size": 2, "max_batch_timeout": 5, "max_retries": 8, "max_concurrency": 2 }
     ]
   },
   // The daily sweep enqueues one message; the consumer does the work (spec §6 `retention` queue).

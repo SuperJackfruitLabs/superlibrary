@@ -8,6 +8,7 @@ import { fakeEmbedder, fakeVectorize } from './helpers/fake-vectors';
 import { upload } from './helpers/upload';
 import { devHeaders } from './helpers/org-plane';
 import { seedRecord } from './helpers/records';
+import { extractText, MAX_TEXT } from '../src/indexing/extract';
 import { deleteItem } from '../src/lifecycle/retention';
 
 let vec: ReturnType<typeof fakeVectorize>;
@@ -36,6 +37,29 @@ describe('indexItem', () => {
     await indexItem(env, r.body.itemId);
     const c = await env.DB.prepare(`SELECT text FROM chunks WHERE item_id = ?`).bind(r.body.itemId).all<{ text: string }>();
     expect(c.results.map((x) => x.text)).toEqual(['Hero banner mockup\nhero.png']);
+  });
+  it('caps a work record at MAX_TEXT', async () => {
+    await seedRecord({ id: 'itm_00000000000000f4', text: 'zz '.repeat(MAX_TEXT) });
+    const item = (await env.DB.prepare(`SELECT * FROM items WHERE id = 'itm_00000000000000f4'`).first<any>())!;
+    expect((await extractText(env, item))!.text.length).toBeLessThanOrEqual(MAX_TEXT);
+    await indexItem(env, 'itm_00000000000000f4');
+    const c = await env.DB.prepare(`SELECT COUNT(*) AS n FROM chunks WHERE item_id = 'itm_00000000000000f4'`).first<{ n: number }>();
+    // 400,000 characters in 3,200-character chunks overlapping by 480: about 147 (uncapped it would be about 440).
+    expect(c!.n).toBeGreaterThan(100);
+    expect(c!.n).toBeLessThan(200);
+  });
+  it('a 2 MB text file is indexed from a bounded prefix, cut mid-character without error', async () => {
+    // 3 bytes a character; 2.1 MB; the 1.6 MB prefix ends one byte into a character.
+    const r = await upload([{ path: 'big.txt', body: '€'.repeat(700_000) }], { headers: devHeaders(), scope: 'workspace', title: 'Big' });
+    const item = (await env.DB.prepare(`SELECT * FROM items WHERE id = ?`).bind(r.body.itemId).first<any>())!;
+    const gets: unknown[] = [];
+    const spy = new Proxy(env.BLOBS, { get(t, k) { const v = Reflect.get(t, k); return k === 'get' ? (key: string, o?: unknown) => { gets.push(o); return t.get(key, o as never); } : typeof v === 'function' ? v.bind(t) : v; } });
+    const x = (await extractText({ ...env, BLOBS: spy }, item))!;
+    // The blob is 2.1 MB; only a MAX_TEXT * 4 byte prefix is read.
+    expect(gets).toEqual([{ range: { offset: 0, length: MAX_TEXT * 4 } }]);
+    expect(x.text.length).toBeLessThanOrEqual(MAX_TEXT + 'Big\n\n'.length);
+    expect(x.text.length).toBeGreaterThan(MAX_TEXT / 2);
+    expect(await indexItem(env, r.body.itemId)).toBe('indexed');
   });
   it('a duplicate message changes nothing', async () => {
     await seedRecord({ id: 'itm_00000000000000b2', text: 'same text' });
@@ -199,12 +223,15 @@ describe('reconcile', () => {
     expect(ids).toContain('itm_00000000000000e1');
   });
   it('the daily cron runs the reconcile', async () => {
+    await seedRecord({ id: 'itm_00000000000000f5', text: 'cron seeded' });
     const send = vi.fn();
     const waits: Promise<unknown>[] = [];
     const ctx = { waitUntil: (p: Promise<unknown>) => { waits.push(p); }, passThroughOnException() {} } as unknown as ExecutionContext;
     await worker.scheduled!({ cron: '30 3 * * *', scheduledTime: Date.UTC(2026, 9, 9, 3, 30), noRetry() {} } as ScheduledController, { ...env, INDEX: { sendBatch: send } as unknown as Queue<IndexMessage> }, ctx);
     await Promise.all(waits);
     expect(waits).toHaveLength(1);
+    const sent = send.mock.calls.flatMap((c) => c[0] as Array<{ body: any }>);
+    expect(sent.map((m) => m.body.itemId)).toContain('itm_00000000000000f5');
   });
   it('the admin route is for operators only', async () => {
     const { SELF } = await import('cloudflare:test');
