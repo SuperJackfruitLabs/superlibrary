@@ -945,11 +945,50 @@ describe('the toolbar on phones (operator review of phase 1): every control keep
     // jsdom has no container queries, so the toggle is display:none here; show it as a phone does.
     const phone = Object.assign(document.createElement('style'), { textContent: '.sl-more-toggle{display:inline-flex!important}' });
     document.head.append(phone);
+    try {
+      more().click();
+      [...panel().querySelectorAll('button')].find((b) => b.textContent === 'View source')!.click();
+      await flush();
+      expect(src(m).searchParams.get('source')).toBe('1');
+      expect(document.activeElement).toBe(more());
+    } finally {
+      phone.remove();
+    }
+  });
+  it('More\'s Download mints a stale grant again, like the toolbar download', async () => {
+    const fresh = { ...GRANT, url: `${ORIGIN}/_view?sig=F`, downloadUrl: `${ORIGIN}/s/F/a.md?download=1`, expiresAt: '2026-10-09T00:10:00.000Z' };
+    const getEmbedUrl = vi.fn(async ({ version }: { version?: number }) => (version === undefined ? GRANT : fresh));
+    await mount({ getEmbedUrl });
+    vi.setSystemTime(new Date('2026-10-09T00:04:55.000Z'));
+    const a = q<HTMLAnchorElement>('a.sl-download')!;
+    const clicks: [string, boolean][] = [];
+    a.addEventListener('click', (e) => { clicks.push([a.href, e.defaultPrevented]); e.preventDefault(); });
     more().click();
-    [...panel().querySelectorAll('button')].find((b) => b.textContent === 'View source')!.click();
+    [...panel().querySelectorAll('a')].find((x) => x.textContent === 'Download')!.click();
     await flush();
-    expect(src(m).searchParams.get('source')).toBe('1');
-    expect(document.activeElement).toBe(more());
-    phone.remove();
+    expect(getEmbedUrl).toHaveBeenLastCalledWith({ itemId: ITEM, version: 3 });
+    expect(clicks).toEqual([[GRANT.downloadUrl, true], [fresh.downloadUrl, false]]);
+  });
+  it('closing Files that More opened returns focus to More, whose bar control is hidden on phones', async () => {
+    await mount({ getEmbedUrl: async () => FOLDER });
+    const phone = Object.assign(document.createElement('style'), { textContent: '.sl-more-toggle{display:inline-flex!important}' });
+    document.head.append(phone);
+    try {
+      more().click();
+      [...panel().querySelectorAll('button')].find((b) => b.textContent === 'Files (4)')!.click();
+      expect(q('.sl-files-panel')!.hasAttribute('hidden')).toBe(false);
+      document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      expect(q('.sl-files-panel')!.hasAttribute('hidden')).toBe(true);
+      expect(document.activeElement).toBe(more());
+    } finally {
+      phone.remove();
+    }
+  });
+  it('the More panel is shown only inside the narrow container, and native selects are 16px', async () => {
+    await mount();
+    const css = document.getElementById('sl-embed-style')!.textContent!;
+    expect(css).toMatch(/\.sl-more-panel\{display:none!important\}/);
+    expect(css).toMatch(/@container \(max-width:640px\)\{[^]*\.sl-more-panel:not\(\[hidden\]\)\{display:flex!important\}/);
+    expect(css).toMatch(/\.sl-select select\{[^}]*font-size:max\(16px,1em\)/);
   });
 });

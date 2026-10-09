@@ -19,7 +19,7 @@ const CSS = `
 .sl-btn:focus-visible,.sl-select:focus-within,.sl-panel button:focus-visible,.sl-link:focus-visible,.sl-more-item:focus-visible,.sl-more-field select:focus-visible{outline:2px solid var(--sl-accent);outline-offset:-2px}
 .sl-btn[aria-pressed=true],.sl-btn[aria-expanded=true]{background:var(--sl-hover);color:var(--sl-accent)}
 .sl-icon{flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-.sl-select select{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;font:inherit;-webkit-appearance:none;appearance:none}
+.sl-select select{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;font:inherit;font-size:max(16px,1em);-webkit-appearance:none;appearance:none}
 .sl-version{font-weight:600;font-variant-numeric:tabular-nums}
 .sl-caret{width:14px;height:14px;margin-left:-2px;color:var(--sl-muted)}
 .sl-error{margin:0;padding:6px 10px;color:var(--sl-danger);border-bottom:1px solid var(--sl-line)}
@@ -45,12 +45,12 @@ const CSS = `
 .sl-embed.sl-overlay{position:fixed;inset:0;z-index:2147483647;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
 .sl-embed:fullscreen .sl-frame,.sl-embed.sl-overlay .sl-frame{flex:1 1 auto;height:auto!important;min-height:0}
 .sl-embed:-webkit-full-screen .sl-frame{flex:1 1 auto;height:auto!important;min-height:0}
-.sl-more-toggle{display:none!important}
+.sl-more-toggle,.sl-more-panel{display:none!important}
 .sl-more-list{display:flex;flex-direction:column;gap:6px}
 .sl-panel .sl-more-item{display:flex;align-items:center;min-height:44px;padding:0 12px;border:1px solid var(--sl-line);border-radius:6px;background:var(--sl-bg);color:inherit;text-decoration:none;font:inherit;cursor:pointer}
 .sl-more-field{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:44px}
 .sl-more-field select{min-height:44px;font:inherit;font-size:max(16px,1em)}
-@container (max-width:640px){.sl-toolbar .sl-secondary{display:none}.sl-more-toggle{display:inline-flex!important}.sl-btn,.sl-select{padding:0 8px}}
+@container (max-width:640px){.sl-toolbar .sl-secondary{display:none}.sl-more-toggle{display:inline-flex!important}.sl-more-panel:not([hidden]){display:flex!important}.sl-btn,.sl-select{padding:0 8px}}
 @media (pointer:coarse){.sl-btn,.sl-select,.sl-panel button,.sl-link{min-height:44px;min-width:44px}}
 `;
 

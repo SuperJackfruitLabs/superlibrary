@@ -171,12 +171,15 @@ export async function mountArtifact(el: HTMLElement, opts: MountOptions): Promis
   };
 
   /** The More panel mirrors the secondary controls the bar shows now; each item uses the bar control itself. */
+  let viaMore = false;
   const renderMore = () => {
     const delegate = (label: string, target: HTMLElement) => {
       const b = make('button', { type: 'button', className: 'sl-more-item', textContent: label });
       b.addEventListener('click', () => {
         closePanel(false);
+        viaMore = true; // a panel this opens returns focus to More: the bar control is hidden on phones
         target.click();
+        viaMore = false;
         if (!openPanel) moreToggle.focus(); // the item may open Files; otherwise focus returns to More
       });
       return b;
@@ -192,7 +195,17 @@ export async function mountArtifact(el: HTMLElement, opts: MountOptions): Promis
       themeSelect.dispatchEvent(new Event('change'));
     });
     items.push(make('label', { className: 'sl-more-field' }, make('span', { textContent: 'Theme' }), theme));
-    if (grant.downloadUrl) items.push(make('a', { className: 'sl-more-item', href: grant.downloadUrl, rel: 'noopener noreferrer', textContent: 'Download' }));
+    if (grant.downloadUrl) {
+      // The toolbar download's own listener mints a fresh grant when this one is stale; use it, not a bare link.
+      const dl = make('a', { className: 'sl-more-item', href: grant.downloadUrl, rel: 'noopener noreferrer', textContent: 'Download' });
+      dl.addEventListener('click', (e) => {
+        e.preventDefault();
+        closePanel(false);
+        download.click();
+        moreToggle.focus();
+      });
+      items.push(dl);
+    }
     items.push(make('a', { className: 'sl-more-item', href: link(), target: '_blank', rel: 'noopener noreferrer', textContent: 'Open in new window' }));
     morePanel.replaceChildren(make('div', { className: 'sl-more-list' }, ...items));
   };
@@ -352,20 +365,20 @@ export async function mountArtifact(el: HTMLElement, opts: MountOptions): Promis
   iframe.addEventListener('load', postTheme);
 
   // --- Panels (2, 7): disclosures under the toolbar, one open at a time.
-  let openPanel: { toggle: HTMLButtonElement; panel: HTMLElement } | null = null;
+  let openPanel: { toggle: HTMLButtonElement; panel: HTMLElement; returnTo: HTMLButtonElement } | null = null;
   function closePanel(focusToggle: boolean) {
     if (!openPanel) return;
-    const { toggle, panel } = openPanel;
+    const { toggle, panel, returnTo } = openPanel;
     openPanel = null;
     panel.hidden = true;
     toggle.setAttribute('aria-expanded', 'false');
-    if (focusToggle) toggle.focus();
+    if (focusToggle) returnTo.focus();
   }
   const togglePanel = (toggle: HTMLButtonElement, panel: HTMLElement, focusFirst: () => HTMLElement | null) => {
     const wasOpen = openPanel?.panel === panel;
     closePanel(false);
     if (wasOpen) return;
-    openPanel = { toggle, panel };
+    openPanel = { toggle, panel, returnTo: viaMore ? moreToggle : toggle };
     panel.hidden = false;
     toggle.setAttribute('aria-expanded', 'true');
     focusFirst()?.focus();
