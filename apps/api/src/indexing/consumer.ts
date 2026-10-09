@@ -77,9 +77,17 @@ export async function indexItem(env: Env, itemId: string): Promise<'indexed' | '
       metadata: { itemId, scope: item.scope, kind: item.kind, outcome: item.outcome, embedder: s.embedder_id!, dims: s.dims!, version: content.version, position: i },
     })));
   }
-  if (stale.length > 0) {
+  // Stale ids go from every slot still written. A slot recorded before but no longer written (for
+  // example the old active slot after a swap) loses all of the item's ids, so the final state
+  // never forgets vectors that still exist.
+  const dropped = Object.keys(oldWhere).filter((k) => !(k in where));
+  if (stale.length > 0 || dropped.length > 0) {
+    const everyId = [...new Set([...oldIds, ...ids])];
     const all = (await env.DB.prepare(`SELECT slot, embedder_id, dims, state, cursor FROM vector_slots WHERE embedder_id IS NOT NULL`).all<SlotRow>()).results;
-    for (const s of all) if (s.slot in oldWhere || s.slot in where) await indexFor(env, s).delete(stale);
+    for (const s of all) {
+      if (s.slot in where && stale.length > 0) await indexFor(env, s).delete(stale);
+      else if (dropped.includes(s.slot)) await indexFor(env, s).delete(everyId);
+    }
   }
   await env.DB.prepare(`UPDATE index_state SET digest = ?, chunk_ids = ?, slots = ? WHERE item_id = ?`).bind(digest, JSON.stringify(ids), JSON.stringify(where), itemId).run();
   return 'indexed';
@@ -107,7 +115,7 @@ export async function indexBatch(batch: MessageBatch<IndexMessage>, env: Env): P
 export async function reconcile(env: Env): Promise<{ queued: number; orphans: number }> {
   const missing = (await env.DB.prepare(
     `SELECT i.id, i.workspace_id FROM items i LEFT JOIN index_state s ON s.item_id = i.id
-      WHERE s.item_id IS NULL AND i.revoked_at IS NULL AND (i.expires_at IS NULL OR i.expires_at > ?1) LIMIT 5000`,
+      WHERE (s.item_id IS NULL OR s.digest LIKE 'pending:%') AND i.revoked_at IS NULL AND (i.expires_at IS NULL OR i.expires_at > ?1) LIMIT 5000`,
   ).bind(new Date().toISOString()).all<{ id: string; workspace_id: string }>()).results;
   // B-R4: revoked or expired items that still hold index state; indexItem removes them.
   const stale = (await env.DB.prepare(

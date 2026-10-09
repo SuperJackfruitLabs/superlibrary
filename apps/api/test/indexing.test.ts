@@ -140,6 +140,27 @@ describe('vectors failing (B-R10)', () => {
   });
 });
 
+describe('slots that stop being written', () => {
+  it('a slot recorded earlier but no longer written loses the item\'s vectors', async () => {
+    const b = fakeVectorize();
+    setIndexingForTests({ embedders: { 'workers-ai/bge-m3': fakeEmbedder(), 'test/other': fakeEmbedder('test/other', 1024) }, bindings: { a: vec, b } });
+    await env.DB.prepare(`UPDATE vector_slots SET embedder_id = 'test/other', dims = 1024, state = 'building' WHERE slot = 'b'`).run();
+    try {
+      await seedRecord({ id: 'itm_00000000000000e2', text: 'swap me' });
+      await indexItem(env, 'itm_00000000000000e2');
+      expect(vec.store.has('itm_00000000000000e2:0:0')).toBe(true);
+      await env.DB.prepare(`UPDATE vector_slots SET state = 'idle' WHERE slot = 'a'`).run();
+      await env.DB.prepare(`UPDATE vector_slots SET state = 'active' WHERE slot = 'b'`).run();
+      expect(await indexItem(env, 'itm_00000000000000e2')).toBe('indexed');
+      expect(vec.store.has('itm_00000000000000e2:0:0')).toBe(false);
+      expect(b.store.has('itm_00000000000000e2:0:0')).toBe(true);
+    } finally {
+      await env.DB.prepare(`UPDATE vector_slots SET embedder_id = NULL, dims = NULL, state = 'idle' WHERE slot = 'b'`).run();
+      await env.DB.prepare(`UPDATE vector_slots SET embedder_id = 'workers-ai/bge-m3', dims = 1024, state = 'active' WHERE slot = 'a'`).run();
+    }
+  });
+});
+
 describe('reconcile', () => {
   it('queues live items with no index state, and deletions for orphaned state', async () => {
     await seedRecord({ id: 'itm_00000000000000b7', text: 'never indexed' });
@@ -165,6 +186,17 @@ describe('reconcile', () => {
     const ids = send.mock.calls.flatMap((c) => c[0] as Array<{ body: any }>).filter((m) => m.body.change === 'upserted').map((m) => m.body.itemId);
     expect(ids).toContain('itm_00000000000000b8');
     expect(ids).toContain('itm_00000000000000b9');
+  });
+  it('queues a live item whose index state is still pending', async () => {
+    const orig = vec.upsert.bind(vec);
+    (vec as any).upsert = async () => { throw new Error('vectorize down'); };
+    await seedRecord({ id: 'itm_00000000000000e1', text: 'stuck pending' });
+    await expect(indexItem(env, 'itm_00000000000000e1')).rejects.toThrow();
+    (vec as any).upsert = orig;
+    const send = vi.fn();
+    await reconcile({ ...env, INDEX: { sendBatch: send } as unknown as Queue<IndexMessage> });
+    const ids = send.mock.calls.flatMap((c) => c[0] as Array<{ body: any }>).filter((m) => m.body.change === 'upserted').map((m) => m.body.itemId);
+    expect(ids).toContain('itm_00000000000000e1');
   });
   it('the daily cron runs the reconcile', async () => {
     const send = vi.fn();
