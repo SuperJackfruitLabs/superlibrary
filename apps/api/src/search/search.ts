@@ -52,37 +52,46 @@ function snippet(text: string, query: string): string {
 const live = `AND i.revoked_at IS NULL AND (i.expires_at IS NULL OR i.expires_at > ?4)`;
 
 export async function search(env: Env, v: Viewer, q: SearchQuery): Promise<SearchResult[]> {
-  let scopes = await viewerScopes(env, v);
-  if (q.board) scopes = scopes.filter((s) => s === `board:${q.board}`);
-  if (scopes.length === 0) return [];
+  const scopes = await viewerScopes(env, v);
+  const boardScope = q.board ? `board:${q.board}` : null;
+  // The vector filter only ever carries scopes the viewer can see; a board filter narrows it to that one board.
+  const vectorScopes = boardScope ? scopes.filter((s) => s === boardScope) : scopes;
+  // An agent has nothing outside its scopes. A person may own items on a board they cannot list (own-item rule), so FTS still runs.
+  if (v.kind === 'agent' && vectorScopes.length === 0) return [];
   const now = new Date().toISOString();
   const kindSql = q.kinds ? `AND i.kind IN (SELECT value FROM json_each(?5))` : `AND ?5 IS NULL`;
   const outcomeSql = q.outcomes ? `AND i.outcome IN (SELECT value FROM json_each(?6))` : `AND ?6 IS NULL`;
-  const binds = [...visibleBinds(v, scopes), now, q.kinds ? JSON.stringify(q.kinds) : null, q.outcomes ? JSON.stringify(q.outcomes) : null] as const;
+  const boardSql = `AND (?7 IS NULL OR i.scope = ?7)`;
+  const binds = [...visibleBinds(v, scopes), now, q.kinds ? JSON.stringify(q.kinds) : null, q.outcomes ? JSON.stringify(q.outcomes) : null, boardScope] as const;
 
   // 1. Exact words, filtered in SQL.
   const fts: Array<{ item_id: string; chunk_id: string }> = [];
   const match = ftsQuery(q.query);
   if (match) {
-    fts.push(...(await env.DB.prepare(
-      `SELECT f.item_id, f.chunk_id FROM chunks_fts f JOIN items i ON i.id = f.item_id
-        WHERE chunks_fts MATCH ?7 AND ${visibleSql('i')} ${live} ${kindSql} ${outcomeSql}
-        ORDER BY bm25(chunks_fts) LIMIT 60`,
-    ).bind(...binds, match).all<{ item_id: string; chunk_id: string }>()).results);
+    try {
+      fts.push(...(await env.DB.prepare(
+        `SELECT f.item_id, f.chunk_id FROM chunks_fts f JOIN items i ON i.id = f.item_id
+          WHERE chunks_fts MATCH ?8 AND ${visibleSql('i')} ${live} ${kindSql} ${outcomeSql} ${boardSql}
+          ORDER BY bm25(chunks_fts) LIMIT 60`,
+      ).bind(...binds, match).all<{ item_id: string; chunk_id: string }>()).results);
+    } catch (e) {
+      console.error('full-text search failed; treated as no hits', e instanceof Error ? e.message : String(e));
+    }
   }
 
   // 2. Meaning, filtered in the vector query, then re-checked in SQL before anything is ranked.
   let semantic: Array<{ item_id: string; chunk_id: string }> = [];
   try {
+    if (vectorScopes.length === 0) throw new Error('no visible scope for the vector query');
     const { active } = await readSlots(env);
     const [values] = await embedderFor(env, active.embedder_id!).embed([q.query]);
     const matches = await indexFor(env, active).query(values!, {
       namespace: v.workspaceId, topK: 50,
-      filter: { scope: { $in: scopes }, ...(q.kinds ? { kind: { $in: q.kinds } } : {}), ...(q.outcomes ? { outcome: { $in: q.outcomes } } : {}) },
+      filter: { scope: { $in: vectorScopes }, ...(q.kinds ? { kind: { $in: q.kinds } } : {}), ...(q.outcomes ? { outcome: { $in: q.outcomes } } : {}) },
     });
     const ids = [...new Set(matches.map((m) => m.itemId))];
     const visible = new Set(ids.length === 0 ? [] : (await env.DB.prepare(
-      `SELECT i.id FROM items i WHERE i.id IN (SELECT value FROM json_each(?7)) AND ${visibleSql('i')} ${live} ${kindSql} ${outcomeSql}`,
+      `SELECT i.id FROM items i WHERE i.id IN (SELECT value FROM json_each(?8)) AND ${visibleSql('i')} ${live} ${kindSql} ${outcomeSql} ${boardSql}`,
     ).bind(...binds, JSON.stringify(ids)).all<{ id: string }>()).results.map((r) => r.id));
     semantic = matches.filter((m) => visible.has(m.itemId)).map((m) => ({ item_id: m.itemId, chunk_id: m.id }));
   } catch (e) {
@@ -106,7 +115,13 @@ export async function search(env: Env, v: Viewer, q: SearchQuery): Promise<Searc
   if (score.size === 0) return [];
   const ids = [...score.keys()];
   const rows = (await env.DB.prepare(`SELECT * FROM items WHERE id IN (SELECT value FROM json_each(?))`).bind(JSON.stringify(ids)).all<ItemRow>()).results;
-  const [sources, superseded, chunks] = await Promise.all([sourcesOf(env, ids), supersededByMap(env, ids), bestChunks(env, ids, hit)]);
+  const [sources, rawSuperseded, chunks] = await Promise.all([sourcesOf(env, ids), supersededByMap(env, ids), bestChunks(env, ids, hit)]);
+  // A replacement the viewer cannot see is not named (spec §4): same visibility and liveness as any result.
+  const repIds = [...new Set(rawSuperseded.values())];
+  const repVisible = new Set(repIds.length === 0 ? [] : (await env.DB.prepare(
+    `SELECT i.id FROM items i WHERE i.id IN (SELECT value FROM json_each(?8)) AND ${visibleSql('i')} ${live}`,
+  ).bind(...binds.slice(0, 4), null, null, null, JSON.stringify(repIds)).all<{ id: string }>()).results.map((r) => r.id));
+  const superseded = new Map([...rawSuperseded].filter(([, n]) => repVisible.has(n)));
   return rows
     .map((i) => ({
       itemId: i.id, kind: i.kind, title: i.title, outcome: i.outcome as Outcome, scope: i.scope,

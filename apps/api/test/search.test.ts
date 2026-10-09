@@ -57,6 +57,66 @@ describe('visibility before ranking (spec §4, §15)', () => {
   });
 });
 
+describe('re-authorisation of vector hits', () => {
+  it('a stale-scope vector hit is dropped by the SQL re-check', async () => {
+    await seed('itm_00000000000000c1', 'quarterly budget forecast STALEMARKER', { board: 'brd_00000000000000b1' });
+    // Re-scoped in D1 while the index still carries the old scope metadata; full-text rows removed so only the vector can find it.
+    await env.DB.prepare(`UPDATE items SET scope = 'board:brd_00000000000000b2' WHERE id = 'itm_00000000000000c1'`).run();
+    await env.DB.prepare(`DELETE FROM chunks_fts WHERE item_id = 'itm_00000000000000c1'`).run();
+    roster(['brd_00000000000000b1']);
+    const r = await search(env, agent, { query: 'quarterly budget forecast', limit: 10 });
+    // The index did return it (the stale metadata admitted it); only the SQL re-check removed it.
+    expect(vec.queries.at(-1)).toMatchObject({ filter: { scope: { $in: ['workspace', 'board:brd_00000000000000b1'] } } });
+    expect(r.map((x) => x.itemId)).not.toContain('itm_00000000000000c1');
+    expect(JSON.stringify(r)).not.toContain('STALEMARKER');
+  });
+});
+
+describe('board filter', () => {
+  const addBoards = () => env.DB.prepare(`INSERT OR REPLACE INTO source_boards (workspace_id, board_id, name, last_seen_at) VALUES (?, 'brd_00000000000000b1', 'B', 't'), (?, 'brd_00000000000000b2', 'B', 't')`).bind(WS, WS).run();
+  async function own(id: string, text: string, board: string) {
+    await seed(id, text, { board });
+    await env.DB.prepare(`UPDATE items SET created_by = ? WHERE id = ?`).bind(person.principalId, id).run();
+  }
+  it("a person's board filter excludes their own items on other boards", async () => {
+    await addBoards();
+    await own('itm_00000000000000c2', 'launch plan alpha', 'brd_00000000000000b1');
+    await own('itm_00000000000000c3', 'launch plan alpha', 'brd_00000000000000b2');
+    const r = await search(env, person, { query: 'launch plan alpha', board: 'brd_00000000000000b1', limit: 10 });
+    expect(r.map((x) => x.itemId)).toEqual(['itm_00000000000000c2']);
+    expect(vec.queries.at(-1)).toMatchObject({ filter: { scope: { $in: ['board:brd_00000000000000b1'] } } });
+  });
+  it('a person finds their own item on a board they cannot list, and no vector query carries it', async () => {
+    await own('itm_00000000000000c4', 'orphan board notes', 'brd_00000000000000b3');
+    vec.queries.length = 0;
+    const r = await search(env, person, { query: 'orphan board notes', board: 'brd_00000000000000b3', limit: 10 });
+    expect(r.map((x) => x.itemId)).toEqual(['itm_00000000000000c4']);
+    expect(vec.queries).toEqual([]);
+  });
+});
+
+describe('board filter on stale vector hits', () => {
+  it("the hydrate step also holds a person's own re-scoped item to the filtered board", async () => {
+    await env.DB.prepare(`INSERT OR REPLACE INTO source_boards (workspace_id, board_id, name, last_seen_at) VALUES (?, 'brd_00000000000000b1', 'B', 't')`).bind(WS).run();
+    await seed('itm_00000000000000c7', 'vendor contract renewal', { board: 'brd_00000000000000b1' });
+    await env.DB.prepare(`UPDATE items SET created_by = ?, scope = 'board:brd_00000000000000b2' WHERE id = 'itm_00000000000000c7'`).bind(person.principalId).run();
+    await env.DB.prepare(`DELETE FROM chunks_fts WHERE item_id = 'itm_00000000000000c7'`).run();
+    expect(await search(env, person, { query: 'vendor contract renewal', board: 'brd_00000000000000b1', limit: 10 })).toEqual([]);
+  });
+});
+
+describe('supersededBy visibility', () => {
+  it('does not name a replacement the viewer cannot see', async () => {
+    await seed('itm_00000000000000c5', 'handbook draft one', { board: 'brd_00000000000000b1', outcome: 'superseded' });
+    await seed('itm_00000000000000c6', 'handbook draft two', { board: 'brd_00000000000000b2', outcome: 'approved' });
+    await env.DB.prepare(`UPDATE work_records SET superseded_by_card = 'card_00000000000000c6' WHERE item_id = 'itm_00000000000000c5'`).run();
+    roster(['brd_00000000000000b1']);
+    const r = await search(env, agent, { query: 'handbook draft', limit: 10 });
+    expect(r.map((x) => x.itemId)).toEqual(['itm_00000000000000c5']);
+    expect(r[0]!.supersededBy).toBeNull();
+  });
+});
+
 describe('ranking (spec §7)', () => {
   it('outcome weights reorder equal matches', async () => {
     await env.DB.prepare(`INSERT OR REPLACE INTO source_boards (workspace_id, board_id, name, last_seen_at) VALUES (?, 'brd_00000000000000b1', 'B', 't')`).bind(WS).run();
@@ -107,5 +167,10 @@ describe('POST /api/v1/search', () => {
     expect(r.status).toBe(200);
     const a = await env.DB.prepare(`SELECT detail FROM audit_events WHERE action = 'items.searched' ORDER BY at DESC LIMIT 1`).first<{ detail: string }>();
     expect(a!.detail).not.toContain('ghp_abc');
+    expect(JSON.parse(a!.detail)).toEqual({ count: 0, queryLength: 14 });
+  });
+  it('answers 400 to a bad body', async () => {
+    const r = await SELF.fetch('https://api.test/api/v1/search', { method: 'POST', headers: { 'X-Dev-Principal': person.principalId, 'X-Dev-Org': ORG, 'content-type': 'application/json' }, body: JSON.stringify({ query: '', extra: 1 }) });
+    expect(r.status).toBe(400);
   });
 });
