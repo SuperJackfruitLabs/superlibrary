@@ -7,6 +7,7 @@
   import { api } from '$lib/session.svelte';
   import FilterBar from '$lib/FilterBar.svelte';
   import ResultList from '$lib/ResultList.svelte';
+  import Button from '$kit/Button.svelte';
   import Tabs from '$kit/Tabs.svelte';
   import { OUTCOME_ORDER, OUTCOME_WORDS } from '$kit/outcome';
   import { boardNames, browseLibrary, loadFacets, rangeProblem, readFilters, rowOfItem, viewTitle, writeFilters, type Filters } from '$lib/library';
@@ -36,14 +37,19 @@
   onMount(async () => { const f = await loadFacets(api); if (f.ok) facets = f.value; });
 
   let loads = 0;
+  let tried: string | null = null;   // the cursor of the last request, so a retry resumes there
   async function load(f: Filters, cursor: string | null = null) {
     const mine = ++loads;
+    tried = cursor;
     loading = true;
     error = null;
     if (rangeProblem(f)) { items = []; counts = null; next = null; loading = false; return; }
     const r = await browseLibrary(api, { ...f, outcomes: f.outcomes.slice(0, 1) }, cursor);
     if (mine !== loads) return;
-    if (r.ok) { items = cursor ? [...items, ...r.value.items] : r.value.items; counts = r.value.counts; next = r.value.next; } else error = r.message;
+    if (r.ok) { items = cursor ? [...items, ...r.value.items] : r.value.items; counts = r.value.counts; next = r.value.next; } else {
+      error = r.message;
+      if (!cursor) { items = []; counts = null; next = null; }   // never show the last view's rows under this view's title
+    }
     loading = false;
   }
   $effect(() => { const f = filters; untrack(() => void load(f)); });
@@ -56,11 +62,11 @@
 <p class="muted" role="status">{loading ? 'Loading…' : error ? '' : `${rows.length}${next ? '+' : ''} item${rows.length === 1 ? '' : 's'}, most recent activity first`}</p>
 {#if error}
   <p class="error" role="alert">{error}</p>
-  <button type="button" onclick={() => load(filters)}>Try again</button>
+  <Button onclick={() => load(filters, tried)}>Try again</Button>
 {:else if !loading && rows.length === 0}
   <p>Nothing{selected ? ` ${OUTCOME_WORDS[selected].toLowerCase()}` : ''} here in this period. Try another board or a longer period.</p>
 {/if}
 {#if rows.length}
   <ResultList {rows} label={title} />
-  {#if next}<button type="button" disabled={loading} onclick={() => load(filters, next)}>{loading ? 'Loading…' : 'More'}</button>{/if}
+  {#if next}<Button disabled={loading} onclick={() => load(filters, next)}>{loading ? 'Loading…' : 'More'}</Button>{/if}
 {/if}
