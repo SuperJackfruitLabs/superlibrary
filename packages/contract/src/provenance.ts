@@ -52,3 +52,11 @@ export const LinkSource = z
   })
   .strict();
 export type LinkSource = z.infer<typeof LinkSource>;
+
+/**
+ * Gap S1: a file a person links from a station in the AgentPod console, with their own token.
+ * Superlibrary records it only when the hub says the station is that person's (never on the
+ * person's word): `station` is the hub's station id, `path` relative to the station's workspace.
+ */
+export const StationFile = z.object({ station: z.string().min(1).max(100), path: z.string().min(1).max(1024) }).strict();
+export type StationFile = z.infer<typeof StationFile>;

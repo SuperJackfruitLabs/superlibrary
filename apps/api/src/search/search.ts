@@ -23,6 +23,7 @@ export async function sourcesOf(env: Env, ids: string[]): Promise<Map<string, It
     ...(r.station ? { station: r.station } : {}), ...(r.station_name ? { stationName: r.station_name } : {}), ...(r.station_removed_at ? { stationRemoved: true } : {}), ...(r.source_path ? { path: r.source_path } : {}),
     ...(r.board_id ? { board: r.board_id } : {}), ...(r.card_id ? { card: r.card_id } : {}), ...(r.stage ? { stage: r.stage } : {}), ...(r.run_id ? { run: r.run_id } : {}),
     ...(r.source_id ? { sourceId: r.source_id } : {}), ...(r.source_url ? { sourceUrl: r.source_url } : {}),
+    ...(r.linked_by ? { linkedBy: r.linked_by } : {}),
   } satisfies ItemSource]));
 }
 

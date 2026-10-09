@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  Provenance, UploadCreate, OUTCOME_WEIGHTS, OUTCOMES, SearchQuery, RelatedQuery, PROMPT_CAPS, estimateTokens, wrapItem, itemUrl,
+  Provenance, StationFile, UploadCreate, OUTCOME_WEIGHTS, OUTCOMES, SearchQuery, RelatedQuery, PROMPT_CAPS, estimateTokens, wrapItem, itemUrl,
   type ItemChanged, type IngestMessage,
 } from '../src/index';
 
@@ -27,6 +27,13 @@ describe('provenance', () => {
     const base = { title: 't', files: [{ path: 'a.md', bytes: 1, sha256: 'a'.repeat(64) }] };
     expect(UploadCreate.safeParse({ ...base, source: { station: 'stn_1', path: 'out/a.md', board: 'brd_00000000000000b1' } }).success).toBe(true);
     expect(UploadCreate.safeParse({ ...base, source: { station: 'stn_1', path: 'out/a.md', board: 'brd_00000000000000b1', extra: 1 } }).success).toBe(false);
+  });
+  it("a person's station file (gap S1) is a station and a path, strictly", () => {
+    expect(StationFile.safeParse({ station: 's', path: 'p', board: 'brd_00000000000000b1' }).success).toBe(false);
+    expect(StationFile.safeParse({ station: '', path: 'p' }).success).toBe(false);
+    expect(StationFile.safeParse({ station: 's', path: '' }).success).toBe(false);
+    const files = [{ path: 'a.md', bytes: 1, sha256: 'a'.repeat(64) }];
+    expect(UploadCreate.parse({ title: 't', files, stationFile: { station: 's', path: 'p' } }).stationFile).toEqual({ station: 's', path: 'p' });
   });
 });
 

@@ -16,6 +16,7 @@ const hostsOf = (s: string) => s.split(/\s+/).filter((x) => x !== '');
 interface SourceRow {
   source: 'upload' | 'agentpod' | 'superpipeline'; board_id: string | null; card_id: string | null; stage: string | null; run_id: string | null;
   agent_principal: string | null; station: string | null; station_name: string | null; source_path: string | null; source_id: string | null; source_url: string | null; station_removed_at: string | null;
+  linked_by: string | null;
 }
 
 function sourceOf(r: SourceRow): ItemSource {
@@ -30,10 +31,11 @@ function sourceOf(r: SourceRow): ItemSource {
   if (r.run_id) s.run = r.run_id;
   if (r.source_id) s.sourceId = r.source_id;
   if (r.source_url) s.sourceUrl = r.source_url;
+  if (r.linked_by) s.linkedBy = r.linked_by;
   return s;
 }
 
-const SOURCE_COLS = `item_id, source, board_id, card_id, stage, run_id, agent_principal, station, station_name, source_path, source_id, source_url, station_removed_at`;
+const SOURCE_COLS = `item_id, source, board_id, card_id, stage, run_id, agent_principal, station, station_name, source_path, source_id, source_url, station_removed_at, linked_by`;
 
 /** What `summary` adds: each item's source, whether its board is known, and a work record's replacement. */
 interface Extras { source?: ItemSource; boardKnown?: boolean; supersededBy?: string | null }
