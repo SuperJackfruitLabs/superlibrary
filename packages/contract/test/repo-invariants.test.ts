@@ -23,6 +23,9 @@ function sources(dir: string): [string, string][] {
 }
 
 describe('repository invariants', () => {
+  it('the API Worker runs next to its database, not next to each caller (each request makes several D1/R2 calls in turn)', () => {
+    expect(jsonc('apps/api/wrangler.jsonc').placement).toEqual({ region: 'aws:ap-southeast-1' });
+  });
   it('the content Worker never writes R2 (plan D8: the binding cannot be made read-only)', () => {
     // Every file, at any depth: a helper in a subfolder writes R2 as surely as one at the top.
     const files = sources('apps/content/src');
