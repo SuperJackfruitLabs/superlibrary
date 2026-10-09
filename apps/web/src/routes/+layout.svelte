@@ -3,6 +3,7 @@
   import { onDestroy, onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
+  import AppHeader from '$lib/AppHeader.svelte';
   import { autoSignIn, signOut, watchSession } from '$lib/auth/org-plane';
   import { currentPlane, devMode, enableUrl, initSession, planeSessionLost, session } from '$lib/session.svelte';
 
@@ -73,10 +74,7 @@
   </main>
 {:else if session.me}
   <div class="shell">
-    <header class="top">
-      <a href="/"><strong>Superlibrary</strong></a>
-      <nav><a href="/upload">Upload</a><button type="button" onclick={logOut}>Sign out</button></nav>
-    </header>
+    <AppHeader onsignout={logOut} />
     {@render children()}
   </div>
 {:else}

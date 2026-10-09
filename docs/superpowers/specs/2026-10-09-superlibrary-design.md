@@ -227,7 +227,16 @@ phase 5.
 
 ### File types
 
-The type comes from sniffing the bytes.
+The type comes from sniffing the bytes. The extension never chooses HTML, SVG, PDF, an image or
+media: PNG bytes named `.html` are an image, and a page named `.txt` or `.png` renders as HTML.
+
+- **HTML** is recognised by the WHATWG MIME Sniffing "HTML" patterns: after optional whitespace
+  and a BOM, one of `<!DOCTYPE HTML`, `<HTML`, `<HEAD`, `<SCRIPT`, `<IFRAME`, `<H1`, `<DIV`,
+  `<FONT`, `<TABLE`, `<A`, `<STYLE`, `<TITLE`, `<B`, `<BODY`, `<BR`, `<P` or `<!--`,
+  case-insensitive, followed by a space, `>` or other whitespace. A page that opens with
+  `<title>` and no doctype is HTML.
+- **SVG** is checked first, so an SVG that opens with an XML declaration, a comment or an SVG
+  doctype stays an image.
 
 | Kind | Shown as |
 |---|---|

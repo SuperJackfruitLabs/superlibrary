@@ -96,7 +96,11 @@ async function whileFirstBatchWaits(inner: () => Promise<Response>, outer: () =>
   let innerRes: { status: number; body: unknown } | undefined;
   let held = false;
   db.batch = (async (statements: D1PreparedStatement[]) => {
-    if (!held) {
+    // Only a commit's batch, which opens by marking its session committed: the queue consumers run
+    // in the background during a test and batch too, and holding one of theirs instead let the
+    // outer request finish before the inner had run (a CI-only race).
+    const sql = (statements[0] as unknown as { statement?: string } | undefined)?.statement;
+    if (!held && sql?.startsWith(`UPDATE upload_sessions SET state = 'committed'`)) {
       held = true;
       // Read here: a response body cannot leave the request context it was made in.
       const res = await inner();

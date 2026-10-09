@@ -72,6 +72,18 @@ const BY_EXTENSION: Record<string, [View, string]> = {
 };
 const CODE = new Set(['ts', 'tsx', 'jsx', 'py', 'rb', 'go', 'rs', 'java', 'kt', 'swift', 'c', 'h', 'cc', 'cpp', 'hpp', 'cs', 'php', 'sh', 'bash', 'zsh', 'fish', 'sql', 'lua', 'r', 'scala', 'svelte', 'vue', 'html', 'htm', 'xml', 'ini', 'cfg', 'conf', 'diff', 'patch', 'dockerfile', 'makefile', 'swift', 'zig', 'ex', 'exs', 'erl', 'hs', 'ml', 'dart', 'tf', 'proto', 'graphql']);
 
+/** WHATWG whitespace bytes (TAB, LF, FF, CR, SPACE); the decoder has already dropped any BOM. */
+const LEADING_WS = /^[\t\n\f\r ]+/;
+/**
+ * WHATWG MIME Sniffing §7.1, the "HTML" rows: one of these, case-insensitive, then a
+ * tag-terminating byte. The standard's terminators are SPACE and '>'; the other whitespace bytes
+ * are accepted too, since a tag name ends at any of them (`<html\nlang="en">` is a page).
+ * Spec §9: the bytes decide, never the extension, so these hold for a `.txt` or a `.png` alike.
+ */
+const HTML_START = /^(?:<!doctype html|<html|<head|<script|<iframe|<h1|<div|<font|<table|<a|<style|<title|<b|<body|<br|<p|<!--)[\t\n\f\r >]/;
+/** An SVG root, optionally after an XML declaration, comments and an SVG doctype. */
+const SVG_START = /^(?:(?:<\?xml[^>]*\?>|<!--[\s\S]*?-->|<!doctype svg[^>]*>)[\t\n\f\r ]*)*<svg[\t\n\f\r />]/;
+
 function extOf(path: string): string {
   const name = (path.split('/').pop() ?? '').toLowerCase();
   if (name === 'dockerfile' || name === 'makefile') return name;
@@ -92,9 +104,10 @@ export function sniff(b: Uint8Array, path: string): Sniffed {
   } catch {
     return bin('application/octet-stream', 'download');
   }
-  const head = content.slice(0, 1024).trimStart().toLowerCase();
-  if (head.startsWith('<!doctype html') || head.startsWith('<html')) return t('html', 'text/html');
-  if (head.startsWith('<svg') || (head.startsWith('<?xml') && head.includes('<svg'))) return { mediaType: 'image/svg+xml', view: 'svg', text: true, encoding };
+  const head = content.slice(0, 1024).replace(LEADING_WS, '').toLowerCase();
+  // SVG first: a comment-led SVG would otherwise match the HTML `<!--` pattern.
+  if (SVG_START.test(head) || (head.startsWith('<?xml') && head.includes('<svg'))) return { mediaType: 'image/svg+xml', view: 'svg', text: true, encoding };
+  if (HTML_START.test(head)) return t('html', 'text/html');
   if (head.startsWith('{') || head.startsWith('[')) {
     try {
       const v = JSON.parse(content) as unknown;
