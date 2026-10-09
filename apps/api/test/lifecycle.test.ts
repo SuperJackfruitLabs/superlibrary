@@ -91,7 +91,7 @@ describe('revocation is immediate', () => {
 });
 
 /**
- * A deterministic race: the first D1 batch (the revoke's) runs only after `meanwhile` has, as if a
+ * A deterministic race: the revoke's D1 batch runs only after `meanwhile` has, as if a
  * concurrent expiry change or n+1 commit rewrote a manifest between the revoke's delete and its batch.
  */
 async function duringFirstBatch<T>(meanwhile: () => Promise<void>, act: () => Promise<T>): Promise<T> {
@@ -99,14 +99,20 @@ async function duringFirstBatch<T>(meanwhile: () => Promise<void>, act: () => Pr
   const original = db.batch.bind(db);
   let held = false;
   db.batch = (async (statements: D1PreparedStatement[]) => {
-    if (!held) {
+    // Only the revoke's batch: the queue consumers run in the background during a test and batch
+    // too, and holding one of theirs instead let the revoke run unraced (a CI-only flake).
+    const sql = (statements[0] as unknown as { statement?: string } | undefined)?.statement;
+    if (!held && /^UPDATE (items|versions) SET revoked_at/.test(sql ?? '')) {
       held = true;
       await meanwhile();
     }
     return original(statements);
   }) as D1Database['batch'];
   try {
-    return await act();
+    const out = await act();
+    // A race that never happened proves nothing: the hook must have caught the revoke's batch.
+    expect(held, 'the revoke batch was held').toBe(true);
+    return out;
   } finally {
     db.batch = original;
   }
