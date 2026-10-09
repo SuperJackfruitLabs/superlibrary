@@ -358,6 +358,7 @@ export const uploadRoutes: Handler = async (request, env, _ctx, url) => {
   if (methods && request.method === 'OPTIONS') return preflight(request, env.CONSOLE_ORIGINS, methods);
   const res = await routeUpload(request, env, url);
   // Every answer, refusals included, so the console reads a refusal rather than an opaque failure.
+  // An uncaught throw becomes index.ts's 500 outside this wrapper, so that answer carries no CORS headers.
   return res && methods ? withCors(request, env.CONSOLE_ORIGINS, res) : res;
 };
 
@@ -483,10 +484,10 @@ async function commit(env: Env, p: Uploader, id: string): Promise<Response> {
   statements.push(env.DB.prepare(`UPDATE upload_sessions SET state = 'committed', result_item_id = ?, result_version = ? WHERE id = ?`).bind(itemId, version, id));
   if (s.item_id) {
     statements.push(env.DB.prepare(`UPDATE items SET latest_version = ?, title = ?, expires_at = COALESCE(?, expires_at) WHERE id = ? AND latest_version = ?`).bind(version, s.title, s.item_expires_at, itemId, version - 1));
-    // A station path linked again: the provenance names the latest run (the item keeps its scope).
+    // A station path linked again on the same board: the provenance names the latest run and the agent that made it.
     if (src && p.kind === 'agent') {
-      statements.push(env.DB.prepare(`UPDATE item_sources SET card_id = ?, run_id = ?, via_service = ?, station_name = ? WHERE item_id = ? AND source = 'agentpod'`)
-        .bind(src.card ?? null, src.run ?? null, p.via, src.stationName ?? null, itemId));
+      statements.push(env.DB.prepare(`UPDATE item_sources SET card_id = ?, run_id = ?, agent_principal = ?, via_service = ?, station_name = ? WHERE item_id = ? AND source = 'agentpod'`)
+        .bind(src.card ?? null, src.run ?? null, p.principalId, p.via, src.stationName ?? null, itemId));
     }
   } else {
     statements.push(

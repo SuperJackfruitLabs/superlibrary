@@ -15,12 +15,7 @@ import { RETENTION_CRON } from './lifecycle/retention';
 import { RECONCILE_CRON, reconcile } from './indexing/consumer';
 import { searchRoutes } from './search/routes';
 
-const handlers: Handler[] = [
-  uploadRoutes,
-  itemRoutes,
-  searchRoutes,
-  sourceRoutes,
-];
+const handlers: Handler[] = [uploadRoutes, itemRoutes, searchRoutes, sourceRoutes];
 
 async function route(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
   const url = new URL(request.url);

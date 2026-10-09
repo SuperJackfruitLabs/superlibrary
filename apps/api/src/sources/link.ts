@@ -25,14 +25,16 @@ export function checkLinkSource(env: Env, p: Uploader, body: { source?: LinkSour
 
 /**
  * Spec §3: linking the same path again creates version n+1. The live item (not revoked, not expired)
- * for this station path, if any; a revoked or expired one is never revived by a link, which starts a new item.
+ * for this station path on this board, if any; a revoked or expired one is never revived by a link, which starts a new item.
+ * The board is part of the match: the same path linked for another board is a new item in that board's scope, never a
+ * version of the old board's item (an agent never changes scope, spec §4).
  */
 export async function linkSessionItem(env: Env, workspaceId: string, source: LinkSource): Promise<string | null> {
   const row = await env.DB.prepare(
     `SELECT i.id FROM item_sources s JOIN items i ON i.id = s.item_id
-      WHERE i.workspace_id = ?1 AND s.source = 'agentpod' AND s.station = ?2 AND s.source_path = ?3 AND i.revoked_at IS NULL
+      WHERE i.workspace_id = ?1 AND s.source = 'agentpod' AND s.station = ?2 AND s.source_path = ?3 AND s.board_id = ?5 AND i.revoked_at IS NULL
         AND (i.expires_at IS NULL OR i.expires_at > ?4)
       ORDER BY i.created_at DESC LIMIT 1`,
-  ).bind(workspaceId, source.station, source.path, new Date().toISOString()).first<{ id: string }>();
+  ).bind(workspaceId, source.station, source.path, new Date().toISOString(), source.board).first<{ id: string }>();
   return row?.id ?? null;
 }

@@ -4,6 +4,7 @@ import { AGENT, HUMAN, planeToken, withOrgPlane } from './helpers/org-plane';
 import { API, HUB_SVC, hubHeaders, sha256Hex, upload } from './helpers/upload';
 
 const bag = env as unknown as Record<string, unknown>;
+const AGENT_2 = 'prn_000000000000000000a3';
 const BOARD = 'brd_00000000000000b1';
 const SCOPE = `board:${BOARD}`;
 const SRC = { station: 'stn_1', stationName: 'builder', path: 'out/report.md', board: BOARD, card: 'card_00000000000000c1', run: 'run_00000000000000d1' };
@@ -38,10 +39,10 @@ describe('an agent links through the hub (spec §5)', () => {
       const src = { ...SRC, path: 'out/twice.md' };
       const a = await upload([{ path: 'twice.md', body: 'v1' }], { headers: h, scope: SCOPE, source: src });
       const later = { ...src, stationName: 'builder-2', card: 'card_00000000000000c2', run: 'run_00000000000000d2' };
-      const b = await upload([{ path: 'twice.md', body: 'v2' }], { headers: h, scope: SCOPE, source: later });
+      const b = await upload([{ path: 'twice.md', body: 'v2' }], { headers: await hubHeaders(AGENT_2), scope: SCOPE, source: later });
       expect([a.status, b.status]).toEqual([201, 201]);
       expect(b.body).toMatchObject({ itemId: a.body.itemId, version: 2 });
-      expect(await provenance(a.body.itemId)).toMatchObject({ via_service: HUB_SVC, station_name: 'builder-2', card_id: 'card_00000000000000c2', run_id: 'run_00000000000000d2' });
+      expect(await provenance(a.body.itemId)).toMatchObject({ agent_principal: AGENT_2, via_service: HUB_SVC, station_name: 'builder-2', card_id: 'card_00000000000000c2', run_id: 'run_00000000000000d2' });
     });
   });
 
@@ -55,6 +56,22 @@ describe('an agent links through the hub (spec §5)', () => {
       expect(b.status).toBe(201);
       expect(b.body.itemId).not.toBe(a.body.itemId);
       expect(b.body.version).toBe(1);
+    });
+  });
+
+  it('the same path linked for another board is a new item there, never a version of the old board\'s item', async () => {
+    await withOrgPlane(async () => {
+      const h = await hubHeaders(AGENT);
+      const B2 = 'brd_00000000000000b2';
+      const src = { ...SRC, path: 'out/cross.md' };
+      const a = await upload([{ path: 'cross.md', body: 'b1' }], { headers: h, scope: SCOPE, source: src });
+      const b = await upload([{ path: 'cross.md', body: 'b2' }], { headers: h, scope: `board:${B2}`, source: { ...src, board: B2, card: 'card_00000000000000c2', run: 'run_00000000000000d2' } });
+      expect([a.status, b.status]).toEqual([201, 201]);
+      expect(b.body.itemId).not.toBe(a.body.itemId);
+      expect(b.body.version).toBe(1);
+      expect(await env.DB.prepare(`SELECT scope, latest_version FROM items WHERE id = ?`).bind(a.body.itemId).first()).toEqual({ scope: SCOPE, latest_version: 1 });
+      expect(await provenance(a.body.itemId)).toMatchObject({ board_id: BOARD, card_id: 'card_00000000000000c1', run_id: 'run_00000000000000d1' });
+      expect(await provenance(b.body.itemId)).toMatchObject({ board_id: B2, card_id: 'card_00000000000000c2' });
     });
   });
 
