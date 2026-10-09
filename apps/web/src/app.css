@@ -73,4 +73,5 @@ summary { padding: 11px 0; cursor: pointer; }
 .modal h2 { font-size: 1.15em; overflow-wrap: anywhere; }
 .modal textarea { width: 100%; box-sizing: border-box; padding: var(--space-2) 10px; border: 1px solid var(--color-border); border-radius: var(--radius-control); background: transparent; color: inherit; }
 .modal-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-2); margin-top: var(--space-4); }
-.panel .stack, .panel > .actions { margin-bottom: var(--space-4); }
+.panel .stack, .panel > .actions { margin-bottom: var(--space-6); }
+textarea { width: 100%; box-sizing: border-box; padding: var(--space-2) 10px; border: 1px solid var(--color-border); border-radius: var(--radius-control); background: transparent; color: inherit; }

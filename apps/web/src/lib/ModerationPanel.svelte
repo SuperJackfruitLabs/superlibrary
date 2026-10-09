@@ -2,6 +2,7 @@
 <script lang="ts">
   import { untrack } from 'svelte';
   import type { ItemSummary } from '@superlibrary/contract';
+  import Button from '$kit/Button.svelte';
   import ConfirmDialog from '$kit/ConfirmDialog.svelte';
   import { api } from '$lib/session.svelte';
   import { readItem, type Ask } from '$lib/item';
@@ -53,8 +54,11 @@
       return err;
     });
   }
+  let undoing = $state(false);
   async function undo() {
+    undoing = true;
     const err = await supersede(api, item.id, null);
+    undoing = false;
     if (err) replaceError = err;
     else onchanged('No longer marked as superseded.');
   }
@@ -73,7 +77,7 @@
   {#if item.supersededBy}
     <p>Superseded by <a href={`/a/${item.supersededBy}`}>the item that replaced it</a>.</p>
     {#if replaceError}<p class="error" role="alert">{replaceError}</p>{/if}
-    <div class="actions"><button type="button" onclick={undo}>Undo superseded</button></div>
+    <div class="actions"><button type="button" disabled={undoing} onclick={undo}>Undo superseded</button></div>
   {:else}
     <form class="stack" novalidate onsubmit={askReplace}>
       <label class="field">Replaced by <input name="replacement" placeholder="A Superlibrary link, or itm_…" bind:value={replacement} /></label>
@@ -91,11 +95,11 @@
     </div>
   {/if}
   <div class="actions">
-    <button type="button" class="kit-button kit-button--danger" onclick={(e) => ask(e.currentTarget, askRemove(item.title, item.kind), async (reason) => {
+    <Button variant="danger" onclick={(e) => ask(e.currentTarget as HTMLElement, askRemove(item.title, item.kind), async (reason) => {
       const err = await removeItem(api, item.id, reason);
       if (!err) onremoved();
       return err;
-    })}>Remove from memory</button>
+    })}>Remove from memory</Button>
   </div>
 </section>
 

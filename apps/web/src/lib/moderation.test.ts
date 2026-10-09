@@ -22,3 +22,29 @@ describe('moderation helpers (spec §11)', () => {
     expect(explain('not_found', 'the replacement was not found')).toBe('Nothing here, or you cannot see it.');
   });
 });
+
+describe('the wire calls', () => {
+  const seen: Array<{ path: string; method: string | undefined; body: unknown }> = [];
+  const ok = async (path: string, init?: RequestInit) => { seen.push({ path, method: init?.method, body: JSON.parse(String(init?.body)) }); return new Response('{}'); };
+  it('send the documented paths, methods and bodies', async () => {
+    const { supersede, setCaption, widen, removeItem } = await import('./moderation');
+    const id = 'itm_0123456789abcdef';
+    expect(await supersede(ok, id, 'itm_0123456789abcde0')).toBeNull();
+    expect(await supersede(ok, id, null)).toBeNull();
+    expect(await setCaption(ok, id, 'A diagram')).toBeNull();
+    expect(await widen(ok, id)).toBeNull();
+    expect(await removeItem(ok, id, 'posted twice')).toBeNull();
+    expect(seen).toEqual([
+      { path: `/api/v1/items/${id}/supersede`, method: 'POST', body: { by: 'itm_0123456789abcde0' } },
+      { path: `/api/v1/items/${id}/supersede`, method: 'POST', body: { by: null } },
+      { path: `/api/v1/items/${id}/caption`, method: 'PATCH', body: { caption: 'A diagram' } },
+      { path: `/api/v1/items/${id}/scope`, method: 'POST', body: { scope: 'workspace' } },
+      { path: `/api/v1/items/${id}/remove`, method: 'POST', body: { reason: 'posted twice' } },
+    ]);
+  });
+  it('a refusal comes back as a sentence', async () => {
+    const { removeItem } = await import('./moderation');
+    const refuse = async () => Response.json({ error: 'forbidden' }, { status: 403 });
+    expect(await removeItem(refuse, 'itm_0123456789abcdef', 'why')).toMatch(/\S/);
+  });
+});
