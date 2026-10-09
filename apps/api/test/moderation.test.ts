@@ -86,6 +86,15 @@ describe('caption (spec §7, §11)', () => {
     expect(cleared.item.caption ?? null).toBeNull();
     send.mockRestore();
   });
+  it('an empty or whitespace-only caption clears it (stored as NULL)', async () => {
+    const id = await art('Clearable');
+    for (const blank of ['', '   ']) {
+      expect((await call(`/api/v1/items/${id}/caption`, { method: 'PATCH', body: { caption: 'Something' } })).status).toBe(200);
+      expect((await loadItem(env, id))!.caption).toBe('Something');
+      expect((await call(`/api/v1/items/${id}/caption`, { method: 'PATCH', body: { caption: blank } })).status).toBe(200);
+      expect((await loadItem(env, id))!.caption).toBeNull();
+    }
+  });
   it('a work record takes no caption', async () => {
     await seedWorkRecord({ id: 'itm_00000000000003b1', ws });
     expect((await call('/api/v1/items/itm_00000000000003b1/caption', { method: 'PATCH', body: { caption: 'x' } })).status).toBe(400);
