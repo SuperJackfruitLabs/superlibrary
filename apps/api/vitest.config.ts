@@ -33,7 +33,15 @@ export default defineConfig(async () => {
           d1Databases: Object.fromEntries(w.d1_databases.map((d) => [d.binding, d.database_id])),
           r2Buckets: w.r2_buckets.map((b) => b.binding),
           queueProducers: Object.fromEntries(w.queues.producers.map((q) => [q.binding, { queueName: q.queue }])),
-          queueConsumers: Object.fromEntries(w.queues.consumers.map((q) => [q.queue, { maxBatchSize: q.max_batch_size, maxRetries: q.max_retries }])),
+          // Producers stay bound, so a commit still emits item.changed (tests spy on `send`). The
+          // `superlibrary-index` consumer is NOT registered: a real consumer would run indexItem in the
+          // tests' own isolate and call env.DB.batch at any moment, so a test that hooks "the first
+          // batch" (lifecycle.test.ts duringFirstBatch) or counts writes could catch the consumer's
+          // batch instead of its own, and CI logged "index failed the AI binding is missing". Tests
+          // drive the consumer themselves with createMessageBatch + indexBatch.
+          queueConsumers: Object.fromEntries(
+            w.queues.consumers.filter((q) => q.queue !== 'superlibrary-index').map((q) => [q.queue, { maxBatchSize: q.max_batch_size, maxRetries: q.max_retries }]),
+          ),
           bindings: {
             ...w.vars,
             TEST_MIGRATIONS: migrations,
