@@ -10,6 +10,11 @@ import { readSlots } from './vector-index';
  * so a page must stay well under that bound even for multi-chunk items: 20 keeps it comfortable.
  */
 const PAGE = 20;
+/**
+ * A page is tied to its run. The IndexMessage contract is fixed {type, slot, after}, so the run token is
+ * encoded inside `after` and the slot's `cursor`: `<run>|<last item id or empty>`. A page from a
+ * cancelled run (or a hand-made one) never equals the cursor of a new run, so it does nothing.
+ */
 const NOW = `strftime('%Y-%m-%dT%H:%M:%fZ','now')`;
 
 /**
@@ -35,10 +40,11 @@ export async function startReindex(env: Env, embedderId: string): Promise<{ slot
   const idle = await env.DB.prepare(`SELECT dims FROM vector_slots WHERE slot = ?`).bind(slot).first<{ dims: number | null }>();
   if ((idle?.dims ?? 1024) !== e.dims) throw new Error('dimension_mismatch');
   // Atomic: only one caller can move a slot to building.
-  const r = await env.DB.prepare(`UPDATE vector_slots SET embedder_id = ?, dims = ?, state = 'building', cursor = NULL, updated_at = ${NOW}
-      WHERE slot = ? AND state = 'idle' AND NOT EXISTS (SELECT 1 FROM vector_slots WHERE state = 'building')`).bind(e.id, e.dims, slot).run();
+  const first = `${crypto.randomUUID().slice(0, 8)}|`;
+  const r = await env.DB.prepare(`UPDATE vector_slots SET embedder_id = ?, dims = ?, state = 'building', cursor = ?, updated_at = ${NOW}
+      WHERE slot = ? AND state = 'idle' AND NOT EXISTS (SELECT 1 FROM vector_slots WHERE state = 'building')`).bind(e.id, e.dims, first, slot).run();
   if (r.meta.changes !== 1) throw new Error('reindex_running');
-  await env.INDEX.send({ type: 'reindex', slot, after: null });
+  await env.INDEX.send({ type: 'reindex', slot, after: first });
   return { slot };
 }
 
@@ -62,19 +68,21 @@ export async function cancelReindex(env: Env): Promise<{ slot: 'a' | 'b' }> {
 export async function reindexPage(env: Env, slot: 'a' | 'b', after: string | null): Promise<void> {
   const s = await readSlots(env);
   if (s.building?.slot !== slot || s.building.cursor !== after) return; // stale, duplicate or cancelled page
-  const ids = (await env.DB.prepare(`SELECT id FROM items WHERE (?1 IS NULL OR id > ?1) ORDER BY id LIMIT ?2`).bind(after, PAGE).all<{ id: string }>()).results.map((r) => r.id);
+  const [run, from] = (after ?? '').split('|') as [string, string | undefined];
+  const ids = (await env.DB.prepare(`SELECT id FROM items WHERE (?1 = '' OR id > ?1) ORDER BY id LIMIT ?2`).bind(from ?? '', PAGE).all<{ id: string }>()).results.map((r) => r.id);
   for (const id of ids) await indexItem(env, id);
-  const last = ids.at(-1) ?? after;
+  const next = `${run}|${ids.at(-1) ?? from ?? ''}`;
   // Advance only if this page still owns the cursor; a duplicate loses and does nothing more.
-  const adv = await env.DB.prepare(`UPDATE vector_slots SET cursor = ? WHERE slot = ? AND state = 'building' AND cursor IS ?`).bind(last, slot, after).run();
+  const adv = await env.DB.prepare(`UPDATE vector_slots SET cursor = ? WHERE slot = ? AND state = 'building' AND cursor IS ?`).bind(next, slot, after).run();
   if (adv.meta.changes !== 1) return;
   if (ids.length === PAGE) {
-    await env.INDEX.send({ type: 'reindex', slot, after: last });
+    await env.INDEX.send({ type: 'reindex', slot, after: next });
     return;
   }
-  // The swap: demote first, then promote (trigger vector_slots_one_active), in one transaction.
+  // The swap: demote first, then promote (trigger vector_slots_one_active), in one transaction. Both
+  // statements require the slot to still be building, so a duplicate final page claims nothing.
   await env.DB.batch([
-    env.DB.prepare(`UPDATE vector_slots SET state = 'idle', updated_at = ${NOW} WHERE state = 'active'`),
+    env.DB.prepare(`UPDATE vector_slots SET state = 'idle', updated_at = ${NOW} WHERE state = 'active' AND EXISTS (SELECT 1 FROM vector_slots WHERE slot = ? AND state = 'building')`).bind(slot),
     env.DB.prepare(`UPDATE vector_slots SET state = 'active', cursor = NULL, updated_at = ${NOW} WHERE slot = ? AND state = 'building'`).bind(slot),
   ]);
 }

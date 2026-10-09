@@ -80,16 +80,41 @@ describe('re-index (spec §7, §15)', () => {
     const sent: IndexMessage[] = [];
     const send = vi.spyOn(env.INDEX, 'send').mockImplementation((async (m: IndexMessage) => { sent.push(m); }) as never);
     await startReindex(env, 'test/next');
-    await reindexPage(env, 'b', 'itm_zzz');                       // stale 'after'
+    const first = (sent.shift() as Extract<IndexMessage, { type: 'reindex' }>).after;
+    await reindexPage(env, 'b', 'zzzzzzzz|itm_zzz');              // stale 'after'
     expect((await readSlots(env)).active.slot).toBe('a');
-    expect((await readSlots(env)).building!.cursor).toBeNull();
+    expect((await readSlots(env)).building!.cursor).toBe(first);
     sent.length = 0;
     await env.DB.prepare(`UPDATE items SET id = id`).run();
-    await reindexPage(env, 'b', null);                            // the real (last) page swaps
+    await reindexPage(env, 'b', first);                           // the real (last) page swaps
     expect((await readSlots(env)).active.slot).toBe('b');
-    await reindexPage(env, 'b', null);                            // a duplicate after the swap
+    await reindexPage(env, 'b', first);                           // a duplicate after the swap
     expect((await readSlots(env)).active.slot).toBe('b');
     expect(sent).toHaveLength(0);
+    send.mockRestore();
+  });
+  it('two identical empty final pages swap exactly once and leave exactly one active slot', async () => {
+    const send = vi.spyOn(env.INDEX, 'send').mockResolvedValue(undefined as never);
+    await startReindex(env, 'test/next');
+    const after = (send.mock.calls[0]![0] as Extract<IndexMessage, { type: 'reindex' }>).after;
+    await Promise.all([reindexPage(env, 'b', after), reindexPage(env, 'b', after)]);
+    await reindexPage(env, 'b', after);
+    const rows = (await env.DB.prepare(`SELECT slot, state FROM vector_slots ORDER BY slot`).all<{ slot: string; state: string }>()).results;
+    expect(rows.filter((r) => r.state === 'active')).toEqual([{ slot: 'b', state: 'active' }]);
+    expect(send).toHaveBeenCalledTimes(1);
+    send.mockRestore();
+  });
+  it('a page from a cancelled run does nothing in a new run of the same slot', async () => {
+    const send = vi.spyOn(env.INDEX, 'send').mockResolvedValue(undefined as never);
+    await startReindex(env, 'test/next');
+    const old = (send.mock.calls[0]![0] as Extract<IndexMessage, { type: 'reindex' }>).after;
+    await cancelReindex(env);
+    await startReindex(env, 'test/next');
+    const cursor = (await readSlots(env)).building!.cursor;
+    expect(cursor).not.toBe(old);
+    await reindexPage(env, 'b', old);
+    expect((await readSlots(env)).active.slot).toBe('a');
+    expect((await readSlots(env)).building!.cursor).toBe(cursor);
     send.mockRestore();
   });
   it('startReindex is atomic: a lost race throws reindex_running and sends one page', async () => {
@@ -108,14 +133,14 @@ describe('re-index (spec §7, §15)', () => {
     await expect(cancelReindex(env)).rejects.toThrow(/no_reindex/);
     await expect(resumeReindex(env)).rejects.toThrow(/no_reindex/);
     await startReindex(env, 'test/next');
-    await env.DB.prepare(`UPDATE vector_slots SET cursor = 'itm_00000000000000c9' WHERE slot = 'b'`).run();
+    await env.DB.prepare(`UPDATE vector_slots SET cursor = 'run1|itm_00000000000000c9' WHERE slot = 'b'`).run();
     send.mockClear();
-    expect(await resumeReindex(env)).toEqual({ slot: 'b', after: 'itm_00000000000000c9' });
-    expect(send).toHaveBeenCalledWith({ type: 'reindex', slot: 'b', after: 'itm_00000000000000c9' });
+    expect(await resumeReindex(env)).toEqual({ slot: 'b', after: 'run1|itm_00000000000000c9' });
+    expect(send).toHaveBeenCalledWith({ type: 'reindex', slot: 'b', after: 'run1|itm_00000000000000c9' });
     expect(await cancelReindex(env)).toEqual({ slot: 'b' });
     expect((await readSlots(env)).building).toBeNull();
     expect((await readSlots(env)).active.slot).toBe('a');
-    await reindexPage(env, 'b', 'itm_00000000000000c9');          // a stale page after the cancel
+    await reindexPage(env, 'b', 'run1|itm_00000000000000c9');          // a stale page after the cancel
     expect((await readSlots(env)).active.slot).toBe('a');
     send.mockRestore();
   });
@@ -128,7 +153,8 @@ describe('re-index (spec §7, §15)', () => {
   it('a reindex page is consumed from the queue', async () => {
     const send = vi.spyOn(env.INDEX, 'send').mockResolvedValue(undefined as never);
     await startReindex(env, 'test/next');
-    await indexBatch(createMessageBatch<IndexMessage>('superlibrary-index', [{ id: 'p', timestamp: new Date(), attempts: 1, body: { type: 'reindex', slot: 'b', after: null } }]), env);
+    const after = (send.mock.calls[0]![0] as Extract<IndexMessage, { type: 'reindex' }>).after;
+    await indexBatch(createMessageBatch<IndexMessage>('superlibrary-index', [{ id: 'p', timestamp: new Date(), attempts: 1, body: { type: 'reindex', slot: 'b', after } }]), env);
     send.mockRestore();
     expect((await readSlots(env)).active.slot).toBe('b');      // no items: one page, then the swap
   });
