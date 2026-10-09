@@ -9,7 +9,7 @@ export const session = $state<{ me: Me | null; notEnabled: { org: string } | nul
 export const currentPlane = () => plane;
 export const devMode = () => import.meta.env.DEV && plane === null;
 
-/** A 401 for `sent` (null: none sent). Not a sign-out: the guard re-authorizes (SuperJackfruitLabs/agentpod#698). */
+/** A 401 for `sent` (null: none sent). Not a sign-out: the guard re-authorizes (SuperJackfruitLabs/agentpod issue 698). */
 export function planeSessionLost(sent: string | null): void {
   discardToken(sent);
   if (!hasTokens()) session.me = null;

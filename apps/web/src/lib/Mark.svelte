@@ -3,7 +3,7 @@
    * The Superlibrary mark: two upright book spines and a third leaning against them.
    *
    * The same three rects as static/favicon.svg and scripts/render-icons.sh, less the favicon's
-   * dark tile; change them together. Coral #ff7a59 is the mark's colour on dark grounds; on a light
+   * dark tile; change them together. Coral is the mark's colour on dark grounds; on a light
    * page it is 2.5:1, under the 3:1 a graphic needs, so the light theme draws it in the deeper
    * --accent-mark shade (design/tokens.toml). Decorative beside the wordmark, so hidden from assistive technology
    * unless a `label` says it stands alone.

@@ -5,6 +5,7 @@
   import '@fontsource/ibm-plex-sans/600.css';
   import '@fontsource/ibm-plex-mono/400.css';
   import '$kit/tokens.css';
+  import '$kit/kit.css';
   import '../app.css';
   import { onDestroy, onMount } from 'svelte';
   import { goto } from '$app/navigation';
@@ -41,7 +42,7 @@
   onDestroy(() => stop?.());
 
   // Tokens are memory-only: a new tab, a reload or a 401 leaves none. Go straight to a silent
-  // authorize (prompt=none); /login only after an explicit sign-out or a failed attempt (SuperJackfruitLabs/agentpod#704).
+  // authorize (prompt=none); /login only after an explicit sign-out or a failed attempt (SuperJackfruitLabs/agentpod issue 704).
   $effect(() => {
     if (initializing || startError || isPublic || session.me || session.notEnabled || devMode()) {
       autoSigningIn = false;

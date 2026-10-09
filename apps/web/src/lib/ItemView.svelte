@@ -5,7 +5,8 @@
   import { formatBytes, mountArtifact, type Mounted } from '@superlibrary/embed';
   import { api, session } from '$lib/session.svelte';
   import { deleteOnToIso } from '$lib/upload';
-  import ConfirmDialog from '$lib/ConfirmDialog.svelte';
+  import ConfirmDialog from '$kit/ConfirmDialog.svelte';
+  import Toast from '$kit/Toast.svelte';
   import {
     ItemError, askRevokeItem, askRevokeVersion, change, day, embedUrlGetter, explain, mayManage, provenanceRows, readItem,
     scopeSetter, shareInfoGetter, shownVersion, versionRows, versionsGetter, when, type Ask,
@@ -174,7 +175,7 @@
   </form>
 {/snippet}
 
-{#if notice}<p class="notice-line" role="status" tabindex="-1" bind:this={noticeEl}>{notice}</p>{/if}
+{#if notice}<div tabindex="-1" bind:this={noticeEl}><Toast message={notice} onclose={() => (notice = null)} /></div>{/if}
 
 {#if phase === 'loading'}
   <p class="muted" role="status">Loading…</p>

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { untrack } from 'svelte';
-  import { holdModal } from '$lib/modal';
+  import { holdModal } from './modal';
 
   let { title, message, action, reason = false, busy = false, error = null, opener = null, onconfirm, oncancel }: {
     title: string;
@@ -37,8 +37,8 @@
     {/if}
     {#if error}<p class="error" role="alert">{error}</p>{/if}
     <div class="modal-actions">
-      <button type="button" data-autofocus onclick={oncancel} disabled={busy}>Cancel</button>
-      <button type="button" class="danger" onclick={() => onconfirm(why.trim())} disabled={busy}>{busy ? 'Working…' : action}</button>
+      <button type="button" class="kit-button" data-autofocus onclick={oncancel} disabled={busy}>Cancel</button>
+      <button type="button" class="kit-button kit-button--danger" onclick={() => onconfirm(why.trim())} disabled={busy}>{busy ? 'Working…' : action}</button>
     </div>
   </div>
 </div>

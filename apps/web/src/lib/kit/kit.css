@@ -1,0 +1,85 @@
+/* apps/web/src/lib/kit/kit.css — the kit's styles and shared patterns. Tokens only (kit.test.ts checks). */
+:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
+.kit-icon { flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+.kit-button { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2); min-height: var(--tap); padding: 0 var(--space-4); box-sizing: border-box;
+  border: 1px solid var(--color-border-strong); border-radius: var(--radius-control); background: var(--color-surface-raised); color: var(--color-content);
+  font: var(--type-ui-lg-weight) var(--type-ui-size)/1 var(--font-sans); text-decoration: none; cursor: pointer; transition: background var(--motion-quick) var(--motion-easing); }
+.kit-button:hover { background: var(--color-surface-sunken); }
+.kit-button:disabled { opacity: 0.55; cursor: default; }
+.kit-button--primary { background: var(--color-accent); border-color: var(--color-accent); color: var(--color-accent-content); }
+.kit-button--primary:hover { background: var(--color-accent); filter: brightness(1.06); }
+.kit-button--danger { background: var(--color-danger); border-color: var(--color-danger); color: var(--color-surface); }
+.kit-button--ghost { border-color: transparent; background: transparent; }
+
+.kit-field { display: grid; gap: var(--space-1); }
+.kit-field label { font: var(--type-label-weight) var(--type-label-size)/var(--type-label-line) var(--font-sans); color: var(--color-content-muted); }
+.kit-hint { margin: 0; color: var(--color-content-faint); font-size: var(--type-meta-size); }
+.kit-error { margin: 0; color: var(--color-danger); font-size: var(--type-meta-size); }
+
+.kit-tabs { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: var(--space-3) 0; padding: 0; list-style: none; }
+.kit-tabs a { display: inline-flex; align-items: center; gap: 6px; min-height: var(--tap); padding: 0 var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-pill); color: inherit; text-decoration: none; }
+.kit-tabs a[aria-current='page'] { border-color: var(--o, var(--color-accent)); box-shadow: inset 0 0 0 1px var(--o, var(--color-accent)); }
+.count { color: var(--color-content-faint); font-variant-numeric: tabular-nums; }
+
+.kit-toolbar { container-type: inline-size; display: flex; flex-wrap: wrap; gap: var(--space-1); }
+.kit-toolbar-item, .kit-more { display: inline-flex; align-items: center; gap: 6px; min-height: var(--tap); padding: 0 var(--space-3); border: 0; border-radius: var(--radius-control); background: transparent; color: var(--color-content); font: var(--type-ui-size)/1 var(--font-sans); text-decoration: none; cursor: pointer; }
+.kit-toolbar-item:hover, .kit-more:hover, .kit-more[aria-expanded='true'] { background: var(--color-surface-sunken); }
+.kit-more { display: none; }
+.kit-more-panel { display: grid; gap: var(--space-1); padding: var(--space-2); border: 1px solid var(--color-border); border-radius: var(--radius-card); background: var(--color-surface-raised); box-shadow: var(--elevation-overlay); }
+.kit-more-panel[hidden] { display: none; }
+@container (max-width: 640px) { .kit-toolbar .kit-secondary { display: none; } .kit-more { display: inline-flex; } }
+
+.kit-toast { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin: 0 0 var(--space-3); padding: var(--space-2) var(--space-3); border: 1px solid var(--color-border); border-left: 3px solid var(--color-ok); border-radius: var(--radius-card); background: var(--color-surface-raised); }
+.kit-toast--info { border-left-color: var(--color-accent); }
+.kit-toast--danger { border-left-color: var(--color-danger); }
+
+.kit-empty { padding: var(--space-8) var(--space-4); text-align: center; color: var(--color-content-muted); }
+.kit-empty h2 { margin: 0 0 var(--space-2); color: var(--color-content); font-size: var(--type-ui-lg-size); }
+.kit-empty p { margin: 0 0 var(--space-4); }
+
+/* The outcome edge (the one signature): a 3px rule in the outcome's colour beside its word. */
+.outcome { display: inline-flex; align-items: center; gap: 6px; font: var(--type-label-weight) var(--type-label-size)/1 var(--font-sans); letter-spacing: 0.02em; color: var(--o); white-space: nowrap; }
+.outcome::before { content: ''; width: 8px; height: 8px; border-radius: var(--radius-pill); background: var(--o); flex: none; }
+.searchbar { display: flex; gap: var(--space-2); margin: var(--space-3) 0; }
+.searchbar input { flex: 1; min-width: 0; }
+.filters { margin: 0 0 var(--space-4); border-bottom: 1px solid var(--color-border); }
+.filters summary { display: flex; align-items: center; min-height: var(--tap); }
+.filter-grid { display: grid; gap: var(--space-3); grid-template-columns: minmax(0, 1fr); padding-bottom: var(--space-3); }
+@media (min-width: 768px) { .filter-grid { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); } }
+.filter-grid select { width: 100%; }
+.outcome-picks { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 0 var(--space-4); margin: 0; padding: 0; border: 0; }
+.outcome-picks legend { margin-bottom: var(--space-1); padding: 0; color: var(--color-content-muted); }
+.pick { color: var(--o); font-weight: 600; }
+.results { list-style: none; margin: 0 0 var(--space-4); padding: 0; }
+.result { padding-left: var(--space-3); border-bottom: 1px solid var(--color-border); border-left: 3px solid var(--o); }
+.result-link { display: grid; gap: 2px; min-height: var(--tap); padding: var(--space-2) 0; color: inherit; text-decoration: none; overflow-wrap: anywhere; }
+.result-title { font-weight: 600; color: var(--color-content); }
+.result-meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-3); color: var(--color-content-muted); font-size: var(--type-meta-size); }
+.snippet { display: -webkit-box; overflow: hidden; color: var(--color-content-muted); font-size: var(--type-ui-size); -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; }
+.replaced { display: inline-flex; align-items: center; min-height: var(--tap); font-size: var(--type-meta-size); }
+.timeline { list-style: none; margin: 0 0 var(--space-6); padding: 0 0 0 var(--space-4); border-left: 2px solid var(--color-border); }
+.timeline li { position: relative; padding: 0 0 var(--space-4) var(--space-3); overflow-wrap: anywhere; }
+.timeline li::before { content: ''; position: absolute; left: calc(-1 * var(--space-4) - 7px); top: 6px; width: 12px; height: 12px; box-sizing: border-box; border: 2px solid var(--o, var(--color-content-faint)); border-radius: var(--radius-pill); background: var(--color-surface); }
+.timeline .when { color: var(--color-content-faint); font-size: var(--type-meta-size); }
+.body { margin: var(--space-1) 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.inline-form { display: flex; flex-wrap: wrap; align-items: end; gap: var(--space-2); }
+.inline-form .field, .inline-form .kit-field { flex: 1 1 220px; }
+.entry { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.entry .result-link { flex: 1 1 260px; }
+
+/* The item page's header (operator review: the title block took too much height before the content). */
+.item-header { margin: 0 0 var(--space-2); }
+.item-header h1 { margin: 0; font: var(--type-title-weight) var(--type-title-size)/var(--type-title-line) var(--font-sans); overflow-wrap: anywhere; }
+.item-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 2px var(--space-3); margin: var(--space-1) 0 0; color: var(--color-content-muted); font-size: var(--type-meta-size); }
+
+/* The embed takes the suite's colours and face (packages/embed host hooks). */
+.viewer {
+  --sl-host-font: var(--font-sans);
+  --sl-host-bg: var(--color-surface-raised-light); --sl-host-fg: var(--color-content-light); --sl-host-muted: var(--color-content-muted-light);
+  --sl-host-line: var(--color-border-light); --sl-host-hover: var(--color-surface-sunken-light); --sl-host-accent: var(--accent-light);
+  --sl-host-accent-content: var(--accent-content-light); --sl-host-danger: var(--color-danger-light);
+  --sl-host-bg-dark: var(--color-surface-raised-dark); --sl-host-fg-dark: var(--color-content-dark); --sl-host-muted-dark: var(--color-content-muted-dark);
+  --sl-host-line-dark: var(--color-border-dark); --sl-host-hover-dark: var(--color-surface-sunken-dark); --sl-host-accent-dark: var(--accent-dark);
+  --sl-host-accent-content-dark: var(--accent-content-dark); --sl-host-danger-dark: var(--color-danger-dark);
+}
