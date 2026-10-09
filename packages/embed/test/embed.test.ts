@@ -936,4 +936,18 @@ describe('the toolbar on phones (operator review of phase 1): every control keep
     }
     expect(css).toContain('var(--sl-host-font,');
   });
+  it('More items are at least 16px (no iOS zoom), show focus, and focus returns to More after an item runs', async () => {
+    const m = await mount();
+    const css = document.getElementById('sl-embed-style')!.textContent!;
+    expect(css).toMatch(/\.sl-more-field select\{[^}]*font-size:max\(16px,1em\)/);
+    expect(css).toContain('.sl-more-item:focus-visible');
+    expect(css).toContain('.sl-more-field select:focus-visible');
+    // jsdom has no container queries, so the toggle is display:none here; show it as a phone does.
+    document.head.append(Object.assign(document.createElement('style'), { textContent: '.sl-more-toggle{display:inline-flex!important}' }));
+    more().click();
+    [...panel().querySelectorAll('button')].find((b) => b.textContent === 'View source')!.click();
+    await flush();
+    expect(src(m).searchParams.get('source')).toBe('1');
+    expect(document.activeElement).toBe(more());
+  });
 });

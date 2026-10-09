@@ -177,6 +177,7 @@ export async function mountArtifact(el: HTMLElement, opts: MountOptions): Promis
       b.addEventListener('click', () => {
         closePanel(false);
         target.click();
+        if (!openPanel) moreToggle.focus(); // the item may open Files; otherwise focus returns to More
       });
       return b;
     };

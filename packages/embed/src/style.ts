@@ -16,7 +16,7 @@ const CSS = `
 .sl-btn,.sl-select{position:relative;display:inline-flex;align-items:center;gap:6px;min-height:36px;min-width:36px;padding:0 10px;border:0;border-radius:6px;
   background:transparent;color:inherit;font:inherit;text-decoration:none;cursor:pointer;white-space:nowrap}
 .sl-btn:hover,.sl-select:hover{background:var(--sl-hover)}
-.sl-btn:focus-visible,.sl-select:focus-within,.sl-panel button:focus-visible,.sl-link:focus-visible{outline:2px solid var(--sl-accent);outline-offset:-2px}
+.sl-btn:focus-visible,.sl-select:focus-within,.sl-panel button:focus-visible,.sl-link:focus-visible,.sl-more-item:focus-visible,.sl-more-field select:focus-visible{outline:2px solid var(--sl-accent);outline-offset:-2px}
 .sl-btn[aria-pressed=true],.sl-btn[aria-expanded=true]{background:var(--sl-hover);color:var(--sl-accent)}
 .sl-icon{flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .sl-select select{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;font:inherit;-webkit-appearance:none;appearance:none}
@@ -49,7 +49,7 @@ const CSS = `
 .sl-more-list{display:flex;flex-direction:column;gap:6px}
 .sl-panel .sl-more-item{display:flex;align-items:center;min-height:44px;padding:0 12px;border:1px solid var(--sl-line);border-radius:6px;background:var(--sl-bg);color:inherit;text-decoration:none;font:inherit;cursor:pointer}
 .sl-more-field{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:44px}
-.sl-more-field select{min-height:44px;font:inherit}
+.sl-more-field select{min-height:44px;font:inherit;font-size:max(16px,1em)}
 @container (max-width:640px){.sl-toolbar .sl-secondary{display:none}.sl-more-toggle{display:inline-flex!important}.sl-btn,.sl-select{padding:0 8px}}
 @media (pointer:coarse){.sl-btn,.sl-select,.sl-panel button,.sl-link{min-height:44px;min-width:44px}}
 `;
