@@ -132,11 +132,8 @@ export async function search(env: Env, v: Viewer, q: SearchQuery, precomputedSco
   let semantic: Array<{ item_id: string; chunk_id: string }> = [];
   try {
     if (vectorScopes.length === 0) throw new Error('no visible scope for the vector query');
-    const { active, values } = await timed('embed', async () => {
-      const { active } = await readSlots(env);
-      const [values] = await embedderFor(env, active.embedder_id!).embed([q.query]);
-      return { active, values };
-    });
+    const { active } = await timed('slots', () => readSlots(env));
+    const [values] = await timed('embed', () => embedderFor(env, active.embedder_id!).embed([q.query]));
     const matches = await timed('vector', () => indexFor(env, active).query(values!, {
       namespace: v.workspaceId, topK: 50,
       filter: { scope: { $in: vectorScopes }, ...(q.kinds ? { kind: { $in: q.kinds } } : {}), ...(q.outcomes ? { outcome: { $in: q.outcomes } } : {}) },

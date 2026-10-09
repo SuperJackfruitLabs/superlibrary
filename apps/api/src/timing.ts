@@ -3,7 +3,7 @@
  * Names and milliseconds only. In Workers, Date.now() advances on I/O, not during CPU work, so a
  * stage measures its storage, AI and network waits, which is what the claim budget is spent on.
  */
-export type Stage = 'auth' | 'scopes' | 'basis' | 'embed' | 'vector' | 'fts' | 'recheck' | 'hydrate' | 'fit' | 'audit';
+export type Stage = 'auth' | 'scopes' | 'basis' | 'slots' | 'embed' | 'vector' | 'fts' | 'recheck' | 'hydrate' | 'fit' | 'audit';
 
 export class Timer {
   private readonly ms = new Map<Stage, number>();

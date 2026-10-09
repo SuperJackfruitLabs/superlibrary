@@ -42,6 +42,7 @@ CREATE TABLE removed_cards (
   PRIMARY KEY (workspace_id, card_id)
 );
 
--- The filters (spec §11): agent and station, and outcome views.
+-- The filters (spec §11): only the agent is indexed (item_sources.agent_principal); the station filter
+-- reads station and station_name unindexed. Outcome views use items(workspace_id, outcome).
 CREATE INDEX item_sources_agent ON item_sources(agent_principal);
 CREATE INDEX items_workspace_outcome ON items(workspace_id, outcome);

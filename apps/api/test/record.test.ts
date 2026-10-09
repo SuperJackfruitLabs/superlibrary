@@ -49,4 +49,11 @@ describe('the work-record view (spec §11 "work-record timelines")', () => {
       expect((await call('/api/v1/items/itm_00000000000002a3/record', { headers: { Authorization: `Bearer ${t}` } })).status).toBe(403);
     });
   });
+  it('an expired record is gone (410), as for any read', async () => {
+    await seedWorkRecord({ id: 'itm_00000000000002a4', ws });
+    await env.DB.prepare(`UPDATE items SET expires_at = '2020-01-01T00:00:00.000Z' WHERE id = ?`).bind('itm_00000000000002a4').run();
+    const res = await call('/api/v1/items/itm_00000000000002a4/record');
+    expect(res.status).toBe(410);
+    expect(await res.json()).toMatchObject({ error: 'expired' });
+  });
 });

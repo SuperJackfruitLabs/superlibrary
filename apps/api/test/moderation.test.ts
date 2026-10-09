@@ -100,6 +100,40 @@ describe('replacement chains', () => {
   });
 });
 
+describe('review fixes', () => {
+  it('superseded_prior is computed in SQL, so a concurrent outcome change is not lost', async () => {
+    const a = await art('Racy A'); const b = await art('Racy B');
+    const real = env.DB.prepare.bind(env.DB);
+    let fired = false;
+    const spy = vi.spyOn(env.DB, 'prepare').mockImplementation(((q: string) => {
+      if (!fired && q.includes('AS next FROM items i')) {
+        fired = true;
+        // Between the handler's read and its write, the card's own sync changes the outcome.
+        void real(`UPDATE items SET outcome = 'rejected' WHERE id = ?`).bind(a).run();
+      }
+      return real(q);
+    }) as typeof env.DB.prepare);
+    const res = await supersede(a, b);
+    spy.mockRestore();
+    expect(res.status).toBe(200);
+    expect(fired).toBe(true);
+    expect((await loadItem(env, a))).toMatchObject({ outcome: 'superseded', superseded_prior: 'rejected' });
+  });
+  it('removing a replacement frees the items that named it, restoring their outcome', async () => {
+    const old = await art('Old thing'); const next = await art('Replacement thing');
+    expect((await supersede(old, next)).status).toBe(200);
+    expect((await call(`/api/v1/items/${next}/remove`, { method: 'POST', body: { reason: 'wrong replacement' } })).status).toBe(200);
+    expect(await loadItem(env, old)).toMatchObject({ outcome: 'completed', superseded_by: null, superseded_prior: null });
+  });
+  it('a chain through an item the person cannot see reveals nothing', async () => {
+    const a = await art('Chain head'); const x = await art('Chain X');
+    const hidden = (await upload([{ path: 'h2.md', body: '# h2' }], { title: 'Hidden link', scope: 'board:brd_00000000000000b9', headers: devHeaders(HUMAN_2) })).body.itemId as string;
+    await env.DB.prepare(`UPDATE items SET superseded_by = ? WHERE id = ?`).bind(hidden, x).run();
+    await env.DB.prepare(`UPDATE items SET superseded_by = ? WHERE id = ?`).bind(a, hidden).run();
+    expect((await supersede(a, x)).status).toBe(200);   // the same answer as if the chain ended at X
+  });
+});
+
 describe('caption (spec §7, §11)', () => {
   it('a caption is indexed, shown and audited', async () => {
     const id = await art('Queue diagram');

@@ -3,7 +3,7 @@ import type { Env } from '../env';
 import type { Person } from '../auth/caller';
 import { audit } from '../audit';
 import { error, json } from '../http';
-import { canSee, loadItem, viewerScopes, visibleBinds, visibleSql, type ItemRow } from '../items/visibility';
+import { canSee, isExpired, loadItem, viewerScopes, visibleBinds, visibleSql, type ItemRow } from '../items/visibility';
 import { extrasFor, summary } from '../items/routes';
 
 /** The whole record, and the artifacts it links that the person can see. Invisible is 404 (D11). */
@@ -12,6 +12,7 @@ export async function recordView(env: Env, p: Person, id: string): Promise<Respo
   const scopes = item ? await viewerScopes(env, p) : [];
   if (!item || item.kind !== 'work-record' || !canSee(p, item, scopes)) return error(404, 'not_found');
   if (item.revoked_at) return error(410, 'revoked');
+  if (isExpired(item)) return error(410, 'expired');
   const w = await env.DB.prepare(`SELECT body, board_id FROM work_records WHERE item_id = ?`).bind(id).first<{ body: string; board_id: string }>();
   if (!w) return error(404, 'not_found');
   const linked = (await env.DB.prepare(

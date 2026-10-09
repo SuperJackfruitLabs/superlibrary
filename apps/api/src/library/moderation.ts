@@ -35,10 +35,13 @@ async function body<S extends z.ZodType>(request: Request, schema: S): Promise<z
 }
 
 /** Following the replacements people and cards name from `by` reaches `id`: setting it would make a loop. */
-async function wouldLoop(env: Env, id: string, by: string): Promise<boolean> {
+async function wouldLoop(env: Env, p: Person, scopes: string[], id: string, by: string): Promise<boolean> {
   let at: string | null = by;
   for (let i = 0; i < 32 && at; i++) {
     if (at === id) return true;
+    // Stop at an item the person cannot see: the answer must not reveal a chain they have no right to know.
+    const row = await loadItem(env, at);
+    if (!row || !canSee(p, row, scopes)) return false;
     // The effective link, as shown: a person's replacement first, else the card's (same join as supersededByMap).
     at = (await env.DB.prepare(
       `SELECT COALESCE(i.superseded_by, n.item_id) AS next FROM items i
@@ -68,10 +71,10 @@ export async function supersede(request: Request, env: Env, p: Person, id: strin
   if (b.by === id) return error(400, 'invalid', { detail: 'an item cannot supersede itself' });
   const target = await loadItem(env, b.by);
   if (!target || !canSee(p, target, m.scopes) || target.revoked_at || isExpired(target)) return error(404, 'not_found', { detail: 'the replacement was not found' });
-  if (await wouldLoop(env, id, b.by)) return error(400, 'invalid', { detail: 'that would make a loop of replacements' });
+  if (await wouldLoop(env, p, m.scopes, id, b.by)) return error(400, 'invalid', { detail: 'that would make a loop of replacements' });
   const prior = m.item.superseded_by ? (m.item.superseded_prior ?? m.item.outcome) : m.item.outcome;
   await env.DB.batch([
-    env.DB.prepare(`UPDATE items SET superseded_prior = ?, superseded_by = ?, outcome = 'superseded' WHERE id = ?`).bind(prior, b.by, id),
+    env.DB.prepare(`UPDATE items SET superseded_prior = CASE WHEN superseded_by IS NULL THEN outcome ELSE COALESCE(superseded_prior, outcome) END, superseded_by = ?, outcome = 'superseded' WHERE id = ?`).bind(b.by, id),
     audit(env.DB, { workspaceId: p.workspaceId, actor: p.principalId, act: p.act, action: 'item.superseded', itemId: id, detail: { by: b.by, prior } }),
   ]);
   // Outcome changes the ranking weight (spec §7): the index consumer re-reads the item.

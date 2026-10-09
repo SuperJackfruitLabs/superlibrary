@@ -64,7 +64,10 @@ export async function deleteItem(env: Env, itemId: string, actor: string, reason
   const versions = (await env.DB.prepare(`SELECT version FROM versions WHERE item_id = ?`).bind(itemId).all<{ version: number }>()).results;
   // Manifests first: from this moment the content origin refuses every version.
   await deleteKeys(env, versions.map((v) => manifestKey(itemId, v.version)));
+  // Items a person marked superseded by this one lose their replacement: they return to their prior outcome.
+  const named = (await env.DB.prepare(`SELECT id FROM items WHERE superseded_by = ?`).bind(itemId).all<{ id: string }>()).results;
   await env.DB.batch([
+    env.DB.prepare(`UPDATE items SET outcome = COALESCE(superseded_prior, outcome), superseded_by = NULL, superseded_prior = NULL WHERE superseded_by = ?`).bind(itemId),
     env.DB.prepare(`DELETE FROM version_files WHERE item_id = ?`).bind(itemId),
     env.DB.prepare(`DELETE FROM versions WHERE item_id = ?`).bind(itemId),
     // Also the references a deleted work record held: once its card's record is gone, an artifact
@@ -78,6 +81,7 @@ export async function deleteItem(env: Env, itemId: string, actor: string, reason
     audit(env.DB, { workspaceId: item.workspace_id, actor, action: 'item.deleted', itemId, detail: { reason } }),
   ]);
   await itemChanged(env, itemId, item.workspace_id, 'deleted');
+  for (const n of named) await itemChanged(env, n.id, item.workspace_id, 'upserted');   // their outcome weight changed
   return deleteOrphanBlobs(env, files.map((f) => f.sha256));
 }
 

@@ -20,13 +20,13 @@ describe('stage timings (gap S4)', () => {
     await indexItem(env, a);
     const res = await call('/api/v1/related', { method: 'POST', body: { itemId: a } });
     expect(res.status).toBe(200);
-    expect(stages(res.headers.get('Server-Timing'))).toEqual(expect.arrayContaining(['auth', 'scopes', 'basis', 'embed', 'vector', 'fts', 'hydrate', 'fit', 'audit', 'd1rt', 'app']));
+    expect(stages(res.headers.get('Server-Timing'))).toEqual(expect.arrayContaining(['auth', 'scopes', 'basis', 'slots', 'embed', 'vector', 'fts', 'hydrate', 'fit', 'audit', 'd1rt', 'app']));
   });
   it('search answers the same stages', async () => {
     const a = (await upload([{ path: 's.md', body: '# Queue workers in search' }], { title: 'Queue search' })).body.itemId as string;
     await indexItem(env, a);
     const res = await call('/api/v1/search', { method: 'POST', body: { query: 'queue workers' } });
-    expect(stages(res.headers.get('Server-Timing'))).toEqual(expect.arrayContaining(['auth', 'scopes', 'embed', 'vector', 'fts', 'hydrate', 'audit', 'd1rt', 'app']));
+    expect(stages(res.headers.get('Server-Timing'))).toEqual(expect.arrayContaining(['auth', 'scopes', 'slots', 'embed', 'vector', 'fts', 'hydrate', 'audit', 'd1rt', 'app']));
   });
   it('timings name stages only: no ids and no query text', async () => {
     const a = (await upload([{ path: 'z.md', body: '# Zephyr notes' }], { title: 'Zephyr' })).body.itemId as string;
