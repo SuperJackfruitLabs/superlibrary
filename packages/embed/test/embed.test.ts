@@ -943,11 +943,13 @@ describe('the toolbar on phones (operator review of phase 1): every control keep
     expect(css).toContain('.sl-more-item:focus-visible');
     expect(css).toContain('.sl-more-field select:focus-visible');
     // jsdom has no container queries, so the toggle is display:none here; show it as a phone does.
-    document.head.append(Object.assign(document.createElement('style'), { textContent: '.sl-more-toggle{display:inline-flex!important}' }));
+    const phone = Object.assign(document.createElement('style'), { textContent: '.sl-more-toggle{display:inline-flex!important}' });
+    document.head.append(phone);
     more().click();
     [...panel().querySelectorAll('button')].find((b) => b.textContent === 'View source')!.click();
     await flush();
     expect(src(m).searchParams.get('source')).toBe('1');
     expect(document.activeElement).toBe(more());
+    phone.remove();
   });
 });

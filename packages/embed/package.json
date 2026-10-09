@@ -5,7 +5,17 @@
   "type": "module",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
-  "scripts": { "test": "vitest run", "typecheck": "tsc --noEmit" },
-  "dependencies": { "@superlibrary/contract": "workspace:*" },
-  "devDependencies": { "jsdom": "^30.1.2" }
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "bundle": "vite build --config vite.bundle.config.ts && cp bundle/superlibrary-embed.d.ts dist/"
+  },
+  "dependencies": {
+    "@superlibrary/contract": "workspace:*"
+  },
+  "devDependencies": {
+    "jsdom": "^30.1.2",
+    "vite": "^8.0.16",
+    "@types/node": "^22.20.5"
+  }
 }

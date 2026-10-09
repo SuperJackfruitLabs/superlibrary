@@ -125,3 +125,16 @@ width the secondary controls move into the labelled **More** panel.
   browser's popup blocker still applies.
 
 The URL lives five minutes; the SDK mints a new one before it opens anything after that.
+
+## Hosts outside this repository
+
+The package is private to this workspace. A product in another repository vendors a build:
+
+1. `pnpm --filter @superlibrary/embed bundle` writes `dist/superlibrary-embed.js` (one ES module,
+   nothing to resolve) and `dist/superlibrary-embed.d.ts` (its types; `test/bundle-types.ts` holds
+   them equal to the source).
+2. The host copies both and records the superlibrary commit and each file's SHA-256 beside them;
+   Superpipeline does this with `scripts/vendor-superlibrary-embed.sh <superlibrary checkout>`, and
+   a test there fails if a file differs from its recorded hash.
+3. The host's duties above still apply: mint with the person's own token, from an origin listed in
+   `EMBED_HOSTS` and `FRAME_ANCESTORS`.
