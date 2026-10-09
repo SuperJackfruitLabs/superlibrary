@@ -1,5 +1,5 @@
 /** The item page's helpers: the embed's callbacks, the item read, and the page's words. */
-import type { EmbedGrant, ItemSummary, VersionSummary, View } from '@superlibrary/contract';
+import { ITEM_ID, type EmbedGrant, type ItemSummary, type VersionSummary, type View } from '@superlibrary/contract';
 import { formatBytes, visibilityWords, type MountOptions, type ShareInfo } from '@superlibrary/embed';
 import type { Me } from './api';
 
@@ -35,6 +35,8 @@ export type ItemRead =
   | { state: 'refused'; code: string };
 
 export async function readItem(api: Api, itemId: string): Promise<ItemRead> {
+  // A route parameter is whatever was typed: anything but an item id is not found, unasked.
+  if (!ITEM_ID.test(itemId)) return { state: 'refused', code: 'not_found' };
   const res = await api(`/api/v1/items/${itemId}`);
   if (!res.ok) {
     const code = await codeOf(res);
@@ -87,6 +89,11 @@ export const kindWords = (view: View) => KIND_WORDS[view];
 export interface Row { label: string; value: string; note?: string; mono?: boolean; copy?: boolean }
 
 export const when = (iso: string) => new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+/** A library row's second line: version, who can see it (in words), when, and its delete date. */
+export function listLine(item: ItemSummary): string {
+  const seen = visibilityWords({ scope: item.scope, canWiden: false });
+  return `v${item.latestVersion} · ${seen} · ${when(item.createdAt)}${item.expiresAt ? ` · to be deleted ${when(item.expiresAt)}` : ''}`;
+}
 export const day = (iso: string) => new Date(iso).toLocaleDateString(undefined, { dateStyle: 'medium' });
 
 /** Spec §3 Provenance, as far as a source provides it; phase 1 uploads are a person's. */

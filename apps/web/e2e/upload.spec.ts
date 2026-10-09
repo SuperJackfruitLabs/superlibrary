@@ -1,5 +1,5 @@
-import { devices, expect, test, type Page } from '@playwright/test';
-import { frameOf, uploadViaApi } from './helpers';
+import { expect, test } from '@playwright/test';
+import { DEV, frameOf, uploadViaApi } from './helpers';
 
 test('a person uploads a file and lands on its page', async ({ page }) => {
   await page.goto('/upload');
@@ -21,10 +21,65 @@ test('a secret is refused with its file and line; an override with a reason uplo
   await expect(page).toHaveURL(/\/a\/itm_[0-9a-f]{16}$/);
 });
 
-test('a denylisted path is refused before anything is sent', async ({ page }) => {
+test('a denylisted file alone is left out, and nothing is sent', async ({ page }) => {
+  const sent: string[] = [];
+  page.on('request', (r) => { if (r.url().includes('/api/v1/uploads')) sent.push(r.url()); });
   await page.goto('/upload');
   await page.locator('input[name=files]').setInputFiles({ name: '.env', mimeType: 'text/plain', buffer: Buffer.from('A=1\n') });
-  await expect(page.getByRole('alert')).toHaveText('.env is not uploaded: it matches the .env* rule.');
+  await expect(page.getByRole('status').filter({ hasText: 'left out' })).toContainText('This file is left out: .env (the .env* rule).');
+  await expect(page.getByRole('alert')).toHaveText('Choose at least one file.');
+  await expect(page.getByRole('button', { name: 'Upload', exact: true })).toBeDisabled();
+  expect(sent).toEqual([]);
+});
+
+test('denied files in a pick are left out and listed; the rest uploads', async ({ page, request }) => {
+  await page.goto('/upload');
+  await page.locator('input[name=files]').setInputFiles([
+    { name: 'notes.md', mimeType: 'text/markdown', buffer: Buffer.from('# Notes\n') },
+    { name: '.env', mimeType: 'text/plain', buffer: Buffer.from('A=1\n') },
+    { name: 'server.pem', mimeType: 'text/plain', buffer: Buffer.from('x') },
+  ]);
+  await expect(page.getByText('These 2 files are left out: .env (the .env* rule) and server.pem (the *.pem rule).')).toBeVisible();
+  await expect(page.getByText('1 file chosen')).toBeVisible();
+  await page.getByRole('button', { name: 'Upload', exact: true }).click();
+  await expect(page).toHaveURL(/\/a\/itm_[0-9a-f]{16}$/);
+  const id = page.url().split('/a/')[1]!;
+  const read = await (await request.get(`http://localhost:8787/api/v1/items/${id}`, { headers: DEV })).json();
+  expect(read.versions[0].files.map((f: { path: string }) => f.path)).toEqual(['notes.md']);
+});
+
+test('a new version keeps its item\'s title, and says whose version it is', async ({ page, request }) => {
+  const item = await uploadViaApi(request, [{ path: 'q.md', body: '# q1' }], { title: 'Quarterly notes' });
+  await page.goto(`/upload?item=${item.itemId}`);
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Upload a new version of Quarterly notes');
+  await expect(page.getByLabel('Title')).toHaveValue('Quarterly notes');
+  await expect(page.getByText('Who will see the new version: Everyone in the workspace.')).toBeVisible();
+  await page.locator('input[name=files]').setInputFiles({ name: 'some-other-name.md', mimeType: 'text/markdown', buffer: Buffer.from('# q2') });
+  await expect(page.getByText('1 file chosen')).toBeVisible();
+  await expect(page.getByLabel('Title')).toHaveValue('Quarterly notes');
+  await page.getByRole('button', { name: 'Upload', exact: true }).click();
+  await expect(page).toHaveURL(new RegExp(`/a/${item.itemId}$`));
+  const read = await (await request.get(`http://localhost:8787/api/v1/items/${item.itemId}`, { headers: DEV })).json();
+  expect(read.item).toMatchObject({ title: 'Quarterly notes', latestVersion: 2 });
+});
+
+test('the upload page says who will see it, and the library says who can', async ({ page, request }) => {
+  await page.goto('/upload');
+  await expect(page.getByText('Everyone in the workspace will be able to see it.')).toBeVisible();
+  const item = await uploadViaApi(request, [{ path: 'v.md', body: '# v' }], { title: 'who sees this' });
+  await page.goto('/');
+  const row = page.locator('.items li', { hasText: 'who sees this' }).first();
+  await expect(row).toContainText('Everyone in the workspace');
+  await expect(row).not.toContainText('· workspace ·');
+  expect(item.itemId).toMatch(/^itm_/);
+});
+
+test('an item address that is not an item id is not found, and the API is not asked', async ({ page }) => {
+  const asked: string[] = [];
+  page.on('request', (r) => { if (r.url().includes('/api/v1/items/')) asked.push(r.url()); });
+  await page.goto('/a/not-an-item');
+  await expect(page.getByText('Nothing here, or you cannot see it.')).toBeVisible();
+  expect(asked).toEqual([]);
 });
 
 test('revoking the whole item says so, and puts focus on it', async ({ page, request }) => {
@@ -38,62 +93,3 @@ test('revoking the whole item says so, and puts focus on it', async ({ page, req
   await expect(said).toBeFocused();
 });
 
-/**
- * Every control a person can tap on a phone is at least 44px tall (Apple's minimum; iOS is the
- * primary platform). A checkbox is measured by its label, which is what takes the tap; a link inside
- * a sentence is exempt (WCAG 2.5.8's inline exception).
- */
-async function shortControls(page: Page, atLeast: number): Promise<string[]> {
-  const { checked, short } = await page.evaluate(() => {
-    const short: string[] = [];
-    let checked = 0;
-    const controls = document.querySelectorAll<HTMLElement>('a[href], button, input, select, textarea, summary, [role=button]');
-    for (const el of controls) {
-      const target = el instanceof HTMLInputElement && (el.type === 'checkbox' || el.type === 'radio') ? (el.closest('label') ?? el) : el;
-      const r = target.getBoundingClientRect();
-      const style = getComputedStyle(target);
-      if (r.width === 0 || r.height === 0 || style.visibility === 'hidden') continue;
-      if (el.closest('[hidden], .visually-hidden')) continue;
-      const p = el.tagName === 'A' ? el.closest('p') : null;
-      if (p && p.textContent!.trim() !== el.textContent!.trim()) continue;
-      checked++;
-      if (r.height < 44 - 0.5) short.push(`${el.tagName.toLowerCase()}${el.className ? '.' + String(el.className).split(' ').join('.') : ''} "${(el.textContent || el.getAttribute('aria-label') || el.getAttribute('name') || '').trim().slice(0, 40)}" ${r.height.toFixed(1)}px`);
-    }
-    return { checked, short };
-  });
-  expect(checked, 'controls measured').toBeGreaterThanOrEqual(atLeast);
-  return short;
-}
-
-test.describe('at phone width', () => {
-  const { defaultBrowserType: _b, ...phone } = devices['Pixel 5'];
-  test.use({ ...phone, viewport: { width: 390, height: 844 } });
-
-  test('every control on the library, upload and item pages is at least 44px tall', async ({ page, request }) => {
-    const item = await uploadViaApi(request, [{ path: 'r.md', body: '# r' }, { path: 'notes/s.md', body: '# s' }], { title: 'tap targets' });
-    await uploadViaApi(request, [{ path: 'r.md', body: '# r2' }], { item: item.itemId });
-
-    await page.goto('/');
-    await expect(page.locator('.items a').first()).toBeVisible();
-    expect(await shortControls(page, 5), 'library').toEqual([]);
-
-    await page.goto('/upload');
-    await page.locator('input[name=files]').setInputFiles([
-      { name: 'a.md', mimeType: 'text/markdown', buffer: Buffer.from('# a') },
-      { name: 'b.md', mimeType: 'text/markdown', buffer: Buffer.from('# b') },
-    ]);
-    await expect(page.getByText('2 files chosen')).toBeVisible();
-    expect(await shortControls(page, 8), 'upload').toEqual([]);
-
-    await page.goto(`/a/${item.itemId}/v/1`);
-    await expect(frameOf(page).locator('h1')).toBeVisible();
-    await expect(page.locator('select.sl-versions')).toBeAttached();
-    await page.locator('button.sl-files-toggle').click();
-    await expect(page.locator('.sl-files-panel button.sl-file')).toHaveCount(2);
-    expect(await shortControls(page, 15), 'item, files open').toEqual([]);
-    await page.locator('button.sl-files-toggle').click();
-    await page.locator('button.sl-share-toggle').click();
-    await expect(page.locator('.sl-share-panel')).toBeVisible();
-    expect(await shortControls(page, 15), 'item, share open').toEqual([]);
-  });
-});

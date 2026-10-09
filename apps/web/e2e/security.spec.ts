@@ -10,6 +10,9 @@ const PROBE = readFileSync(new URL('./fixtures/probe.js', import.meta.url), 'utf
 const HTML = '<!doctype html><html><body><pre id="results"></pre><script src="probe.js"></script></body></html>';
 const tokenOf = (url: string) => new URL(url).searchParams.get('sig')!;
 
+// A security assertion that passes only on a second try is a failure, not a flake.
+test.describe.configure({ retries: 0 });
+
 test.describe('the content origin, under a malicious HTML artifact (spec §15)', () => {
   test('it runs, and can read no storage, reach no network, navigate nothing and open nothing', async ({ page, request }) => {
     const item = await uploadViaApi(request, [{ path: 'index.html', body: HTML }, { path: 'probe.js', body: PROBE }], { title: 'probe' });
@@ -43,7 +46,7 @@ test.describe('the content origin, under a malicious HTML artifact (spec §15)',
     expect(await page.evaluate(() => localStorage.getItem('secret')), "the app's storage is untouched").toBe('app-secret');
   });
 
-  test('it cannot be framed by an origin outside the allowlist', async ({ page, request }) => {
+  test('it cannot be framed by an origin outside the allowlist', async ({ page, request, browserName }) => {
     const item = await uploadViaApi(request, [{ path: 'index.html', body: HTML }, { path: 'probe.js', body: PROBE }]);
     const url = await embedUrl(request, item.itemId);
     // A real server on loopback, not `page.route`: Chrome's Local Network Access treats a fulfilled
@@ -53,16 +56,29 @@ test.describe('the content origin, under a malicious HTML artifact (spec §15)',
     try {
       const responses: number[] = [];
       const content = new URL(url).origin;
-      page.on('response', (r) => { if (r.url().startsWith(`${content}/s/`) && r.request().resourceType() === 'document') responses.push(r.status()); });
+      const policies: string[] = [];
+      page.on('response', async (r) => {
+        if (!r.url().startsWith(`${content}/s/`) || r.request().resourceType() !== 'document') return;
+        responses.push(r.status());
+        policies.push((await r.allHeaders())['content-security-policy'] ?? '');
+      });
       const refusals: string[] = [];
       page.on('console', (m) => { if (m.text().includes('frame-ancestors')) refusals.push(m.text()); });
       await page.goto(`http://127.0.0.1:${(evil.address() as AddressInfo).port}/`);
       // The content Worker answered (`/_view` redirects to the entry), and the browser refused to
       // show it, because of frame-ancestors.
       await expect.poll(() => responses, { timeout: 10_000 }).toEqual([200]);
-      await expect.poll(() => page.frames().find((f) => f !== page.mainFrame())?.url() ?? '', { timeout: 10_000 }).toMatch(/^chrome-error:/);
+      const child = () => page.frames().find((f) => f !== page.mainFrame());
+      // Chromium swaps the refused frame for its error page; WebKit leaves the URL and shows nothing.
+      if (browserName === 'chromium') await expect.poll(() => child()?.url() ?? '', { timeout: 10_000 }).toMatch(/^chrome-error:/);
       await expect.poll(() => refusals.length, { timeout: 10_000 }).toBeGreaterThan(0);
-      expect(refusals[0]).toContain('http://localhost:5173');
+      // Chromium names the policy in its message; WebKit only names the directive. The policy is
+      // the configured allowlist either way: it is on the response the browser refused to show.
+      if (browserName === 'chromium') expect(refusals[0]).toContain('http://localhost:5173');
+      await expect.poll(() => policies[0] ?? '', { message: 'the refused document carries the configured frame-ancestors', timeout: 10_000 }).toMatch(/frame-ancestors http:\/\/localhost:5173(;|$)/);
+      // In every engine: the refused frame holds none of the artifact's document.
+      expect(child(), 'the frame exists').toBeDefined();
+      expect(await child()!.locator('#results').count(), "the artifact's page did not render in the frame").toBe(0);
     } finally {
       await new Promise((done) => evil.close(done));
     }

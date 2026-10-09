@@ -22,13 +22,12 @@ export function takePicked(input: { files: FileList | null; value: string }): Fi
   return files;
 }
 
-/** Files from an <input type=file>, with a folder pick's own name dropped from every path. */
-export async function filesFromPicker(files: ArrayLike<File>): Promise<LocalFile[]> {
-  const list = Array.from(files);
+/** Paths for an <input type=file>'s files, with a folder pick's own name dropped from every one. */
+function pickedPaths(list: File[]): string[] {
   const rel = list.map((f) => (f as File & { webkitRelativePath?: string }).webkitRelativePath || f.name);
   const tops = new Set(rel.map((p) => p.split('/')[0]));
   const strip = list.length > 0 && rel.every((p) => p.includes('/')) && tops.size === 1;
-  return Promise.all(list.map(async (f, i) => ({ path: strip ? rel[i]!.split('/').slice(1).join('/') : rel[i]!, bytes: new Uint8Array(await f.arrayBuffer()) })));
+  return strip ? rel.map((p) => p.split('/').slice(1).join('/')) : rel;
 }
 
 /** The central directory, read directly: fflate does not expose an entry's Unix mode. */
@@ -54,10 +53,48 @@ export function zipEntries(zip: Uint8Array): { name: string; size: number; symli
   return out;
 }
 
-/** A Mac's Compress stores resource forks under __MACOSX/; they are not part of the folder. */
-const isMacJunk = (name: string) => name === '__MACOSX/' || name.startsWith('__MACOSX/');
+/**
+ * Files no one means to upload, skipped without a word: a Mac's Compress stores resource forks under
+ * __MACOSX/, Finder leaves .DS_Store and Windows Explorer Thumbs.db in folders.
+ */
+const JUNK = new Set(['.ds_store', 'thumbs.db']);
+export function isJunk(path: string): boolean {
+  const segs = path.split('/').filter((s) => s !== '');
+  return segs[0] === '__MACOSX' || JUNK.has((segs[segs.length - 1] ?? '').toLowerCase());
+}
 
-export function expandZip(zip: Uint8Array): LocalFile[] | { refused: string } {
+/** A file the path rules deny (spec §8), left out of the upload rather than blocking it. */
+export type LeftOut = { path: string; rule: string };
+export interface Selection { files: LocalFile[]; leftOut: LeftOut[]; name: string }
+type Refused = { refused: string };
+
+/**
+ * Junk skipped, denied paths left out (and listed), any other refusal (`..`, absolute, backslash…)
+ * blocking the whole pick. The server enforces the same rules on whatever is declared.
+ */
+function partition<T extends { path: string }>(entries: T[]): { kept: T[]; leftOut: LeftOut[] } | Refused {
+  const kept: T[] = [];
+  const leftOut: LeftOut[] = [];
+  for (const e of entries) {
+    if (isJunk(e.path)) continue;
+    const c = checkPath(e.path);
+    if (c.ok) kept.push(e);
+    else if (c.reason === 'denied') leftOut.push({ path: e.path, rule: c.rule! });
+    else return { refused: pathRefusalSentence(c) };
+  }
+  return { kept, leftOut };
+}
+
+/** Spec §8 caps, from sizes alone, so nothing over them is ever read into memory. */
+function overCaps(entries: { path: string; size: number }[]): string | null {
+  const big = entries.find((e) => e.size > LIMITS.fileBytes);
+  if (big) return `${big.path} is larger than 25 MB, the limit for one file.`;
+  if (entries.length > LIMITS.folderFiles) return `A folder may have at most ${LIMITS.folderFiles} files; this has ${entries.length}.`;
+  if (entries.reduce((n, e) => n + e.size, 0) > LIMITS.folderBytes) return 'Together these are more than 100 MB, the limit for a folder.';
+  return null;
+}
+
+function expandZipSelection(zip: Uint8Array): { files: LocalFile[]; leftOut: LeftOut[] } | Refused {
   let entries;
   try {
     entries = zipEntries(zip);
@@ -66,16 +103,68 @@ export function expandZip(zip: Uint8Array): LocalFile[] | { refused: string } {
   }
   const link = entries.find((e) => e.symlink);
   if (link) return { refused: `The zip contains a symbolic link, ${link.name}, which is not uploaded.` };
-  const files = entries.filter((e) => !e.dir && !isMacJunk(e.name));
+  const split = partition(entries.filter((e) => !e.dir).map((e) => ({ ...e, path: e.name })));
+  if ('refused' in split) return split;
+  const files = split.kept;
   if (files.length > LIMITS.folderFiles) return { refused: `The zip has ${files.length} files; a folder may have at most ${LIMITS.folderFiles}.` };
   if (files.reduce((n, e) => n + e.size, 0) > LIMITS.folderBytes) return { refused: 'The zip expands to more than 100 MB, the limit for a folder.' };
+  const big = files.find((e) => e.size > LIMITS.fileBytes);
+  if (big) return { refused: `${big.name} is larger than 25 MB, the limit for one file.` };
+  const wanted = new Set(files.map((e) => e.name));
   let inflated;
   try {
-    inflated = unzipSync(zip, { filter: (f) => !f.name.endsWith('/') && !isMacJunk(f.name) });
+    inflated = unzipSync(zip, { filter: (f) => wanted.has(f.name) });
   } catch (e) {
     return { refused: `This file could not be read as a zip: ${e instanceof Error ? e.message : String(e)}.` };
   }
-  return Object.keys(inflated).sort().map((path) => ({ path, bytes: inflated[path]! }));
+  return { files: Object.keys(inflated).sort().map((path) => ({ path, bytes: inflated[path]! })), leftOut: split.leftOut };
+}
+
+/** A zip's files, junk and denied entries dropped, checked from its central directory before inflating. */
+export function expandZip(zip: Uint8Array): LocalFile[] | Refused {
+  const out = expandZipSelection(zip);
+  return 'refused' in out ? out : out.files;
+}
+
+/**
+ * Headroom over the folder cap for a zip's own size: its headers (a few hundred bytes per entry,
+ * at most 500 entries) can make a zip whose contents fit slightly larger than them.
+ */
+const ZIP_OVERHEAD = 2 * 1024 * 1024;
+
+/**
+ * What a pick becomes. Every check that sizes and paths can answer runs first; bytes are read only
+ * when the pick is within the caps (an iOS tab that reads 1 GB dies). A single .zip is expanded
+ * when `expandZips` is set.
+ */
+export async function selectFiles(picked: ArrayLike<File>, opts: { expandZips: boolean }): Promise<Selection | Refused> {
+  const chosen = Array.from(picked);
+  if (opts.expandZips && chosen.length === 1 && chosen[0]!.name.toLowerCase().endsWith('.zip')) {
+    const z = chosen[0]!;
+    if (z.size > LIMITS.folderBytes + ZIP_OVERHEAD) return { refused: 'The zip is larger than 100 MB, the limit for a folder.' };
+    const out = expandZipSelection(new Uint8Array(await z.arrayBuffer()));
+    if ('refused' in out) return out;
+    return { ...out, name: z.name.replace(/\.zip$/i, '') };
+  }
+  const paths = pickedPaths(chosen);
+  const split = partition(chosen.map((file, i) => ({ path: paths[i]!, file, size: file.size })));
+  if ('refused' in split) return split;
+  const cap = overCaps(split.kept);
+  if (cap) return { refused: cap };
+  const files = await Promise.all(split.kept.map(async (e) => ({ path: e.path, bytes: new Uint8Array(await e.file.arrayBuffer()) })));
+  // A folder pick is named after its folder, one file after itself; several loose files get no name.
+  const rel = (chosen[0] as (File & { webkitRelativePath?: string }) | undefined)?.webkitRelativePath ?? '';
+  const name = rel.includes('/') ? rel.split('/')[0]! : chosen.length === 1 ? chosen[0]!.name : '';
+  return { files, leftOut: split.leftOut, name };
+}
+
+const quoteRule = (l: LeftOut) => `${l.path} (the ${l.rule} rule)`;
+
+/** "These N files are left out: …", each with its rule; null when nothing was. */
+export function leftOutSentence(leftOut: LeftOut[]): string | null {
+  if (leftOut.length === 0) return null;
+  if (leftOut.length === 1) return `This file is left out: ${quoteRule(leftOut[0]!)}.`;
+  return `These ${leftOut.length} files are left out: ${list(leftOut.map(quoteRule))}.`;
 }
 
 /** The server decides; this only says it first, in the same words for every client. */

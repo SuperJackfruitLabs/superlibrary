@@ -74,12 +74,27 @@ export async function watchContainment(page: Page, itemId: string) {
     requests.push(r.url());
     if (!allowed.has(u.origin)) offOrigin.push(r.url());
   });
+  const content = contentOriginOf(itemId);
+  /**
+   * Every frame's violations. Only a frame that went away mid-read is skipped (a navigation, a
+   * remount); any other failure to read is a failure, and the item's own frame must have been read,
+   * so an empty answer cannot come from not looking.
+   */
   const violations = async (): Promise<string[]> => {
     const all: string[] = [];
+    let readContent = false;
     for (const f of page.frames()) {
-      const v = await f.evaluate(() => (globalThis as { __slViolations?: string[] }).__slViolations ?? []).catch(() => [] as string[]);
+      let v: string[];
+      try {
+        v = await f.evaluate(() => (globalThis as { __slViolations?: string[] }).__slViolations ?? []);
+      } catch (e) {
+        if (f.isDetached() || /detached|Execution context was destroyed|navigat/i.test(String(e))) continue;
+        throw e;
+      }
+      if (f.url().startsWith(`${content}/`)) readContent = true;
       all.push(...v);
     }
+    expect(readContent, `the item's content-origin frame (${content}) was read for violations`).toBe(true);
     return all;
   };
   return {

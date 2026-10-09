@@ -1,7 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { zipSync } from 'fflate';
 import { LIMITS } from '@superlibrary/contract';
-import { deleteOnToIso, describeRefusal, expandZip, filesFromPicker, overrideAndCommit, precheck, secretRefusal, takePicked, uploadFiles, zipEntries } from './upload';
+import { deleteOnToIso, describeRefusal, expandZip, leftOutSentence, overrideAndCommit, precheck, secretRefusal, selectFiles, takePicked, uploadFiles, zipEntries } from './upload';
 
 const enc = (s: string) => new TextEncoder().encode(s);
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status });
@@ -66,17 +66,86 @@ describe('zips are expanded here, and checked before anything is sent (plan D16)
   });
 });
 
-describe('filesFromPicker', () => {
+describe('selectFiles: what a pick becomes, checked before any file is read', () => {
   const file = (name: string, rel: string, body = 'x') => Object.assign(new File([body], name), { webkitRelativePath: rel });
+  /** A File that only claims a size: reading it is what the caps must prevent (an iOS tab can die). */
+  const claimed = (name: string, size: number, rel = '') => {
+    const arrayBuffer = vi.fn(async () => new ArrayBuffer(0));
+    return { f: { name, size, webkitRelativePath: rel, arrayBuffer } as unknown as File, arrayBuffer };
+  };
+  const zipFile = (entries: Parameters<typeof zipSync>[0], name = 'site.zip') => new File([zipSync(entries) as Uint8Array<ArrayBuffer>], name);
+  const ok = async (...args: Parameters<typeof selectFiles>) => { const out = await selectFiles(...args); if ('refused' in out) throw new Error(out.refused); return out; };
 
-  it("drops a folder pick's own name from every path", async () => {
-    const out = await filesFromPicker([file('index.html', 'site/index.html', '<p>'), file('a b.css', 'site/css/a b.css')]);
-    expect(out.map((f) => f.path)).toEqual(['index.html', 'css/a b.css']);
-    expect(out[0]!.bytes).toEqual(enc('<p>'));
+  it("drops a folder pick's own name from every path, and names the selection after the folder", async () => {
+    const out = await ok([file('index.html', 'site/index.html', '<p>'), file('a b.css', 'site/css/a b.css')], { expandZips: true });
+    expect(out.files.map((f) => f.path)).toEqual(['index.html', 'css/a b.css']);
+    expect(out.files[0]!.bytes).toEqual(enc('<p>'));
+    expect(out.name).toBe('site');
   });
 
   it('keeps plain picked files by name', async () => {
-    expect((await filesFromPicker([file('my report #1.md', ''), file('b.md', '')])).map((f) => f.path)).toEqual(['my report #1.md', 'b.md']);
+    expect((await ok([file('my report #1.md', ''), file('b.md', '')], { expandZips: true })).files.map((f) => f.path)).toEqual(['my report #1.md', 'b.md']);
+  });
+
+  it('leaves out denied files and lists them with their rule; the rest still uploads', async () => {
+    const out = await ok([file('a.md', 'proj/a.md'), file('HEAD', 'proj/.git/HEAD'), file('.env', 'proj/.env'), file('k.pem', 'proj/certs/k.pem')], { expandZips: true });
+    expect(out.files.map((f) => f.path)).toEqual(['a.md']);
+    expect(out.leftOut).toEqual([{ path: '.git/HEAD', rule: '.git/' }, { path: '.env', rule: '.env*' }, { path: 'certs/k.pem', rule: '*.pem' }]);
+    expect(leftOutSentence(out.leftOut)).toBe('These 3 files are left out: .git/HEAD (the .git/ rule), .env (the .env* rule) and certs/k.pem (the *.pem rule).');
+    expect(leftOutSentence([{ path: '.env', rule: '.env*' }])).toBe('This file is left out: .env (the .env* rule).');
+    expect(leftOutSentence([])).toBeNull();
+  });
+
+  it('a refusal that is not a denial still blocks the whole pick, in its sentence', async () => {
+    expect(await selectFiles([file('a.md', ''), file('a\\b.md', '')], { expandZips: true })).toEqual({ refused: 'a\\b.md is not uploaded: it contains a backslash.' });
+  });
+
+  it('skips .DS_Store and Thumbs.db silently', async () => {
+    const out = await ok([file('a.md', 'p/a.md'), file('.DS_Store', 'p/.DS_Store'), file('Thumbs.db', 'p/img/Thumbs.db')], { expandZips: true });
+    expect(out.files.map((f) => f.path)).toEqual(['a.md']);
+    expect(out.leftOut).toEqual([]);
+  });
+
+  it('a file over 25 MB is refused from its size; nothing is read', async () => {
+    const big = claimed('big.bin', LIMITS.fileBytes + 1);
+    const small = claimed('a.md', 3);
+    expect(await selectFiles([small.f, big.f], { expandZips: true })).toEqual({ refused: 'big.bin is larger than 25 MB, the limit for one file.' });
+    expect(big.arrayBuffer).not.toHaveBeenCalled();
+    expect(small.arrayBuffer).not.toHaveBeenCalled();
+  });
+
+  it('more than 500 files, or more than 100 MB together, is refused before anything is read', async () => {
+    const many = Array.from({ length: LIMITS.folderFiles + 1 }, (_, i) => claimed(`f${i}.md`, 1, `d/f${i}.md`));
+    expect(await selectFiles(many.map((m) => m.f), { expandZips: true })).toEqual({ refused: `A folder may have at most ${LIMITS.folderFiles} files; this has ${LIMITS.folderFiles + 1}.` });
+    expect(many.some((m) => m.arrayBuffer.mock.calls.length > 0)).toBe(false);
+    const heavy = Array.from({ length: 5 }, (_, i) => claimed(`h${i}.bin`, 21 * 1024 * 1024, `d/h${i}.bin`));
+    expect(await selectFiles(heavy.map((m) => m.f), { expandZips: true })).toEqual({ refused: 'Together these are more than 100 MB, the limit for a folder.' });
+    expect(heavy.some((m) => m.arrayBuffer.mock.calls.length > 0)).toBe(false);
+  });
+
+  it('a zip over the folder cap is refused from its size, unread', async () => {
+    const z = claimed('huge.zip', LIMITS.folderBytes + 3 * 1024 * 1024);
+    expect(await selectFiles([z.f], { expandZips: true })).toEqual({ refused: 'The zip is larger than 100 MB, the limit for a folder.' });
+    expect(z.arrayBuffer).not.toHaveBeenCalled();
+  });
+
+  it('a zip is expanded, named after itself, with denied entries left out and junk skipped', async () => {
+    const out = await ok([zipFile({ 'site/index.html': enc('<p>'), 'site/.git/config': enc('[core]'), 'site/.DS_Store': enc('x'), 'Thumbs.db': enc('x') })], { expandZips: true });
+    expect(out.files.map((f) => f.path)).toEqual(['site/index.html']);
+    expect(out.leftOut).toEqual([{ path: 'site/.git/config', rule: '.git/' }]);
+    expect(out.name).toBe('site');
+  });
+
+  it('denied zip entries do not count against the folder limits', async () => {
+    const entries: Record<string, Uint8Array> = { 'a.md': enc('a') };
+    for (let i = 0; i < LIMITS.folderFiles; i++) entries[`.git/objects/${i}`] = enc('o');
+    const out = await ok([zipFile(entries)], { expandZips: true });
+    expect(out.files.map((f) => f.path)).toEqual(['a.md']);
+    expect(out.leftOut).toHaveLength(LIMITS.folderFiles);
+  });
+
+  it('with zips not expanded, a zip is one file', async () => {
+    expect((await ok([zipFile({ 'a.md': enc('a') }, 'a.zip')], { expandZips: false })).files.map((f) => f.path)).toEqual(['a.zip']);
   });
 });
 

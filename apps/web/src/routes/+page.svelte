@@ -2,14 +2,13 @@
   import { onMount } from 'svelte';
   import type { ItemSummary } from '@superlibrary/contract';
   import { api } from '$lib/session.svelte';
+  import { listLine } from '$lib/item';
 
   let items = $state<ItemSummary[]>([]);
   let next = $state<string | null>(null);
   let error = $state<string | null>(null);
   let loading = $state(true);
 
-  // The API sends ISO 8601 UTC with `Z`, which every browser (Safari included) parses as is.
-  const when = (iso: string) => new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 
   async function load(before: string | null = null) {
     loading = true;
@@ -48,7 +47,7 @@
       <li>
         <a href={`/a/${item.id}`}>
           <span class="title">{item.title}</span>
-          <small>v{item.latestVersion} · {item.scope} · {when(item.createdAt)}{item.expiresAt ? ` · to be deleted ${when(item.expiresAt)}` : ''}</small>
+          <small>{listLine(item)}</small>
         </a>
       </li>
     {/each}

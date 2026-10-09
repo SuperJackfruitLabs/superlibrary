@@ -34,8 +34,9 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      # The Chromium build this Playwright version pins (headless shell included), and its system libraries.
-      - run: pnpm --filter @superlibrary/web exec playwright install --with-deps chromium
+      # The Chromium and WebKit builds this Playwright version pins (Chromium's headless shell
+      # included), and their system libraries. WebKit runs the containment and phone-width specs.
+      - run: pnpm --filter @superlibrary/web exec playwright install --with-deps chromium webkit
       # Writes a fresh dev signing pair (no .dev.vars in CI), then boots the API (:8787), the content
       # Worker (:8788) and the web dev server (:5173), headless.
       - run: pnpm --filter @superlibrary/web e2e

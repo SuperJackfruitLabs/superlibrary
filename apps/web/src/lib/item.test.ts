@@ -3,7 +3,7 @@ import type { ItemSummary, VersionSummary } from '@superlibrary/contract';
 import type { Me } from './api';
 import {
   ItemError, askRevokeItem, askRevokeVersion, embedUrlGetter, explain, kindWords, mayManage, parseVersion, provenanceRows, readItem, scopeSetter,
-  shareInfoGetter, shownVersion, versionRows, versionsGetter,
+  listLine, shareInfoGetter, shownVersion, versionRows, versionsGetter, when,
 } from './item';
 
 describe('item helpers', () => {
@@ -70,6 +70,14 @@ describe('the callbacks the item page gives the embed', () => {
 });
 
 describe('reading the item', () => {
+  it('an id that is not an item id is not found, and the API is never asked', async () => {
+    const calls: string[] = [];
+    const api = async (path: string) => { calls.push(path); return json({ item: ITEM, versions: [] }); };
+    for (const bad of ['itm_xyz', 'itm_0000000000000001%2F..', '..', 'ITM_0000000000000001', 'itm_00000000000000012']) {
+      expect(await readItem(api, bad)).toEqual({ state: 'refused', code: 'not_found' });
+    }
+    expect(calls).toEqual([]);
+  });
   it('an item and its versions', async () => {
     expect(await readItem(async () => json({ item: ITEM, versions: [v(1)] }), ITEM.id)).toEqual({ state: 'ok', item: ITEM, versions: [v(1)] });
   });
@@ -77,6 +85,15 @@ describe('reading the item', () => {
     expect(await readItem(async () => json({ error: 'expired' }, 410), ITEM.id)).toEqual({ state: 'expired' });
     expect(await readItem(async () => json({ error: 'revoked' }, 410), ITEM.id)).toEqual({ state: 'refused', code: 'revoked' });
     expect(await readItem(async () => new Response('<html>', { status: 502 }), ITEM.id)).toEqual({ state: 'refused', code: 'http_502' });
+  });
+});
+
+describe('the library list', () => {
+  it('says who can see each item, in words, not the raw scope', () => {
+    const at = '2026-10-09T06:48:00.000Z';
+    const line = listLine({ ...ITEM, scope: 'workspace', latestVersion: 2, createdAt: at, expiresAt: null });
+    expect(line).toBe(`v2 · Everyone in the workspace · ${when(at)}`);
+    expect(listLine({ ...ITEM, scope: 'board:brd_0000000000000001', latestVersion: 1, createdAt: at, expiresAt: at })).toBe(`v1 · Only you · ${when(at)} · to be deleted ${when(at)}`);
   });
 });
 
