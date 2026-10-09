@@ -3,6 +3,7 @@ import { error, json, type Handler } from '../http';
 import { resolvePerson } from '../auth/caller';
 import { BadCursor, browse } from './browse';
 import { facets } from './facets';
+import { addToCollection, collectionDetail, createCollection, deleteCollection, listCollections, loadCollection, patchCollection, removeFromCollection } from './collections';
 import { recordView } from './record';
 
 export const issues = (e: { issues: Array<{ path: PropertyKey[]; message: string }> }) =>
@@ -33,6 +34,28 @@ export const libraryRoutes: Handler = async (request, env, _ctx, url) => {
   if (rec && request.method === 'GET') {
     const p = await resolvePerson(request, env);
     return p instanceof Response ? p : recordView(env, p, rec[1]!);
+  }
+  const col = /^\/api\/v1\/collections(?:\/(col_[0-9a-f]{16})(\/items(?:\/(itm_[0-9a-f]{16}))?)?)?$/.exec(url.pathname);
+  if (col) {
+    const p = await resolvePerson(request, env);
+    if (p instanceof Response) return p;
+    const [, colId, items, itemId] = col;
+    if (!colId) {
+      if (request.method === 'GET') return listCollections(env, p);
+      if (request.method === 'POST') return createCollection(request, env, p);
+      return null;
+    }
+    const c = await loadCollection(env, p, colId);
+    if (!c) return error(404, 'not_found');
+    if (!items) {
+      if (request.method === 'GET') return collectionDetail(env, p, c);
+      if (request.method === 'PATCH') return patchCollection(request, env, p, c);
+      if (request.method === 'DELETE') return deleteCollection(env, p, c);
+      return null;
+    }
+    if (!itemId && request.method === 'POST') return addToCollection(request, env, p, c);
+    if (itemId && request.method === 'DELETE') return removeFromCollection(env, p, c, itemId);
+    return null;
   }
   return null;
 };

@@ -72,6 +72,8 @@ export async function deleteItem(env: Env, itemId: string, actor: string, reason
     env.DB.prepare(`DELETE FROM item_references WHERE item_id = ? OR (from_kind = 'work-record' AND from_id = ?)`).bind(itemId, itemId),
     env.DB.prepare(`DELETE FROM item_sources WHERE item_id = ?`).bind(itemId),
     env.DB.prepare(`DELETE FROM work_records WHERE item_id = ?`).bind(itemId),
+    // A collection that held it no longer does (spec §12; collection_items has a foreign key to items).
+    env.DB.prepare(`DELETE FROM collection_items WHERE item_id = ?`).bind(itemId),
     env.DB.prepare(`DELETE FROM items WHERE id = ?`).bind(itemId),
     audit(env.DB, { workspaceId: item.workspace_id, actor, action: 'item.deleted', itemId, detail: { reason } }),
   ]);
