@@ -33,7 +33,7 @@ test('install files are public', async ({ playwright, baseURL }) => {
 
 test('the header and the sign-in page show the mark', async ({ page }) => {
   await page.goto('/');
-  await expect(page.locator('header.top a[href="/"] [data-testid="superlibrary-mark"]')).toBeVisible();
+  await expect(page.locator('header.suite-shell a[href="/"] [data-testid="superlibrary-mark"]')).toBeVisible();
   await page.goto('/login');
   await expect(page.locator('main [data-testid="superlibrary-mark"]')).toBeVisible();
 });

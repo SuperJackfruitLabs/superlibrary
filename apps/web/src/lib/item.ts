@@ -103,6 +103,8 @@ export function provenanceRows(item: ItemSummary, me: Me | null): Row[] {
   const rows: Row[] = [{ label: 'Created by', value: who }];
   if (s.station) rows.push({ label: 'Station', value: s.station, mono: true });
   if (s.path) rows.push({ label: 'Source path', value: s.path, mono: true });
+  if (s.board) rows.push({ label: 'Board', value: s.board, mono: true });
+  if (s.stage) rows.push({ label: 'Stage', value: s.stage });
   if (s.card) rows.push({ label: 'Card', value: s.card, mono: true });
   if (s.run) rows.push({ label: 'Run', value: s.run, mono: true });
   rows.push({ label: 'Created', value: when(item.createdAt) });
@@ -128,7 +130,7 @@ export function versionRows(v: VersionSummary): Row[] {
 }
 
 const WORDS: Record<string, string> = {
-  revoked: 'This was revoked.', expired: 'This has expired.', not_found: 'Nothing here, or you cannot see it.',
+  revoked: 'This was revoked.', expired: 'This has expired.', not_found: 'Nothing here, or you cannot see it.', name_taken: 'A collection with that name already exists.',
   not_permitted: 'Only the person who uploaded it, or an owner of the workspace, may do that.',
   sign_in_required: 'Sign in again to do that.',
 };
@@ -136,6 +138,9 @@ const WORDS: Record<string, string> = {
 export function explain(code: string, detail?: string): string {
   if (code === 'invalid') {
     if (detail === 'expiresAt must be in the future') return 'Choose a date after today.';
+    if (detail === 'that would make a loop of replacements') return 'That would make a loop: the replacement is already marked as superseded by this item.';
+    if (detail === 'an item cannot supersede itself') return 'An item cannot replace itself.';
+    if (detail === 'a reason of 3 to 500 characters is required') return 'Say why, in at least 3 characters.';
     return detail ? `That was not accepted: ${detail}.` : 'That was not accepted.';
   }
   return WORDS[code] ?? `Something went wrong (${code}).`;
@@ -152,9 +157,9 @@ export const askRevokeItem = (title: string): Ask => ({
 });
 
 /** A change to the item (revoke, expiry): null when it was done, else the sentence to show. */
-export async function change(api: Api, path: string, method: 'POST' | 'PATCH', body: unknown): Promise<string | null> {
+export async function change(api: Api, path: string, method: 'POST' | 'PATCH' | 'DELETE', body?: unknown): Promise<string | null> {
   try {
-    const res = await api(path, { method, headers: JSON_HEADERS, body: JSON.stringify(body) });
+    const res = await api(path, body === undefined ? { method } : { method, headers: JSON_HEADERS, body: JSON.stringify(body) });
     if (res.ok) return null;
     const b = (await res.json().catch(() => ({}))) as { error?: string; detail?: string };
     return explain(b.error ?? `http_${res.status}`, b.detail);

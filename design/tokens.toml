@@ -1,0 +1,144 @@
+# design/tokens.toml
+# Superlibrary's design tokens, as one source. scripts/generate-tokens.mjs writes
+# apps/web/src/lib/kit/tokens.css from it; do not edit that file. CI fails on drift
+# (apps/web/src/lib/kit/tokens.test.ts), and on any colour that misses its contrast.
+#
+# Shaped as the suite design system will be (operator direction A, 2026-10-09):
+#   [suite.*]   shared by every product: neutrals, type, spacing, radii, focus, motion
+#   [product]   this product's own layer: its accent, its mark, its own meanings (outcomes)
+#   [parent]    the Super Jackfruit Labs identity: designed separately, reserved here
+# When the suite package exists, [suite.*] moves into it and this file keeps [product].
+# Names follow Supermessage's design/tokens.toml where they mean the same thing.
+
+[suite.color.light]
+surface = { value = "#fbfbfd" }
+surface-sunken = { value = "#f2f2f6", contrast = [{ against = "surface", min = 1.04, max = 1.13 }] }
+surface-raised = { value = "#ffffff" }
+border = { value = "#e5e5ea" }
+border-strong = { value = "#c7c7cc" }
+content = { value = "#1d1d1f", contrast = [{ against = "surface", min = 12.0 }] }
+content-muted = { value = "#55555a", contrast = [{ against = "surface", min = 6.0 }, { against = "surface-sunken", min = 6.0 }] }
+content-faint = { value = "#6b6b70", contrast = [{ against = "surface", min = 4.5 }, { against = "surface-sunken", min = 4.5 }, { against = "surface-raised", min = 4.5 }] }
+danger = { value = "#c0392b", contrast = [{ against = "surface", min = 4.5 }, { against = "surface-sunken", min = 4.5 }] }
+ok = { value = "#187c49", contrast = [{ against = "surface", min = 4.5 }, { against = "surface-sunken", min = 4.5 }] }
+scrim = { value = "rgb(0 0 0 / 0.45)" }
+
+[suite.color.dark]
+surface = { value = "#161618" }
+surface-sunken = { value = "#0f0f11", contrast = [{ against = "surface", min = 1.04, max = 1.13 }] }
+surface-raised = { value = "#1f1f22" }
+border = { value = "#343437" }
+border-strong = { value = "#4a4a4f" }
+content = { value = "#f5f5f7", contrast = [{ against = "surface", min = 12.0 }] }
+content-muted = { value = "#c7c7cc", contrast = [{ against = "surface", min = 6.0 }, { against = "surface-raised", min = 6.0 }] }
+content-faint = { value = "#98989d", contrast = [{ against = "surface", min = 4.5 }, { against = "surface-sunken", min = 4.5 }, { against = "surface-raised", min = 4.5 }] }
+danger = { value = "#ff6b5b", contrast = [{ against = "surface", min = 4.5 }, { against = "surface-raised", min = 4.5 }] }
+ok = { value = "#4cc38a", contrast = [{ against = "surface", min = 4.5 }, { against = "surface-sunken", min = 4.5 }] }
+scrim = { value = "rgb(0 0 0 / 0.65)" }
+
+[suite.font]
+sans = "'IBM Plex Sans', system-ui, -apple-system, sans-serif"
+mono = "'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace"
+
+# Web sizes; iOS fields stay at 16px or more (app.css), whatever the role.
+[suite.type.label]
+web = { size = "0.75rem", line_height = 1.3, weight = 600 }
+[suite.type.meta]
+web = { size = "0.8125rem", line_height = 1.35, weight = 400 }
+[suite.type.ui]
+web = { size = "0.875rem", line_height = 1.4, weight = 400 }
+[suite.type.ui-lg]
+web = { size = "0.9375rem", line_height = 1.4, weight = 600 }
+[suite.type.body]
+web = { size = "0.9375rem", line_height = 1.55, weight = 400 }
+[suite.type.title]
+web = { size = "1.375rem", line_height = 1.25, weight = 600 }
+
+[suite.space]
+1 = "4px"
+2 = "8px"
+3 = "12px"
+4 = "16px"
+6 = "24px"
+8 = "32px"
+# Apple's minimum tap target; iOS is the operator's primary platform.
+tap = "44px"
+
+[suite.radius]
+control = "6px"
+card = "8px"
+pill = "9999px"
+sharp = "0"
+
+[suite.focus]
+ring = "2px solid var(--color-accent)"
+offset = "2px"
+
+[suite.motion]
+quick = "120ms"
+settle = "200ms"
+easing = "cubic-bezier(0.2, 0, 0, 1)"
+
+[suite.elevation]
+overlay = "0 8px 24px rgb(0 0 0 / 0.18)"
+
+[product]
+name = "Superlibrary"
+
+# Coral. #ff7a59 is 2.5:1 on a light page, under the 3:1 a graphic needs, so light uses the deeper shade.
+[product.color.light]
+accent = { value = "#b04a1e", contrast = [{ against = "surface", min = 4.5 }, { against = "surface-sunken", min = 4.5 }] }
+accent-content = { value = "#ffffff", contrast = [{ against = "accent", min = 4.5 }] }
+accent-soft = { value = "#fbe9e2", contrast = [{ against = "content", min = 4.5 }] }
+mark = { value = "#b04a1e", contrast = [{ against = "surface", min = 3.0 }] }
+
+[product.color.dark]
+accent = { value = "#ff7a59", contrast = [{ against = "surface", min = 4.5 }, { against = "surface-raised", min = 4.5 }] }
+accent-content = { value = "#161618", contrast = [{ against = "accent", min = 4.5 }] }
+accent-soft = { value = "#3a2219", contrast = [{ against = "content", min = 4.5 }] }
+mark = { value = "#ff7a59", contrast = [{ against = "surface", min = 3.0 }] }
+
+# Spec §3 outcomes. Always shown with the outcome's word: colour never carries meaning alone.
+[product.outcome.light]
+approved = { value = "#187c49", contrast = [{ against = "surface", min = 4.5 }, { against = "surface-sunken", min = 4.5 }] }
+completed = { value = "#0f766e", contrast = [{ against = "surface", min = 4.5 }, { against = "surface-sunken", min = 4.5 }] }
+in-progress = { value = "#2356c2", contrast = [{ against = "surface", min = 4.5 }, { against = "surface-sunken", min = 4.5 }] }
+superseded = { value = "#6d4fb3", contrast = [{ against = "surface", min = 4.5 }, { against = "surface-sunken", min = 4.5 }] }
+rejected = { value = "#b42318", contrast = [{ against = "surface", min = 4.5 }, { against = "surface-sunken", min = 4.5 }] }
+failed = { value = "#a14306", contrast = [{ against = "surface", min = 4.5 }, { against = "surface-sunken", min = 4.5 }] }
+abandoned = { value = "#6b6b70", contrast = [{ against = "surface", min = 4.5 }, { against = "surface-sunken", min = 4.5 }] }
+
+[product.outcome.dark]
+approved = { value = "#4cc38a", contrast = [{ against = "surface", min = 4.5 }, { against = "surface-raised", min = 4.5 }] }
+completed = { value = "#2dd4bf", contrast = [{ against = "surface", min = 4.5 }, { against = "surface-raised", min = 4.5 }] }
+in-progress = { value = "#8ab4ff", contrast = [{ against = "surface", min = 4.5 }, { against = "surface-raised", min = 4.5 }] }
+superseded = { value = "#b39cf0", contrast = [{ against = "surface", min = 4.5 }, { against = "surface-raised", min = 4.5 }] }
+rejected = { value = "#ff6b5b", contrast = [{ against = "surface", min = 4.5 }, { against = "surface-raised", min = 4.5 }] }
+failed = { value = "#f79009", contrast = [{ against = "surface", min = 4.5 }, { against = "surface-raised", min = 4.5 }] }
+abandoned = { value = "#98989d", contrast = [{ against = "surface", min = 4.5 }, { against = "surface-raised", min = 4.5 }] }
+
+# Each product's accent and address, for the suite switcher. Colour belongs only to products (the
+# parent has none). An empty url is a product whose address is not settled yet: not linked.
+[suite.products]
+agentpod = { name = "AgentPod", accent = "#5fb3d4", url = "https://console.agentpod.dev" }
+superpipeline = { name = "Superpipeline", accent = "#f4a526", url = "https://app.superpipeline.dev" }
+superwitness = { name = "Superwitness", accent = "#3fd0a2", url = "" }
+supermessage = { name = "Supermessage", accent = "#9d8ff0", url = "" }
+superlibrary = { name = "Superlibrary", accent = "#ff7a59", url = "https://app.superlibrary.dev" }
+
+# The Super Jackfruit Labs identity, PROVISIONAL: operator working decision 2026-10-09, option C
+# "Ink". A neutral parent with no hue of its own; the generator refuses a parent accent. Changing it
+# is an edit here (and to ParentMark.svelte's geometry), nothing else.
+[parent]
+name = "Super Jackfruit Labs"
+
+[parent.color]
+ink = { value = "#121722" }
+slate = { value = "#3a4252" }
+mist = { value = "#8a93a3", contrast = [{ against = "ink", min = 4.5 }] }
+paper = { value = "#f5f6f8", contrast = [{ against = "ink", min = 12.0 }] }
+# The parent mark: three hexagons (cells of the jackfruit's skin), white on the shared ink product tile.
+tile = { value = "#121722" }
+tile-dark = { value = "#1c2430" }
+mark = { value = "#f5f6f8", contrast = [{ against = "tile", min = 4.5 }] }
+mark-dark = { value = "#e6e9ee", contrast = [{ against = "tile-dark", min = 4.5 }] }

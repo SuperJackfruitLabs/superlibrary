@@ -68,7 +68,7 @@ test('the upload page says who will see it, and the library says who can', async
   await expect(page.getByText('Everyone in the workspace will be able to see it.')).toBeVisible();
   const item = await uploadViaApi(request, [{ path: 'v.md', body: '# v' }], { title: 'who sees this' });
   await page.goto('/');
-  const row = page.locator('.items li', { hasText: 'who sees this' }).first();
+  const row = page.locator('.results li', { hasText: 'who sees this' }).first();
   await expect(row).toContainText('Everyone in the workspace');
   await expect(row).not.toContainText('· workspace ·');
   expect(item.itemId).toMatch(/^itm_/);

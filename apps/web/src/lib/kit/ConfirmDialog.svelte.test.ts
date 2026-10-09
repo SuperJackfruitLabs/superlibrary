@@ -132,4 +132,17 @@ describe('the confirmation dialog (no browser confirm or prompt)', () => {
     const { dialog } = open({ error: 'Only the person who uploaded it, or an owner of the workspace, may do that.' });
     expect(dialog.querySelector('[role=alert]')!.textContent).toContain('Only the person who uploaded it');
   });
+  it('a required reason keeps the act disabled until it is given, and says it is recorded', () => {
+    const { dialog, props } = open({ reason: true, reasonRequired: true, action: 'Remove from memory' });
+    const act = [...dialog.querySelectorAll('button')].find((b) => b.textContent === 'Remove from memory')!;
+    expect(act.disabled).toBe(true);
+    expect(dialog.textContent).toContain('required');
+    const ta = dialog.querySelector('textarea')!;
+    ta.value = 'posted twice';
+    ta.dispatchEvent(new Event('input', { bubbles: true }));
+    flushSync();
+    expect(act.disabled).toBe(false);
+    act.click();
+    expect(props.onconfirm).toHaveBeenCalledWith('posted twice');
+  });
 });

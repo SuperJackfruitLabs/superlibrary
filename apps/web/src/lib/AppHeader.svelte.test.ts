@@ -7,11 +7,12 @@ import AppHeader from './AppHeader.svelte';
 
 let c: ReturnType<typeof mount> | undefined;
 afterEach(() => { if (c) unmount(c); c = undefined; document.body.innerHTML = ''; });
+const me = { principalId: 'prn_000000000000000000a2', org: 'org_1', workspaceId: 'wks_1', role: 'owner' as const };
+const open = (onsignout = vi.fn()) => { c = mount(AppHeader, { target: document.body, props: { me, onsignout } }); flushSync(); };
 
 describe('the app header', () => {
   it('shows the mark beside the name, as decoration inside the home link', () => {
-    c = mount(AppHeader, { target: document.body, props: { onsignout: vi.fn() } });
-    flushSync();
+    open();
     const home = document.querySelector<HTMLAnchorElement>('header a[href="/"]')!;
     const mark = home.querySelector('svg[data-testid="superlibrary-mark"]')!;
     expect(mark).not.toBeNull();
@@ -21,19 +22,38 @@ describe('the app header', () => {
   });
 
   it('the mark draws the same three spines as the favicon', () => {
-    c = mount(AppHeader, { target: document.body, props: { onsignout: vi.fn() } });
-    flushSync();
+    open();
     const fav = readFileSync(join(__dirname, '..', '..', 'static', 'favicon.svg'), 'utf8');
     const fromFavicon = [...fav.matchAll(/<rect (x="[^/]*?)\/>/g)].map((m) => m[1]!.trim());
     const inHeader = [...document.querySelectorAll('[data-testid="superlibrary-mark"] rect')].map((r) => [...r.attributes].map((a) => `${a.name}="${a.value}"`).join(' '));
     expect(inHeader).toEqual(fromFavicon);
   });
 
-  it('Sign out calls back', () => {
+  it('the nav reads Library, Outcomes, Collections, Upload', () => {
+    open();
+    expect([...document.querySelectorAll('nav[aria-label="Superlibrary"] a')].map((a) => a.textContent)).toEqual(['Library', 'Outcomes', 'Collections', 'Upload']);
+  });
+
+  it('opening the account menu closes the suite switcher, and Escape on the trigger closes it', () => {
+    open();
+    const sw = document.querySelector<HTMLButtonElement>('button.suite-switcher')!;
+    const acct = document.querySelector<HTMLButtonElement>('button.suite-shell-account')!;
+    sw.click(); flushSync();
+    expect(sw.getAttribute('aria-expanded')).toBe('true');
+    acct.click(); flushSync();
+    expect(sw.getAttribute('aria-expanded')).toBe('false');
+    expect(acct.getAttribute('aria-expanded')).toBe('true');
+    acct.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); flushSync();
+    expect(acct.getAttribute('aria-expanded')).toBe('false');
+    expect(document.activeElement).toBe(acct);
+  });
+
+  it('Sign out is inside the account menu, not in the bar, and calls back', () => {
     const onsignout = vi.fn();
-    c = mount(AppHeader, { target: document.body, props: { onsignout } });
-    flushSync();
-    document.querySelector<HTMLButtonElement>('header button')!.click();
+    open(onsignout);
+    const signout = [...document.querySelectorAll<HTMLButtonElement>('header button')].find((b) => b.textContent!.trim() === 'Sign out')!;
+    expect(signout.closest('.suite-shell-menu')).not.toBeNull();
+    signout.click();
     expect(onsignout).toHaveBeenCalledOnce();
   });
 });
