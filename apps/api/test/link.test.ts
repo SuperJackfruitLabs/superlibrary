@@ -163,6 +163,21 @@ describe('an agent links through the hub (spec §5)', () => {
     send.mockRestore();
   });
 
+  it('a revoked item is never revived by a link and never listed for the station', async () => {
+    await withOrgPlane(async () => {
+      const h = await hubHeaders(AGENT);
+      const src = { ...SRC, station: 'stn_7', path: 'rev.md' };
+      const a = await upload([{ path: 'rev.md', body: 'one' }], { headers: h, scope: SCOPE, source: src });
+      await env.DB.prepare(`UPDATE items SET scope = 'workspace', revoked_at = ? WHERE id = ?`).bind(new Date().toISOString(), a.body.itemId).run();
+      const b = await upload([{ path: 'rev.md', body: 'two' }], { headers: h, scope: SCOPE, source: src });
+      expect(b.status).toBe(201);
+      expect(b.body.itemId).not.toBe(a.body.itemId);
+      await env.DB.prepare(`UPDATE items SET scope = 'workspace' WHERE id = ?`).bind(b.body.itemId).run();
+      const res = await SELF.fetch(`${API}/api/v1/sources/agentpod/items?station=stn_7`, { headers: { Authorization: `Bearer ${await planeToken()}` } });
+      expect(((await res.json()) as { items: Array<{ id: string }> }).items.map((i) => i.id)).toEqual([b.body.itemId]);
+    });
+  });
+
   it("lists a station's items for the console, with the person's own token", async () => {
     await withOrgPlane(async () => {
       const h = await hubHeaders(AGENT);

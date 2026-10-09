@@ -84,7 +84,7 @@ export function buildWorkRecord(b: CardBundle, appUrl: string, boardId = ''): { 
     stage: b.card.currentStageKey,
     archivedAt: b.card.archivedAt,
     createdAt: b.card.createdAt,
-    updatedAt: b.card.updatedAt,
+    updatedAt: b.card.updatedAt ?? b.card.createdAt,
     handoffs: attempts.map((a, i) => ({
       runId: a.runId, stage: a.stageKey, agent: a.agentId, startedAt: a.startedAt, endedAt: a.endedAt, attempt: i + 1,
       status: a.status, handoff: cleanValue(`handoffs.${a.runId}`, a.handoff),
@@ -134,9 +134,15 @@ export function buildWorkRecord(b: CardBundle, appUrl: string, boardId = ''): { 
       record.title = record.title.slice(0, 1000);
       for (const h of record.handoffs) h.failureReason = clip(h.failureReason);
       for (const r of record.references) { r.title = clip(r.title); r.url = r.url.slice(0, 1000); }
-      while (bytes(record) > BODY_CAP && record.references.length > 0) record.references.pop();
-      while (bytes(record) > BODY_CAP && record.handoffs.length > 0) record.handoffs.pop();
-      while (bytes(record) > BODY_CAP && record.gates.length > 0) record.gates.pop();
+      // Subtract each popped element's size (+1 for its comma) instead of re-serialising the whole
+      // record per pop; re-measure once per list so an estimate off by a byte cannot leave it over.
+      for (const list of [record.references, record.handoffs, record.gates] as unknown[][]) {
+        let now = bytes(record);
+        while (now > BODY_CAP && list.length > 0) {
+          while (now > BODY_CAP && list.length > 0) now -= bytes(list.pop()) + 1;
+          now = bytes(record);
+        }
+      }
     }
   }
   const text = [

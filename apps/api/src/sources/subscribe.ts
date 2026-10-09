@@ -60,7 +60,15 @@ export async function subscribeWorkspace(env: Env, workspaceId: string, org: str
 
 /** The hourly cron: every workspace Superlibrary holds a credential for (plan P20). */
 export async function subscribeAll(env: Env): Promise<void> {
-  const orgs = Object.keys(JSON.parse(env.SERVICE_CREDENTIALS || '{}') as Record<string, string>);
+  if (!pushConfigured(env)) {
+    console.error('subscribe skipped: PUSH_SIGNING_KEY is not configured');
+    return;
+  }
+  let orgs: string[];
+  try { orgs = Object.keys(JSON.parse(env.SERVICE_CREDENTIALS || '{}') as Record<string, string>); } catch {
+    console.error('subscribe skipped: SERVICE_CREDENTIALS is not valid JSON');
+    return;
+  }
   for (const org of orgs) {
     try {
       await subscribeWorkspace(env, await ensureWorkspace(env.DB, org), org);

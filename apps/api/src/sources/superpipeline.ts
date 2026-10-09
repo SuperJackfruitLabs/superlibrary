@@ -3,7 +3,7 @@ import { serviceToken } from '../clients/plane';
 
 export interface PipelineCard {
   id: string; title: string; spec: unknown; state: string; currentStageKey: string | null;
-  archivedAt: string | null; needsHuman: { reason: string } | null; createdAt: string; updatedAt: string;
+  archivedAt: string | null; needsHuman: { reason: string } | null; createdAt: string; updatedAt: string | null;
 }
 export interface PipelineAttempt {
   runId: string; stageKey: string; agentId: string | null; status: string; outcome: string | null;

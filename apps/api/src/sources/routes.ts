@@ -50,7 +50,8 @@ async function startBackfill(request: Request, env: Env): Promise<Response> {
     return error(502, 'pipeline_unreachable', { detail: 'Superpipeline could not be reached to list its boards; try again shortly' });
   }
   const boards = (await env.DB.prepare(`SELECT board_id FROM source_boards WHERE workspace_id = ?`).bind(p.workspaceId).all<{ board_id: string }>()).results;
-  if (boards.length > 0) await env.INGEST.sendBatch(boards.map((b) => ({ body: { type: 'board.backfill' as const, workspaceId: p.workspaceId, boardId: b.board_id } })));
+  const msgs = boards.map((b) => ({ body: { type: 'board.backfill' as const, workspaceId: p.workspaceId, boardId: b.board_id } }));
+  for (let i = 0; i < msgs.length; i += 100) await env.INGEST.sendBatch(msgs.slice(i, i + 100));
   await audit(env.DB, { workspaceId: p.workspaceId, actor: p.principalId, act: p.act, action: 'backfill.started', detail: { boards: boards.length } }).run();
   return json({ boards: boards.length, registered: sub.registered, failed: sub.failed }, 202);
 }

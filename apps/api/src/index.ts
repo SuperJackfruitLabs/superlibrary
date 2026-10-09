@@ -61,7 +61,7 @@ export default {
   },
   /** The daily cron only enqueues; the consumer does the work (spec §6 `retention` queue). */
   async scheduled(c: ScheduledController, env: Env, ctx: ExecutionContext) {
-    if (c.cron === SUBSCRIBE_CRON) ctx.waitUntil(subscribeAll(env));
+    if (c.cron === SUBSCRIBE_CRON) ctx.waitUntil(subscribeAll(env).catch((e) => console.error('subscribeAll failed', e instanceof Error ? e.message : String(e))));
     else if (c.cron === RECONCILE_CRON) {
       ctx.waitUntil(reconcile(env).catch((e) => console.error('reconcile failed', e instanceof Error ? e.message : String(e))));
     } else if (c.cron === RETENTION_CRON) await env.RETENTION.send({ type: 'sweep', at: new Date(c.scheduledTime).toISOString() });

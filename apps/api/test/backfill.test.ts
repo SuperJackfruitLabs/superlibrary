@@ -2,6 +2,8 @@
 import { SELF, createExecutionContext, createMessageBatch, env, getQueueResult } from 'cloudflare:test';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ORG, card, fakePipeline, type FakeState } from './helpers/fake-pipeline';
+import { subscribeAll } from '../src/sources/subscribe';
+import worker from '../src/index';
 import { BACKFILL_PAGE, backfillBoard, ingestBatch, syncCard } from '../src/ingest/consumer';
 import { ensureWorkspace } from '../src/auth/caller';
 import { __resetServiceTokensForTests } from '../src/clients/plane';
@@ -126,6 +128,46 @@ describe('backfill', () => {
       expect(r.status).toBe(502);
       expect(sendBatch).not.toHaveBeenCalled();
     } finally { globalThis.fetch = fake; sendBatch.mockRestore(); delete bag.PUSH_SIGNING_KEY; }
+  });
+  it('the Worker queue entry dispatches superlibrary-ingest to the ingest consumer', async () => {
+    const ws = await ensureWorkspace(env.DB, ORG);
+    const batch = createMessageBatch<any>('superlibrary-ingest', [{ id: 'q1', timestamp: new Date(), attempts: 1, body: { type: 'card.sync', workspaceId: ws, boardId: B, cardId: 'card_00000000000000e2', reason: 'test' } }]);
+    const ctx = createExecutionContext();
+    await (worker as any).queue(batch, env, ctx);
+    expect((await getQueueResult(batch, ctx)).explicitAcks).toEqual(['q1']);
+    expect(await recordFor(ws, 'card_00000000000000e2')).not.toBeNull();
+  });
+  it('the operator route sends board.backfill in chunks of at most 100', async () => {
+    const ws = await ensureWorkspace(env.DB, ORG);
+    for (let i = 0; i < 250; i++) await env.DB.prepare(`INSERT OR IGNORE INTO source_boards (workspace_id, board_id, name, last_seen_at) VALUES (?, ?, 'x', 't')`).bind(ws, `brd_${String(5000 + i).padStart(16, '0')}`).run();
+    const sizes: number[] = [];
+    const spy = vi.spyOn(env.INGEST, 'sendBatch').mockImplementation((async (m: any) => { sizes.push(m.length); }) as any);
+    bag.PUSH_SIGNING_KEY = 'k'.repeat(32);
+    bag.OPERATORS = HUMAN;
+    try {
+      const r = await SELF.fetch('https://api.test/api/v1/sources/superpipeline/backfill', { method: 'POST', headers: devHeaders(HUMAN, ORG) });
+      expect(r.status).toBe(202);
+    } finally { spy.mockRestore(); delete bag.PUSH_SIGNING_KEY; }
+    expect(sizes.length).toBeGreaterThan(2);
+    expect(Math.max(...sizes)).toBeLessThanOrEqual(100);
+    expect(sizes.reduce((a, b) => a + b, 0)).toBe(251);
+  });
+  it('the hourly subscribe never throws on a malformed credential list and does nothing without a push key', async () => {
+    const was = bag.SERVICE_CREDENTIALS;
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      bag.PUSH_SIGNING_KEY = 'k'.repeat(32);
+      bag.SERVICE_CREDENTIALS = '{not json';
+      await expect(subscribeAll(env)).resolves.toBeUndefined();
+      expect(err).toHaveBeenCalledWith(expect.stringContaining('SERVICE_CREDENTIALS'));
+      delete bag.PUSH_SIGNING_KEY;
+      bag.SERVICE_CREDENTIALS = JSON.stringify({ [ORG]: 'a:b', org_00000000000000000b02: 'a:b' });
+      err.mockClear();
+      state.calls.length = 0;
+      await subscribeAll(env);
+      expect(state.calls).toEqual([]);
+      expect(err).toHaveBeenCalledTimes(1);   // checked once at the top, not once per org
+    } finally { bag.SERVICE_CREDENTIALS = was; err.mockRestore(); delete bag.PUSH_SIGNING_KEY; }
   });
   it('a big board is enqueued in bounded pages that together cover every card once', async () => {
     const ws = await ensureWorkspace(env.DB, ORG);
