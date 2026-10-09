@@ -15,13 +15,14 @@ const hostsOf = (s: string) => s.split(/\s+/).filter((x) => x !== '');
 
 interface SourceRow {
   source: 'upload' | 'agentpod' | 'superpipeline'; board_id: string | null; card_id: string | null; stage: string | null; run_id: string | null;
-  agent_principal: string | null; station: string | null; source_path: string | null; source_id: string | null; source_url: string | null; station_removed_at: string | null;
+  agent_principal: string | null; station: string | null; station_name: string | null; source_path: string | null; source_id: string | null; source_url: string | null; station_removed_at: string | null;
 }
 
 function sourceOf(r: SourceRow): ItemSource {
   const s: ItemSource = { sourceKind: r.source, agent: r.agent_principal !== null, stationRemoved: r.station_removed_at !== null };
   if (r.agent_principal) s.agentPrincipal = r.agent_principal;
   if (r.station) s.station = r.station;
+  if (r.station_name) s.stationName = r.station_name;
   if (r.source_path) s.path = r.source_path;
   if (r.board_id) s.board = r.board_id;
   if (r.card_id) s.card = r.card_id;
@@ -32,7 +33,7 @@ function sourceOf(r: SourceRow): ItemSource {
   return s;
 }
 
-const SOURCE_COLS = `item_id, source, board_id, card_id, stage, run_id, agent_principal, station, source_path, source_id, source_url, station_removed_at`;
+const SOURCE_COLS = `item_id, source, board_id, card_id, stage, run_id, agent_principal, station, station_name, source_path, source_id, source_url, station_removed_at`;
 
 /** What `summary` adds: each item's source, whether its board is known, and a work record's replacement. */
 interface Extras { source?: ItemSource; boardKnown?: boolean; supersededBy?: string | null }
@@ -51,7 +52,7 @@ export function summary(i: ItemRow, extra: Extras = {}): ItemSummary {
 }
 
 /** Sources, known boards and replacements for these items, in one pass each (a list is never N+1). */
-async function extrasFor(env: Env, p: Person, items: ItemRow[], scopes?: string[]): Promise<Map<string, Extras>> {
+export async function extrasFor(env: Env, p: Person, items: ItemRow[], scopes?: string[]): Promise<Map<string, Extras>> {
   const out = new Map<string, Extras>(items.map((i) => [i.id, {}]));
   if (items.length === 0) return out;
   const ids = JSON.stringify(items.map((i) => i.id));

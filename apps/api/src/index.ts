@@ -16,8 +16,9 @@ import { RECONCILE_CRON, reconcile } from './indexing/consumer';
 import { handleMcp } from './mcp/server';
 import { searchRoutes } from './search/routes';
 import { SUBSCRIBE_CRON, subscribeAll } from './sources/subscribe';
+import { libraryRoutes } from './library/routes';
 
-const handlers: Handler[] = [uploadRoutes, itemRoutes, searchRoutes, sourceRoutes];
+const handlers: Handler[] = [uploadRoutes, itemRoutes, searchRoutes, sourceRoutes, libraryRoutes];
 
 async function route(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
   const url = new URL(request.url);
