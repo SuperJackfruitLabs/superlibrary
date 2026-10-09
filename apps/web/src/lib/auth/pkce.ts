@@ -1,4 +1,4 @@
-/** PKCE (RFC 7636) helpers for the console's sign-in through the organization plane. */
+/** PKCE (RFC 7636) helpers for signing in to Superlibrary through the organization plane. */
 
 const b64url = (bytes: Uint8Array) =>
   btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");

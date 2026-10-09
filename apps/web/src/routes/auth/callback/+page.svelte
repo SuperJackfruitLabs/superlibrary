@@ -9,10 +9,10 @@
   let failed = $state(false);
 
   onMount(async () => {
-    if (!currentPlane()) await initSession();
-    const p = currentPlane();
-    if (!p) { failed = true; message = 'This deployment has no sign-in service configured.'; return; }
     try {
+      if (!currentPlane()) await initSession();
+      const p = currentPlane();
+      if (!p) { failed = true; message = 'This deployment has no sign-in service configured.'; return; }
       const { returnTo, interactive } = await completeSignIn(new URLSearchParams(window.location.search), p);
       if (interactive) {
         // The silent authorize found no plane session: ask again, and let the plane show its page.

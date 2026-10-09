@@ -1,9 +1,10 @@
 /**
  * Signing in through the organization plane (issuer contract §3.1): OAuth 2.1 authorization code +
  * PKCE S256, as the first-party public client `superlibrary-web`, with `resource` = the Superlibrary
- * audience on every token request. Copied from the stack's operator console (its
- * apps/console/src/lib/auth/org-plane.ts at 2efe25a8, which carries the fixes from #695, #698 and
- * #704); only the client id, the storage keys and discovery differ. Keep it in step with that file.
+ * audience on every token request. Copied from the stack's operator console, in the AgentPod
+ * repository (SuperJackfruitLabs/agentpod): apps/console/src/lib/auth/org-plane.ts at 2efe25a8,
+ * which carries the fixes from SuperJackfruitLabs/agentpod#695, #698 and #704. Only the client id,
+ * the storage keys and discovery differ. Keep it in step with that file.
  *
  * Tokens live in this module's memory only. Which plane comes from this app's own API: RFC 9728
  * protected-resource metadata at `/.well-known/oauth-protected-resource` (same origin).

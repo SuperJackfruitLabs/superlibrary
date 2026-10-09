@@ -9,21 +9,34 @@
   let { children } = $props();
   let initializing = $state(true);
   let autoSigningIn = $state(false);
+  /** Why the session could not be started; shown with a retry, never as an endless "Connecting…". */
+  let startError = $state<string | null>(null);
   const publicRoutes = ['/login', '/auth/callback'];
   let isPublic = $derived(publicRoutes.some((r) => page.url.pathname.startsWith(r)));
   let stop: (() => void) | undefined;
 
+  async function start() {
+    initializing = true;
+    startError = null;
+    try {
+      await initSession();
+    } catch (e) {
+      startError = e instanceof Error ? e.message : 'Superlibrary could not start.';
+    } finally {
+      initializing = false;
+    }
+  }
+
   onMount(async () => {
-    await initSession();
-    initializing = false;
+    await start();
     stop = watchSession(currentPlane, { onSignedOut: () => planeSessionLost(null) });
   });
   onDestroy(() => stop?.());
 
   // Tokens are memory-only: a new tab, a reload or a 401 leaves none. Go straight to a silent
-  // authorize (prompt=none); /login only after an explicit sign-out or a failed attempt (#704).
+  // authorize (prompt=none); /login only after an explicit sign-out or a failed attempt (SuperJackfruitLabs/agentpod#704).
   $effect(() => {
-    if (initializing || isPublic || session.me || session.notEnabled || devMode()) {
+    if (initializing || startError || isPublic || session.me || session.notEnabled || devMode()) {
       autoSigningIn = false;
       return;
     }
@@ -48,6 +61,11 @@
   <p class="status" role="status">Connecting…</p>
 {:else if isPublic}
   {@render children()}
+{:else if startError}
+  <main class="notice">
+    <p class="error" role="alert">{startError}</p>
+    <button type="button" onclick={start}>Try again</button>
+  </main>
 {:else if session.notEnabled}
   <main class="notice">
     <h1>Superlibrary is not enabled for this workspace</h1>
@@ -57,7 +75,7 @@
   <div class="shell">
     <header class="top">
       <a href="/"><strong>Superlibrary</strong></a>
-      <nav><a href="/upload">Upload</a> · <button type="button" onclick={logOut}>Sign out</button></nav>
+      <nav><a href="/upload">Upload</a><button type="button" onclick={logOut}>Sign out</button></nav>
     </header>
     {@render children()}
   </div>

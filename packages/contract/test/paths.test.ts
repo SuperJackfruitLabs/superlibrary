@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { checkPath } from '../src/paths';
+import { PATH_REFUSAL_REASONS, checkPath, pathRefusalSentence } from '../src/paths';
 
 describe('checkPath (spec §8 path rules)', () => {
   it('normalises harmless paths', () => {
@@ -45,5 +45,22 @@ describe('checkPath (spec §8 path rules)', () => {
     // Non-secret files are accepted even with trailing dots/spaces
     expect(checkPath('notes.'), 'notes.').toMatchObject({ ok: true });
     expect(checkPath('report .md'), 'report .md').toMatchObject({ ok: true });
+  });
+});
+
+describe('pathRefusalSentence (one wording for every client: web precheck and suli)', () => {
+  it('says why, in a sentence, naming the path as given', () => {
+    const say = (p: string) => { const c = checkPath(p); if (c.ok) throw new Error('expected a refusal'); return pathRefusalSentence(c); };
+    expect(say('.env')).toBe('.env is not uploaded: it matches the .env* rule.');
+    expect(say('../x')).toBe('../x is not uploaded: it leaves the folder.');
+    expect(say('/etc/passwd')).toBe('/etc/passwd is not uploaded: it is an absolute path.');
+    expect(say('a\\b')).toBe('a\\b is not uploaded: it contains a backslash.');
+    expect(say('./')).toBe('./ is not uploaded: it has no name.');
+    expect(say('a\u0001b')).toBe('a\u0001b is not uploaded: it contains a control character.');
+    expect(say('x'.repeat(1025))).toBe(`${'x'.repeat(1025)} is not uploaded: its path is too long.`);
+  });
+
+  it('has a reason for every refusal checkPath can give', () => {
+    for (const r of ['empty', 'too_long', 'control_character', 'backslash', 'absolute', 'parent'] as const) expect(PATH_REFUSAL_REASONS[r]).toMatch(/^it/);
   });
 });

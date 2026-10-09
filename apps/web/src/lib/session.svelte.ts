@@ -1,7 +1,7 @@
 import { discardToken, discoverPlane, hasTokens, planeAccessToken, type PlaneDiscovery } from './auth/org-plane';
-import { createApi } from './api';
+import { createApi, parseMe, type Me } from './api';
 
-export interface Me { principalId: string; org: string; workspaceId: string; role: 'owner' | 'member' }
+export type { Me };
 
 let plane: PlaneDiscovery | null = null;
 export const session = $state<{ me: Me | null; notEnabled: { org: string } | null }>({ me: null, notEnabled: null });
@@ -9,7 +9,7 @@ export const session = $state<{ me: Me | null; notEnabled: { org: string } | nul
 export const currentPlane = () => plane;
 export const devMode = () => import.meta.env.DEV && plane === null;
 
-/** A 401 for `sent` (null: none sent). Not a sign-out: the guard re-authorizes (console #698). */
+/** A 401 for `sent` (null: none sent). Not a sign-out: the guard re-authorizes (SuperJackfruitLabs/agentpod#698). */
 export function planeSessionLost(sent: string | null): void {
   discardToken(sent);
   if (!hasTokens()) session.me = null;
@@ -17,19 +17,29 @@ export function planeSessionLost(sent: string | null): void {
 
 export const api = createApi({ plane: currentPlane, token: (p) => planeAccessToken(p), onUnauthorized: planeSessionLost, dev: import.meta.env.DEV });
 
+/**
+ * Who is signed in. Resolves with `session.me` set, or null after a 401 (the guard signs in again)
+ * or with `session.notEnabled` set; rejects, with a sentence to show, on anything else, so the
+ * layout can offer a retry instead of waiting forever.
+ */
 export async function refreshMe(): Promise<void> {
   if (plane && !hasTokens()) { session.me = null; return; }
   const res = await api('/api/v1/me');
   if (res.ok) {
-    session.me = (await res.json()) as Me;
+    const me = parseMe(await res.json().catch(() => null));
+    if (!me) { session.me = null; throw new Error('The library service answered, but not as expected.'); }
+    session.me = me;
     session.notEnabled = null;
     return;
   }
   session.me = null;
+  if (res.status === 401) return;
   if (res.status === 403) {
     const body = (await res.json().catch(() => ({}))) as { error?: string; org?: string };
-    if (body.error === 'product_not_enabled' && body.org) session.notEnabled = { org: body.org };
+    if (body.error === 'product_not_enabled' && body.org) { session.notEnabled = { org: body.org }; return; }
+    throw new Error(`This account cannot use Superlibrary (${body.error ?? 'forbidden'}).`);
   }
+  throw new Error(`The library service could not be reached (HTTP ${res.status}).`);
 }
 
 export async function initSession(): Promise<void> {

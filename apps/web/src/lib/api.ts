@@ -30,3 +30,14 @@ export function createApi(deps: ApiDeps) {
     return res;
   };
 }
+
+export interface Me { principalId: string; org: string; workspaceId: string; role: 'owner' | 'member' }
+
+/** `/api/v1/me`'s body, or null when it is anything else (an HTML page from a missing route, say). */
+export function parseMe(body: unknown): Me | null {
+  if (typeof body !== 'object' || body === null) return null;
+  const b = body as Record<string, unknown>;
+  const str = (k: string) => typeof b[k] === 'string' && b[k] !== '';
+  if (!str('principalId') || !str('org') || !str('workspaceId') || (b.role !== 'owner' && b.role !== 'member')) return null;
+  return { principalId: b.principalId as string, org: b.org as string, workspaceId: b.workspaceId as string, role: b.role };
+}

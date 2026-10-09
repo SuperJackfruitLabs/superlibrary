@@ -16,7 +16,7 @@ describe('createApi', () => {
     expect(seen).toEqual(['Bearer t1', 'Bearer t2']);
   });
 
-  it('a 401 reports the token it sent — not a sign-out (console behaviour, #698)', async () => {
+  it('a 401 reports the token it sent — not a sign-out (the AgentPod console, SuperJackfruitLabs/agentpod#698)', async () => {
     const onUnauthorized = vi.fn();
     const api = createApi({ plane: () => PLANE, token: async () => 'sent-token', onUnauthorized, dev: false, fetchFn: (async () => new Response('{}', { status: 401 })) as never });
     expect((await api('/api/v1/me')).status).toBe(401);
