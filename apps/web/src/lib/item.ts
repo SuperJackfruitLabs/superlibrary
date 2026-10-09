@@ -138,6 +138,9 @@ const WORDS: Record<string, string> = {
 export function explain(code: string, detail?: string): string {
   if (code === 'invalid') {
     if (detail === 'expiresAt must be in the future') return 'Choose a date after today.';
+    if (detail === 'that would make a loop of replacements') return 'That would make a loop: the replacement is already marked as superseded by this item.';
+    if (detail === 'an item cannot supersede itself') return 'An item cannot replace itself.';
+    if (detail === 'a reason of 3 to 500 characters is required') return 'Say why, in at least 3 characters.';
     return detail ? `That was not accepted: ${detail}.` : 'That was not accepted.';
   }
   return WORDS[code] ?? `Something went wrong (${code}).`;

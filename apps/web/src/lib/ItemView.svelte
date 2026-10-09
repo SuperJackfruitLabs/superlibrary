@@ -11,6 +11,7 @@
   import ItemHeader from '$lib/ItemHeader.svelte';
   import WorkRecordView from '$lib/WorkRecordView.svelte';
   import RelatedList from '$lib/RelatedList.svelte';
+  import ModerationPanel from '$lib/ModerationPanel.svelte';
   import { themeState } from '$kit/theme.svelte';
   import {
     ItemError, askRevokeItem, askRevokeVersion, change, day, embedUrlGetter, explain, mayManage, provenanceRows, readItem,
@@ -32,6 +33,7 @@
   $effect(() => { const t = themeState.value; mounted?.setTheme(t); });
   /** Bumped to mount the viewer again (after a version is revoked, or on Try again). */
   let mountKey = $state(0);
+  let removed = $state(false);
   let record = $state<RecordView | null>(null);
   let notice = $state<string | null>(null);
   let noticeEl = $state<HTMLElement | null>(null);
@@ -199,7 +201,11 @@
 
 {#if notice}<Toast message={notice} onclose={() => (notice = null)} bind:el={noticeEl} />{/if}
 
-{#if phase === 'loading'}
+{#if removed}
+  <h1 tabindex="-1">Removed from memory</h1>
+  <p>It is gone from the library and from search. The audit log keeps your reason.</p>
+  <p><a class="kit-button" href="/">Back to the library</a></p>
+{:else if phase === 'loading'}
   <p class="muted" role="status">Loading…</p>
 {:else if phase === 'expired'}
   <h1>This has expired</h1>
@@ -296,6 +302,7 @@
   {#if manage}
     <section class="manage" aria-labelledby="manage-h">
       <h2 id="manage-h" class="visually-hidden">Manage</h2>
+      <ModerationPanel {item} onchanged={(n) => { notice = n; void load(); }} onremoved={() => { removed = true; }} />
       <div class="panel">{@render expiryForm(item.expiresAt ? `To be deleted on ${day(item.expiresAt)}` : 'Delete on a date')}</div>
       <div class="panel">
         <h2>Revoke</h2>
