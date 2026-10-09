@@ -14,6 +14,15 @@ toolbar around it lives in the host page and has:
 | **Open in new window** | `https://app.superlibrary.dev/a/<id>[/v/<n>]`. |
 | **Share** | Who can see the item, in words; widening it to the workspace, for a person allowed to; **Copy link** and **Share…** (the system share sheet, or a copy where there is none). The link is always the app link, never a content URL. There are no public links. |
 
+**On phones** (the embed narrower than 640 px) the version, **Full screen** and **Share** stay in the
+toolbar with their words; Files, View source, Theme, Download and Open in new window move into a
+**More** panel, each labelled. No control is ever an icon alone.
+
+**Host styling.** Every colour is a custom property with a host hook: set `--sl-host-bg`, `-fg`,
+`-muted`, `-line`, `-hover`, `-accent`, `-accent-content` and `-danger` (light) and the same names
+ending in `-dark` (dark) on any ancestor, and `--sl-host-font` for the face. Unset, the embed's own
+neutral values apply.
+
 ```ts
 import { mountArtifact } from '@superlibrary/embed';
 
@@ -81,9 +90,8 @@ view.destroy();
 | `onScopeChange(info)` | | The person widened the item; `info` is the fresh `ShareInfo`. |
 | `nonce` | | Put on the toolbar's one `<style>` element (`#sl-embed-style`), for a host whose CSP needs it. |
 
-The toolbar's colours are custom properties on `.sl-embed` (`--sl-bg`, `--sl-fg`, `--sl-muted`,
-`--sl-line`, `--sl-hover`, `--sl-accent`, `--sl-danger`). Below 640 px of width it shows icons
-only; every control keeps its accessible name.
+The toolbar's colours and face take the host's hooks (see **Host styling** above); below 640 px of
+width the secondary controls move into the labelled **More** panel.
 
 ## Frame protocol
 

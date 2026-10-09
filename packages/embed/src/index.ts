@@ -147,7 +147,11 @@ export async function mountArtifact(el: HTMLElement, opts: MountOptions): Promis
   open.setAttribute('aria-label', 'Open in new window');
   const shareToggle = toolButton('sl-share-toggle', 'share', 'Share');
   const sharePanel = make('div', { className: 'sl-panel sl-share-panel', id: `${id}-share`, hidden: true });
-  for (const [toggle, panel] of [[filesToggle, filesPanel], [shareToggle, sharePanel]] as const) {
+  // Phones (operator review): secondary controls fold into a labelled More panel; nothing is ever icon-only.
+  const moreToggle = toolButton('sl-more-toggle', 'more', 'More');
+  const morePanel = make('div', { className: 'sl-panel sl-more-panel', id: `${id}-more`, hidden: true });
+  for (const c of [filesToggle, sourceBtn, themeEl, download, open]) c.classList.add('sl-secondary');
+  for (const [toggle, panel] of [[filesToggle, filesPanel], [shareToggle, sharePanel], [moreToggle, morePanel]] as const) {
     toggle.setAttribute('aria-expanded', 'false');
     toggle.setAttribute('aria-controls', panel.id);
   }
@@ -159,11 +163,37 @@ export async function mountArtifact(el: HTMLElement, opts: MountOptions): Promis
   iframe.setAttribute('title', opts.title ?? 'Superlibrary artifact');
   iframe.style.height = initialHeight;
 
-  root.append(bar, errorEl, filesPanel, sharePanel, iframe);
+  root.append(bar, errorEl, filesPanel, sharePanel, morePanel, iframe);
 
   const showError = (text: string | null) => {
     errorEl.textContent = text ?? '';
     errorEl.hidden = text === null;
+  };
+
+  /** The More panel mirrors the secondary controls the bar shows now; each item uses the bar control itself. */
+  const renderMore = () => {
+    const delegate = (label: string, target: HTMLElement) => {
+      const b = make('button', { type: 'button', className: 'sl-more-item', textContent: label });
+      b.addEventListener('click', () => {
+        closePanel(false);
+        target.click();
+      });
+      return b;
+    };
+    const items: HTMLElement[] = [];
+    if (isFolder()) items.push(delegate(`Files (${files().length})`, filesToggle));
+    if (current() !== undefined && SOURCE_VIEWS.has(current()!.view)) items.push(delegate(view.source ? 'Show rendered' : 'View source', sourceBtn));
+    const theme = make('select', { className: 'sl-more-theme' });
+    theme.append(...(['system', 'light', 'dark'] as const).map((t) => make('option', { value: t, textContent: THEME_NAMES[t] })));
+    theme.value = themeSelect.value;
+    theme.addEventListener('change', () => {
+      themeSelect.value = theme.value;
+      themeSelect.dispatchEvent(new Event('change'));
+    });
+    items.push(make('label', { className: 'sl-more-field' }, make('span', { textContent: 'Theme' }), theme));
+    if (grant.downloadUrl) items.push(make('a', { className: 'sl-more-item', href: grant.downloadUrl, rel: 'noopener noreferrer', textContent: 'Download' }));
+    items.push(make('a', { className: 'sl-more-item', href: link(), target: '_blank', rel: 'noopener noreferrer', textContent: 'Open in new window' }));
+    morePanel.replaceChildren(make('div', { className: 'sl-more-list' }, ...items));
   };
 
   /** Lay the toolbar out for the current grant and file; keeps focus on a control that stays. */
@@ -182,7 +212,8 @@ export async function mountArtifact(el: HTMLElement, opts: MountOptions): Promis
     if (sourceable) children.push(sourceBtn);
     children.push(make('span', { className: 'sl-spacer' }), themeEl);
     if (grant.downloadUrl) children.push(download); // D6: folders have no download in phase 1
-    children.push(fsBtn, open, shareToggle);
+    children.push(fsBtn, open, shareToggle, moreToggle);
+    renderMore();
     bar.replaceChildren(...children);
     if (!isFolder() && openPanel?.panel === filesPanel) closePanel(false);
     if (active && active !== document.activeElement && active.isConnected) active.focus();
@@ -426,6 +457,10 @@ export async function mountArtifact(el: HTMLElement, opts: MountOptions): Promis
     status.textContent = '';
     togglePanel(shareToggle, sharePanel, () => copyBtn);
     if (openPanel?.panel === sharePanel) void loadShare();
+  });
+  moreToggle.addEventListener('click', () => {
+    renderMore(); // the source label and theme follow what the bar shows now
+    togglePanel(moreToggle, morePanel, () => morePanel.querySelector('button, a, select'));
   });
 
   // --- Full screen (4): the Fullscreen API on the whole embed; a fixed overlay where it is missing

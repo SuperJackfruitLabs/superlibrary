@@ -631,7 +631,7 @@ describe('(3) Open in new window, and the toolbar\'s accessible names', () => {
   it('every control has a name a screen reader can say, even when only its icon shows', async () => {
     await mount({ getEmbedUrl: async () => FOLDER, getVersions: async () => [3, 2] });
     const names = [...el.querySelectorAll<HTMLElement>('.sl-toolbar button, .sl-toolbar a, .sl-toolbar select')].map((c) => c.getAttribute('aria-label') ?? c.textContent);
-    expect(names).toEqual(['Version', 'Files (4)', 'View source', 'Theme', 'Full screen', 'Open in new window', 'Share']);
+    expect(names).toEqual(['Version', 'Files (4)', 'View source', 'Theme', 'Full screen', 'Open in new window', 'Share', 'More']);
   });
 });
 
@@ -888,5 +888,52 @@ describe('PR 3 review: Escape belongs to the SDK only when it acts', () => {
     document.body.dispatchEvent(ev2);
     expect(ev2.defaultPrevented).toBe(true);
     expect(q('.sl-embed')!.classList.contains('sl-overlay')).toBe(false);
+  });
+});
+
+describe('the toolbar on phones (operator review of phase 1): every control keeps its words', () => {
+  const more = () => q<HTMLButtonElement>('button.sl-more-toggle')!;
+  const panel = () => q<HTMLElement>('.sl-more-panel')!;
+  it('a labelled More panel holds every secondary control, each with its words', async () => {
+    await mount({ getEmbedUrl: async () => FOLDER });
+    expect(more().textContent).toContain('More');
+    expect(more().getAttribute('aria-controls')).toBe(panel().id);
+    expect(panel().hidden).toBe(true);
+    more().click();
+    expect(more().getAttribute('aria-expanded')).toBe('true');
+    const words = [...panel().querySelectorAll<HTMLElement>('button, a, label')].map((c) => c.textContent!.trim());
+    expect(words).toEqual(['Files (4)', 'View source', expect.stringContaining('Theme'), 'Open in new window']);
+    for (const s of ['.sl-files-toggle', '.sl-source', '.sl-theme-menu', '.sl-open']) expect(q(s)!.classList.contains('sl-secondary'), s).toBe(true);
+    for (const s of ['.sl-version-menu', '.sl-fullscreen', '.sl-share-toggle']) expect(q(s)!.classList.contains('sl-secondary'), s).toBe(false);
+  });
+  it('a More item does what its toolbar control does', async () => {
+    const m = await mount();
+    more().click();
+    [...panel().querySelectorAll('button')].find((b) => b.textContent === 'View source')!.click();
+    await flush();
+    expect(src(m).searchParams.get('source')).toBe('1');
+    expect(panel().hidden).toBe(true);
+    more().click();
+    expect([...panel().querySelectorAll('a')].map((a) => a.textContent)).toEqual(['Download', 'Open in new window']);
+  });
+  it('the theme chosen in More is the theme chosen in the toolbar', async () => {
+    await mount();
+    more().click();
+    const sel = panel().querySelector<HTMLSelectElement>('select')!;
+    sel.value = 'dark';
+    sel.dispatchEvent(new Event('change'));
+    expect(q('.sl-embed')!.getAttribute('data-theme')).toBe('dark');
+    expect(q<HTMLSelectElement>('select.sl-theme')!.value).toBe('dark');
+  });
+  it('labels are never hidden at narrow widths, and the host may set the colours and face', async () => {
+    await mount();
+    const css = document.getElementById('sl-embed-style')!.textContent!;
+    expect(css).not.toMatch(/\.sl-toolbar \.sl-label\{position:absolute/);
+    expect(css).toMatch(/@container \(max-width:640px\)\{[^}]*\.sl-toolbar \.sl-secondary\{display:none\}/);
+    for (const n of ['bg', 'fg', 'muted', 'line', 'hover', 'accent', 'accent-content', 'danger']) {
+      expect(css, n).toContain(`var(--sl-host-${n},`);
+      expect(css, `${n} dark`).toContain(`var(--sl-host-${n}-dark,`);
+    }
+    expect(css).toContain('var(--sl-host-font,');
   });
 });
