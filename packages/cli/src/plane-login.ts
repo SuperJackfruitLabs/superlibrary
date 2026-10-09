@@ -22,7 +22,8 @@ function safeBase(raw: unknown): string | null {
 
 export async function discoverPlane(base: string, fetchImpl: typeof fetch = fetch): Promise<PlaneTarget | null> {
   const res = await fetchImpl(`${base}/.well-known/oauth-protected-resource`, { redirect: 'error', signal: AbortSignal.timeout(15_000) });
-  if (!res.ok) return null;
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`discovery answered ${res.status}`);
   const meta = (await res.json()) as { resource?: unknown; authorization_servers?: unknown };
   const plane = safeBase(Array.isArray(meta.authorization_servers) ? meta.authorization_servers[0] : null);
   const audience = typeof meta.resource === 'string' ? meta.resource : null;

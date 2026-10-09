@@ -16,3 +16,8 @@ it('discovers the plane from the API and signs in as the suli device client', as
   expect(bodies[0]).toEqual({ client_id: 'suli', scope: 'openid' });
   expect(lines[0]).toContain('ABCD-EFGH');
 });
+
+it('no sign-in service is a 404; any other failure of discovery is an error', async () => {
+  expect(await discoverPlane('https://app.test', (async () => new Response('', { status: 404 })) as never)).toBeNull();
+  await expect(discoverPlane('https://app.test', (async () => new Response('', { status: 503 })) as never)).rejects.toThrow('discovery answered 503');
+});

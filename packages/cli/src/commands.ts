@@ -38,7 +38,7 @@ export const COMMANDS: CommandSpec[] = [
       { name: '--item', value: '<itm_…>', type: 'string', description: 'Upload as a new version of this item' },
       { name: '--board', value: '<brd_…>', type: 'string', description: 'Scope it to a board (visible only to you until board access arrives)' },
       { name: '--entry', value: '<path>', type: 'string', default: 'index.html, then README.md, then the first file', description: 'The file a folder opens on' },
-      { name: '--expires', value: '<YYYY-MM-DD>', type: 'date', description: 'Delete it on this date' },
+      { name: '--expires', value: '<YYYY-MM-DD>', type: 'date', description: 'Delete it on this date (the start of that day, UTC)' },
       { name: '--override', value: '<reason>', type: 'string', description: 'Upload despite a secret-scan finding; your reason is recorded' },
     ],
     summary: 'Upload a file or a folder',
@@ -57,7 +57,7 @@ export const COMMANDS: CommandSpec[] = [
   },
   {
     path: ['revoke'], group: 'artifacts', args: [{ name: 'item', description: 'The item id (itm_…)' }],
-    flags: [{ name: '--version', value: '<n>', type: 'integer', description: 'Revoke only this version' }, { name: '--reason', value: '<text>', type: 'string', description: 'Why; recorded' }],
+    flags: [{ name: '--version', value: '<n>', type: 'integer', description: 'Revoke only this version' }, { name: '--reason', value: '<text>', type: 'string', description: 'Why; recorded when the whole item is revoked, so not allowed with --version' }],
     summary: 'Revoke an item or one version', description: 'Revokes at once: a viewer URL already handed out stops working immediately. Only the uploader or an owner of the workspace may.',
     routes: [{ method: 'POST', path: '/api/v1/items/:id/revoke' }, { method: 'POST', path: '/api/v1/items/:id/versions/:n/revoke' }],
     access: { ...PERSON, person: 'uploader-or-owner' }, output: '"Revoked."', fails: ['you are not the uploader or an owner (403)'], examples: ['suli revoke itm_0123456789abcdef --reason "posted by mistake"', 'suli revoke itm_0123456789abcdef --version 2'],

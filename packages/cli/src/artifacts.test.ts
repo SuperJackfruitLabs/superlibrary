@@ -1,9 +1,10 @@
 import { mkdirSync, mkdtempSync, symlinkSync, truncateSync, writeFileSync } from 'node:fs';
+import { basename } from 'node:path';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
-import { LIMITS, pathRefusalSentence, sizeRefusal } from '@superlibrary/contract';
-import { getItem, makeClient, revoke, uploadWith, walk } from './artifacts.ts';
+import { LIMITS, describeRefusal, pathRefusalSentence, sizeRefusal } from '@superlibrary/contract';
+import { getItem, makeClient, revoke, upload, uploadWith, walk } from './artifacts.ts';
 import { tokenSource } from './credential.ts';
 
 const tmp = () => mkdtempSync(join(tmpdir(), 'suli-up-'));
@@ -62,7 +63,7 @@ describe('uploadWith', () => {
     let clock = 0;
     let n = 0;
     const exchange = vi.fn(async () => ({ token: `tok${++n}`, expiresIn: 300 }));
-    const src = tokenSource({ env: {}, dir: tmp(), exchange, now: () => clock, device: { credential: 'dev_00000000000000000000:' + 'a'.repeat(43), plane: 'https://accounts.test', audience: 'https://app.test' } });
+    const src = tokenSource({ env: {}, base: 'https://app.test', dir: tmp(), exchange, now: () => clock, device: { credential: 'dev_00000000000000000000:' + 'a'.repeat(43), plane: 'https://accounts.test', audience: 'https://app.test' } });
     const auth: string[] = [];
     const fetchImpl = (async (url: string, init: RequestInit) => {
       auth.push(new Headers(init.headers).get('authorization')!);
@@ -99,29 +100,128 @@ describe('uploadWith', () => {
 });
 
 
-describe('get and revoke', () => {
-  it('revoke posts the version route with the reason; get asks for the viewer URL only with --embed', async () => {
-    vi.stubEnv('SUPERLIBRARY_TOKEN', 'tok');
-    const seen: string[] = [];
-    vi.stubGlobal('fetch', async (url: string, init: RequestInit) => {
-      seen.push(`${init.method} ${new URL(url).pathname} ${init.body ?? ''}`);
-      return new Response(JSON.stringify(url.endsWith('/embed') ? { url: 'https://v.test/x', expiresAt: 'soon' } : { item: { title: 'T', scope: 'org', createdBy: 'p', createdAt: 'now' }, versions: [{ version: 1, fileCount: 1, sha256: 'a'.repeat(64), revokedAt: null }] }));
+describe('a single file gets the same checks as a folder', () => {
+  it('refuses a denied name and an oversized file before reading or sending anything', async () => {
+    const d = tmp();
+    writeFileSync(join(d, '.env'), 'A=1');
+    expect(() => walk(join(d, '.env'))).toThrow('.env is not uploaded: it matches the .env* rule.');
+    writeFileSync(join(d, 'big.bin'), '');
+    truncateSync(join(d, 'big.bin'), LIMITS.fileBytes + 1);
+    expect(() => walk(join(d, 'big.bin'))).toThrow(sizeRefusal.file('big.bin'));
+    const fetchImpl = vi.fn();
+    await expect(uploadWith(makeClient('https://app.test', async () => 't', fetchImpl as never), join(d, '.env'), {})).rejects.toThrow('.env is not uploaded');
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+});
+
+type Seen = { method: string; url: string; body: string };
+function stack(handler: (s: Seen) => Response | undefined = () => undefined) {
+  const seen: Seen[] = [];
+  const impl = (async (url: string, init: RequestInit) => {
+    const s = { method: String(init.method), url, body: init.body instanceof Uint8Array ? '' : String(init.body ?? '') };
+    seen.push(s);
+    const custom = handler(s);
+    if (custom) return custom;
+    if (url.endsWith('/api/v1/uploads')) return Response.json({ uploadId: 'upl_0000000000000001' }, { status: 201 });
+    if (url.includes('/files?')) return Response.json({});
+    return Response.json({ itemId: 'itm_0000000000000001', version: 1, url: 'https://app.test/a/itm_0000000000000001' }, { status: 201 });
+  }) as never;
+  return { seen, impl, client: makeClient('https://app.test', async () => 't', impl) };
+}
+
+describe('uploadWith details', () => {
+  it('encodes a path with #, ? and % and a non-ASCII letter into the PUT query', async () => {
+    const d = tmp();
+    const name = 'a#b?c%d é.txt';
+    writeFileSync(join(d, name), 'x');
+    const { seen, client } = stack();
+    await uploadWith(client, d, { title: 'T' });
+    const put = seen.find((s) => s.method === 'PUT')!;
+    expect(put.url).toBe(`https://app.test/api/v1/uploads/upl_0000000000000001/files?path=${encodeURIComponent(name)}`);
+    expect(new URL(put.url).searchParams.get('path')).toBe(name);
+  });
+  it('titles an upload of "." after the folder, not "."', async () => {
+    const d = tmp();
+    writeFileSync(join(d, 'a.txt'), 'x');
+    const { seen, client } = stack();
+    await uploadWith(client, d + '/.', {});
+    expect(JSON.parse(seen[0]!.body).title).toBe(basename(d));
+  });
+  it('sends the override reason, and turns a server refusal into the shared sentence', async () => {
+    const d = tmp();
+    writeFileSync(join(d, 'a.txt'), 'x');
+    let committed = 0;
+    const { seen, client } = stack((s) => {
+      if (s.url.endsWith('/commit')) return ++committed === 1 ? Response.json({ error: 'secret_found', findings: [{ path: 'a.txt', line: 1, rule: 'r' }] }, { status: 422 }) : undefined;
+      return undefined;
     });
-    const write = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
-    try {
-      await revoke('itm_0000000000000001', { version: '2', reason: 'mistake', json: false });
-      await getItem('itm_0000000000000001', { embed: false, version: null, json: false });
-      await getItem('itm_0000000000000001', { embed: true, version: null, json: false });
-    } finally {
-      write.mockRestore();
-      vi.unstubAllGlobals();
-      vi.unstubAllEnvs();
-    }
-    expect(seen).toEqual([
-      'POST /api/v1/items/itm_0000000000000001/versions/2/revoke {"reason":"mistake"}',
-      'GET /api/v1/items/itm_0000000000000001 ',
-      'GET /api/v1/items/itm_0000000000000001 ',
-      'POST /api/v1/items/itm_0000000000000001/embed {}',
-    ]);
+    await uploadWith(client, d, { override: 'rotated already' });
+    expect(JSON.parse(seen.find((s) => s.url.endsWith('/override'))!.body)).toEqual({ reason: 'rotated already' });
+
+    const { client: c2 } = stack((s) => (s.method === 'PUT' ? Response.json({ error: 'quota_exceeded' }, { status: 413 }) : undefined));
+    await expect(uploadWith(c2, d, {})).rejects.toThrow(describeRefusal({ ok: false, status: 413, error: 'quota_exceeded' }));
+  });
+  it('rejects an --expires date that is not a real day, before any request', async () => {
+    const d = tmp();
+    writeFileSync(join(d, 'a.txt'), 'x');
+    const { seen, client } = stack();
+    for (const bad of ['2026-02-30', '2026-13-01', 'tomorrow']) await expect(uploadWith(client, d, { expires: bad })).rejects.toThrow('--expires takes a real date, YYYY-MM-DD');
+    expect(seen).toEqual([]);
+    await uploadWith(client, d, { expires: '2026-03-01' });
+    expect(JSON.parse(seen[0]!.body).expiresAt).toBe('2026-03-01T00:00:00.000Z');
+  });
+  it('a refused sign-in says which credential was refused', async () => {
+    const res = async () => new Response('', { status: 401 });
+    await expect(makeClient('https://app.test', async () => 't', res as never, 'env')('GET', '/x')).rejects.toThrow('SUPERLIBRARY_TOKEN was refused');
+    await expect(makeClient('https://app.test', async () => 't', res as never)('GET', '/x')).rejects.toThrow('Run suli login');
+  });
+});
+
+describe('upload, get and revoke', () => {
+  const ID = 'itm_0000000000000001';
+  async function run(fn: () => Promise<void>, handler?: (s: Seen) => Response | undefined) {
+    vi.stubEnv('SUPERLIBRARY_TOKEN', 'tok');
+    vi.stubEnv('SUPERLIBRARY_URL', 'https://app.test');
+    const st = stack(handler);
+    vi.stubGlobal('fetch', st.impl);
+    let out = '';
+    const write = vi.spyOn(process.stdout, 'write').mockImplementation(((c: string) => { out += c; return true; }) as never);
+    try { await fn(); } finally { write.mockRestore(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); }
+    return { seen: st.seen, out };
+  }
+  const item = { item: { title: 'T', scope: 'org', createdBy: 'p', createdAt: 'now' }, versions: [{ version: 1, fileCount: 1, sha256: 'a'.repeat(64), revokedAt: null }] };
+  const grant = { url: 'https://v.test/x', expiresAt: 'soon', version: 2 };
+  const answer = (s: Seen) => Response.json(s.url.endsWith('/embed') ? grant : item);
+
+  it('--json prints the commit result as one JSON line', async () => {
+    const d = tmp();
+    writeFileSync(join(d, 'a.txt'), 'x');
+    const { out } = await run(() => upload(join(d, 'a.txt'), { title: null, item: null, board: null, entry: null, expires: null, override: null, json: true }));
+    expect(JSON.parse(out)).toMatchObject({ itemId: ID, version: 1 });
+    expect(out.trim().split('\n')).toHaveLength(1);
+  });
+  it('get --embed --version sends that version and prints the version it minted', async () => {
+    const { seen, out } = await run(() => getItem(ID, { embed: true, version: '2', json: false }), answer);
+    expect(JSON.parse(seen[1]!.body)).toEqual({ version: 2 });
+    expect(out).toContain('viewer of v2 (until soon): https://v.test/x');
+  });
+  it('whole-item revoke posts the reason; revoking a version takes no reason', async () => {
+    const { seen } = await run(() => revoke(ID, { version: null, reason: 'mistake', json: false }), () => Response.json({}));
+    expect(seen.map((s) => `${s.method} ${new URL(s.url).pathname} ${s.body}`)).toEqual([`POST /api/v1/items/${ID}/revoke {"reason":"mistake"}`]);
+    const v = await run(() => revoke(ID, { version: '2', reason: null, json: false }), () => Response.json({}));
+    expect(v.seen.map((s) => `${new URL(s.url).pathname} ${s.body}`)).toEqual([`/api/v1/items/${ID}/versions/2/revoke {}`]);
+    const both = await run(() => expect(revoke(ID, { version: '2', reason: 'why', json: false })).rejects.toThrow('--reason is recorded only when the whole item is revoked'));
+    expect(both.seen).toEqual([]);
+  });
+  it('checks the item id and the version before any request', async () => {
+    const r = await run(async () => {
+      await expect(getItem('itm_xyz', { embed: false, version: null, json: false })).rejects.toThrow('is not an item id');
+      await expect(getItem(ID, { embed: true, version: 'abc', json: false })).rejects.toThrow('--version takes a whole number');
+      await expect(getItem(ID, { embed: true, version: '0', json: false })).rejects.toThrow('--version takes a whole number');
+      await expect(getItem(ID, { embed: true, version: '2x', json: false })).rejects.toThrow('--version takes a whole number');
+      await expect(revoke('../x', { version: null, reason: null, json: false })).rejects.toThrow('is not an item id');
+      await expect(revoke(ID, { version: '1/../..', reason: null, json: false })).rejects.toThrow('--version takes a whole number');
+    });
+    expect(r.seen).toEqual([]);
   });
 });

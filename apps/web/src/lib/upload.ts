@@ -1,15 +1,15 @@
 import { unzipSync } from 'fflate';
-import { LIMITS, NOTHING_ADDED as NOTHING, checkPath, pathRefusalSentence, sizeRefusal, type CommitResult, type PathRefusal } from '@superlibrary/contract';
+import { LIMITS, checkPath, describeRefusal, listWords, pathRefusalSentence, secretRefusal, sizeRefusal, type CommitResult, type Finding, type RefusalDetail, type UploadRefusal } from '@superlibrary/contract';
+
+export { describeRefusal, secretRefusal };
 
 export interface LocalFile { path: string; bytes: Uint8Array }
 export type Api = (path: string, init?: RequestInit) => Promise<Response>;
-export type Finding = { path: string; line: number; rule: string };
-/** What a refusal's body said beyond its error code (only the fields the upload API sends). */
-export interface RefusalDetail { path?: string; reason?: string; rule?: string; missing?: string[]; limit?: number; used?: number; entry?: string; detail?: string }
+export type { Finding, RefusalDetail };
 export type UploadOutcome =
   | { ok: true; result: CommitResult }
   | { ok: false; status: number; error: string; uploadId?: string; findings?: Finding[]; detail?: RefusalDetail };
-export type Refusal = Extract<UploadOutcome, { ok: false }>;
+export type Refusal = UploadRefusal;
 export type Progress = (sent: number, total: number) => void;
 
 /**
@@ -164,7 +164,7 @@ const quoteRule = (l: LeftOut) => `${l.path} (the ${l.rule} rule)`;
 export function leftOutSentence(leftOut: LeftOut[]): string | null {
   if (leftOut.length === 0) return null;
   if (leftOut.length === 1) return `This file is left out: ${quoteRule(leftOut[0]!)}.`;
-  return `These ${leftOut.length} files are left out: ${list(leftOut.map(quoteRule))}.`;
+  return `These ${leftOut.length} files are left out: ${listWords(leftOut.map(quoteRule))}.`;
 }
 
 /** The server decides; this only says it first, in the same words for every client. */
@@ -186,44 +186,6 @@ export function deleteOnToIso(date: string): string {
   return new Date(y, m - 1, d).toISOString();
 }
 
-const list = (parts: string[]) => (parts.length < 2 ? parts.join('') : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`);
-
-/** Spec §8: refused naming file and line. The flagged bytes wait in a private quarantine, not in the library. */
-export function secretRefusal(findings: Finding[]): string {
-  const where = list(findings.map((f) => `${f.path} line ${f.line} (${f.rule})`));
-  return `${where} ${findings.length === 1 ? 'looks like a secret' : 'look like secrets'}. Nothing was added to the library.`;
-}
-
-/** One sentence for each refusal the upload API gives (apps/api/src/uploads/routes.ts). */
-export function describeRefusal(r: Refusal): string {
-  const d = r.detail ?? {};
-  switch (r.error) {
-    case 'path_refused': return d.path && d.reason ? pathRefusalSentence({ path: d.path, reason: d.reason as PathRefusal, rule: d.rule }) : `A path was refused. ${NOTHING}`;
-    case 'duplicate_path': return `${d.path} is chosen twice.`;
-    case 'file_too_large': return sizeRefusal.file(d.path!);
-    case 'folder_too_large': return sizeRefusal.folder();
-    case 'too_many_files': return sizeRefusal.files();
-    case 'quota_exceeded': return `This would take the workspace over its storage limit. ${NOTHING}`;
-    case 'secret_found': return secretRefusal(r.findings ?? []);
-    case 'upload_expired': return `This upload was not finished within ${LIMITS.uploadTtlHours} hours and has expired. Upload it again.`;
-    case 'revoked': return 'That item has been revoked, so it cannot have a new version.';
-    case 'expired': return 'That item has expired. Choose a new delete date to upload a new version.';
-    case 'not_found': return r.uploadId ? 'This upload is no longer open. Upload it again.' : 'That item does not exist, or you cannot change it.';
-    case 'incomplete': return `${list(d.missing ?? [])} did not arrive. Upload again.`;
-    case 'size_mismatch': case 'sha256_mismatch': return `${d.path} changed while it was being sent. Upload again.`;
-    case 'version_conflict': return 'Someone else added a version of this item at the same moment. Upload again.';
-    case 'gone': return 'This upload was committed, but its item has since been deleted.';
-    case 'invalid':
-      if (d.detail === 'expiresAt must be in the future') return `The delete date must be after today. ${NOTHING}`;
-      return d.detail ? `The upload was not accepted: ${d.detail}. ${NOTHING}` : `The upload was not accepted. ${NOTHING}`;
-    case 'not_declared': return `${d.path} was not part of this upload. Upload again.`;
-    case 'already_committed': return 'This upload is already in the library.';
-    case 'nothing_to_override': return 'Nothing in this upload needs an override. Upload it again.';
-    case 'entry_not_found': return `${d.entry}, the file to open first, is not among the chosen files. ${NOTHING}`;
-    case 'product_not_enabled': return 'Superlibrary is not enabled for this workspace.';
-    default: return `The upload was refused (${r.error}, HTTP ${r.status}). ${NOTHING}`;
-  }
-}
 
 async function sha256Hex(b: Uint8Array): Promise<string> {
   return [...new Uint8Array(await crypto.subtle.digest('SHA-256', b as Uint8Array<ArrayBuffer>))].map((x) => x.toString(16).padStart(2, '0')).join('');

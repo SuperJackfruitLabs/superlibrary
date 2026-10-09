@@ -6,7 +6,7 @@
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { exchangeDevice, type PlaneTarget } from './plane-login.ts';
+import { DEVICE_CREDENTIAL, exchangeDevice, type PlaneTarget } from './plane-login.ts';
 
 export const ENV_TOKEN = "SUPERLIBRARY_TOKEN";
 export const ENV_BASE = "SUPERLIBRARY_URL";
@@ -46,7 +46,13 @@ export function saveDevice(d: Device, dir = configDir()): void {
   writePrivate(dir, 'device.json', d);
   rmSync(join(dir, 'token.json'), { force: true });
 }
-export function loadDevice(dir = configDir()): Device | null { return readJson<Device>(join(dir, 'device.json')); }
+const isUrl = (v: unknown): v is string => { try { return typeof v === 'string' && !!new URL(v); } catch { return false; } };
+
+/** The saved device credential, or null when there is none or the file is not one `suli login` wrote. */
+export function loadDevice(dir = configDir()): Device | null {
+  const d = readJson<Partial<Device>>(join(dir, 'device.json'));
+  return d && typeof d.credential === 'string' && DEVICE_CREDENTIAL.test(d.credential) && isUrl(d.plane) && isUrl(d.audience) ? (d as Device) : null;
+}
 export function clearCredentials(dir = configDir()): void {
   rmSync(join(dir, 'device.json'), { force: true });
   rmSync(join(dir, 'token.json'), { force: true });
@@ -55,6 +61,8 @@ export function clearCredentials(dir = configDir()): void {
 export interface TokenDeps {
   env?: Record<string, string | undefined>;
   dir?: string;
+  /** The server the token will be sent to; defaults to $SUPERLIBRARY_URL. A device credential is only sent to its own audience. */
+  base?: string;
   device?: Device | null;
   now?: () => number;
   exchange?: (t: PlaneTarget, credential: string) => Promise<{ token: string; expiresIn: number }>;
@@ -72,6 +80,8 @@ export function tokenSource(deps: TokenDeps = {}): { kind: 'env' | 'device' | 'n
   return {
     kind: 'device',
     async token() {
+      const base = deps.base ?? baseUrl(env);
+      if (new URL(base).origin !== new URL(device.audience).origin) throw new Error(`You are signed in for ${device.audience}, not ${base}. Run suli login.`);
       const cached = readJson<{ token: string; expiresAt: number }>(join(dir, 'token.json'));
       if (cached && cached.expiresAt - now() > 30_000) return cached.token;
       const { token, expiresIn } = await exchange({ plane: device.plane, audience: device.audience }, device.credential);

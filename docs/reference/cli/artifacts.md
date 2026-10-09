@@ -22,7 +22,7 @@ suli upload <path> [--title <text>] [--item <itm_…>] [--board <brd_…>] [--en
 | `--item <itm_…>` | string | — | Upload as a new version of this item |
 | `--board <brd_…>` | string | — | Scope it to a board (visible only to you until board access arrives) |
 | `--entry <path>` | string | index.html, then README.md, then the first file | The file a folder opens on |
-| `--expires <YYYY-MM-DD>` | date | — | Delete it on this date |
+| `--expires <YYYY-MM-DD>` | date | — | Delete it on this date (the start of that day, UTC) |
 | `--override <reason>` | string | — | Upload despite a secret-scan finding; your reason is recorded |
 
 **Who may run it**
@@ -105,7 +105,7 @@ suli revoke <item> [--version <n>] [--reason <text>]
 | flag | type | default | meaning |
 |---|---|---|---|
 | `--version <n>` | integer | — | Revoke only this version |
-| `--reason <text>` | string | — | Why; recorded |
+| `--reason <text>` | string | — | Why; recorded when the whole item is revoked, so not allowed with --version |
 
 **Who may run it**
 
