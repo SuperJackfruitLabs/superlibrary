@@ -1,38 +1,5 @@
-import { devices, expect, test, type Page } from '@playwright/test';
-import { frameOf, uploadViaApi } from './helpers';
-
-/** Nothing scrolls sideways: the page is no wider than the screen. */
-async function expectNoSideways(page: Page, label: string) {
-  const w = await page.evaluate(() => ({ scrollWidth: Math.max(document.documentElement.scrollWidth, document.body.scrollWidth), innerWidth: window.innerWidth }));
-  expect(w.scrollWidth, `${label}: nothing scrolls sideways (innerWidth ${w.innerWidth})`).toBeLessThanOrEqual(w.innerWidth);
-}
-
-/**
- * Every control a person can tap on a phone is at least 44px tall (Apple's minimum; iOS is the
- * primary platform). A checkbox is measured by its label, which is what takes the tap; a link inside
- * a sentence is exempt (WCAG 2.5.8's inline exception).
- */
-async function shortControls(page: Page, atLeast: number): Promise<string[]> {
-  const { checked, short } = await page.evaluate(() => {
-    const short: string[] = [];
-    let checked = 0;
-    const controls = document.querySelectorAll<HTMLElement>('a[href], button, input, select, textarea, summary, [role=button]');
-    for (const el of controls) {
-      const target = el instanceof HTMLInputElement && (el.type === 'checkbox' || el.type === 'radio') ? (el.closest('label') ?? el) : el;
-      const r = target.getBoundingClientRect();
-      const style = getComputedStyle(target);
-      if (r.width === 0 || r.height === 0 || style.visibility === 'hidden') continue;
-      if (el.closest('[hidden], .visually-hidden')) continue;
-      const p = el.tagName === 'A' ? el.closest('p') : null;
-      if (p && p.textContent!.trim() !== el.textContent!.trim()) continue;
-      checked++;
-      if (r.height < 44 - 0.5) short.push(`${el.tagName.toLowerCase()}${el.className ? '.' + String(el.className).split(' ').join('.') : ''} "${(el.textContent || el.getAttribute('aria-label') || el.getAttribute('name') || '').trim().slice(0, 40)}" ${r.height.toFixed(1)}px`);
-    }
-    return { checked, short };
-  });
-  expect(checked, 'controls measured').toBeGreaterThanOrEqual(atLeast);
-  return short;
-}
+import { devices, expect, test } from '@playwright/test';
+import { expectNoSideways, frameOf, shortControls, uploadViaApi } from './helpers';
 
 test.describe('at phone width', () => {
   const { defaultBrowserType: _b, ...phone } = devices['Pixel 5'];

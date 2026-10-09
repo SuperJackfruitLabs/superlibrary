@@ -110,3 +110,83 @@ export async function watchContainment(page: Page, itemId: string) {
     },
   };
 }
+
+/** Nothing scrolls sideways: the page is no wider than the screen. */
+export async function expectNoSideways(page: Page, label: string) {
+  const w = await page.evaluate(() => ({ scrollWidth: Math.max(document.documentElement.scrollWidth, document.body.scrollWidth), innerWidth: window.innerWidth }));
+  expect(w.scrollWidth, `${label}: nothing scrolls sideways (innerWidth ${w.innerWidth})`).toBeLessThanOrEqual(w.innerWidth);
+}
+
+/**
+ * Every control a person can tap on a phone is at least 44px tall (Apple's minimum; iOS is the
+ * primary platform). A checkbox is measured by its label, which is what takes the tap; a link inside
+ * a sentence is exempt (WCAG 2.5.8's inline exception).
+ */
+export async function shortControls(page: Page, atLeast: number): Promise<string[]> {
+  const { checked, short } = await page.evaluate(() => {
+    const short: string[] = [];
+    let checked = 0;
+    const controls = document.querySelectorAll<HTMLElement>('a[href], button, input, select, textarea, summary, [role=button]');
+    for (const el of controls) {
+      const target = el instanceof HTMLInputElement && (el.type === 'checkbox' || el.type === 'radio') ? (el.closest('label') ?? el) : el;
+      const r = target.getBoundingClientRect();
+      const style = getComputedStyle(target);
+      if (r.width === 0 || r.height === 0 || style.visibility === 'hidden') continue;
+      if (el.closest('[hidden], .visually-hidden')) continue;
+      const p = el.tagName === 'A' ? el.closest('p') : null;
+      if (p && p.textContent!.trim() !== el.textContent!.trim()) continue;
+      checked++;
+      if (r.height < 44 - 0.5) short.push(`${el.tagName.toLowerCase()}${el.className ? '.' + String(el.className).split(' ').join('.') : ''} "${(el.textContent || el.getAttribute('aria-label') || el.getAttribute('name') || '').trim().slice(0, 40)}" ${r.height.toFixed(1)}px`);
+    }
+    return { checked, short };
+  });
+  expect(checked, 'controls measured').toBeGreaterThanOrEqual(atLeast);
+  return short;
+}
+
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+/** The dev person's workspace (on a fresh run, the dev person is its owner: the first person seen). */
+export async function devWorkspace(request: APIRequestContext): Promise<string> {
+  const res = await request.get(`${API}/api/v1/me`, { headers: DEV });
+  return ((await res.json()) as { workspaceId: string }).workspaceId;
+}
+
+const sq = (s: string) => `'${s.replace(/'/g, "''")}'`;
+const REPO = join(import.meta.dirname, '..', '..', '..');
+let seq = 0;
+
+/**
+ * A work record written straight into the local D1 the dev Worker serves, with its FTS row. e2e has
+ * no Superpipeline; these are the rows the ingest and index consumers write (phases 2-3 A13, B3).
+ */
+export function seedWorkRecordLocal(o: { ws: string; title: string; text: string; outcome: string; board?: string; boardName?: string; comment?: string }): string {
+  const hex = `${Date.now().toString(16)}${(seq++).toString(16).padStart(4, '0')}`.slice(-16).padStart(16, '0');
+  const id = `itm_${hex}`;
+  const card = `card_${hex}`;
+  const board = o.board ?? 'brd_00000000000000e1';
+  const now = new Date().toISOString();
+  const text = `${o.title}\n${o.text}`;
+  const body = {
+    schema: 'work-record/1', boardId: board, cardId: card, title: o.title, spec: { goal: o.text }, state: 'completed', stage: 'review', archivedAt: null, createdAt: now, updatedAt: now,
+    handoffs: [{ runId: `run_${hex}`, stage: 'draft', agent: 'prn_000000000000000000a2', startedAt: now, endedAt: now, attempt: 1, status: 'completed', handoff: { summary: 'Draft ready' }, failureReason: null }],
+    comments: [{ id: 'cmt_e2e', author: { kind: 'human', name: 'A person' }, body: o.comment ?? 'Reviewed', createdAt: now }],
+    references: [], gates: [], supersededByCard: null, outcome: o.outcome, redactions: [], truncated: false,
+  };
+  const sql = [
+    `INSERT OR REPLACE INTO source_boards (workspace_id, board_id, name, last_seen_at) VALUES (${sq(o.ws)}, ${sq(board)}, ${sq(o.boardName ?? 'Marketing & Community')}, ${sq(now)});`,
+    `INSERT INTO items (id, workspace_id, kind, title, scope, outcome, created_by) VALUES (${sq(id)}, ${sq(o.ws)}, 'work-record', ${sq(o.title)}, ${sq(`board:${board}`)}, ${sq(o.outcome)}, 'source:superpipeline');`,
+    `INSERT INTO work_records (item_id, workspace_id, board_id, card_id, digest, body, text, source_updated_at) VALUES (${sq(id)}, ${sq(o.ws)}, ${sq(board)}, ${sq(card)}, 'e2e', ${sq(JSON.stringify(body))}, ${sq(text)}, ${sq(now)});`,
+    `INSERT INTO item_sources (item_id, source, board_id, card_id, stage, source_id, source_url) VALUES (${sq(id)}, 'superpipeline', ${sq(board)}, ${sq(card)}, 'review', ${sq(card)}, ${sq(`https://app.superpipeline.dev/b/${board}/c/${card}`)});`,
+    `INSERT INTO chunks (id, item_id, version, position, text, tokens) VALUES (${sq(`${id}:0:0`)}, ${sq(id)}, 0, 0, ${sq(text)}, 20);`,
+    `INSERT INTO chunks_fts (text, chunk_id, item_id) VALUES (${sq(text)}, ${sq(`${id}:0:0`)}, ${sq(id)});`,
+  ].join('\n');
+  const file = join(mkdtempSync(join(tmpdir(), 'sl-e2e-')), 'seed.sql');
+  writeFileSync(file, sql);
+  // The same persist directory the webServer's API uses (playwright.config.ts PERSIST), relative to apps/api.
+  execFileSync('pnpm', ['--filter', '@superlibrary/api', 'exec', 'wrangler', 'd1', 'execute', 'superlibrary-catalog', '--local', '--persist-to', '../../.wrangler-e2e', '--file', file], { cwd: REPO, stdio: 'pipe' });
+  return id;
+}

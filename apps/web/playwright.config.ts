@@ -22,7 +22,7 @@ export default defineConfig({
     { name: 'chromium', use: { ...devices['Desktop Chrome'], channel: process.env.PW_CHANNEL || undefined, launchOptions: { executablePath: process.env.PW_CHROMIUM || undefined } } },
     {
       name: 'webkit',
-      testMatch: /(security|phone)\.spec\.ts$/,
+      testMatch: /(security|phone|responsive)\.spec\.ts$/,
       // WebKit cannot resolve `itm-<hex>.localhost` itself; e2e/loopback-proxy.mjs does it, loopback only.
       use: { ...devices['Desktop Safari'], proxy: { server: 'http://127.0.0.1:8799' }, launchOptions: { executablePath: process.env.PW_WEBKIT || undefined } },
     },
