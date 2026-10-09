@@ -1,7 +1,8 @@
 import { z } from 'zod';
 import { ITEM_ID } from './ids';
 import { OUTCOMES, type ItemSource, type Outcome } from './model';
-import { BOARD_ID, CARD_ID } from './provenance';
+import { ITEM_KINDS, LibraryFilters, SINCE_UNTIL, sinceBeforeUntil } from './library';
+import { CARD_ID } from './provenance';
 
 /** Spec §7: approved and completed rank first; rejected and failed rank lower, never hidden. */
 export const OUTCOME_WEIGHTS: Readonly<Record<Outcome, number>> = {
@@ -12,15 +13,16 @@ export const RRF_K = 60;
 /** Spec §8: the related-work section's caps. */
 export const PROMPT_CAPS = { items: 5, tokens: 1500 } as const;
 
-const KINDS = ['artifact', 'work-record'] as const;
+const KINDS = ITEM_KINDS;
 
-export const SearchQuery = z.object({
-  query: z.string().trim().min(1).max(1000),
-  kinds: z.array(z.enum(KINDS)).min(1).optional(),
-  outcomes: z.array(z.enum(OUTCOMES)).min(1).optional(),
-  board: z.string().regex(BOARD_ID).optional(),
-  limit: z.number().int().min(1).max(25).default(10),
-}).strict();
+export const SearchQuery = z
+  .object({
+    query: z.string().trim().min(1).max(1000),
+    ...LibraryFilters,
+    limit: z.number().int().min(1).max(25).default(10),
+  })
+  .strict()
+  .refine(sinceBeforeUntil, SINCE_UNTIL);
 export type SearchQuery = z.infer<typeof SearchQuery>;
 
 const relatedCaps = { limit: z.number().int().min(1).max(10).default(PROMPT_CAPS.items), maxTokens: z.number().int().min(100).max(4000).default(PROMPT_CAPS.tokens) };

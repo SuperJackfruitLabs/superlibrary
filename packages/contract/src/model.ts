@@ -143,4 +143,6 @@ export interface ItemSummary {
   audience?: 'uploader' | 'board' | 'workspace';
   /** A superseded item's replacement (spec §15). */
   supersededBy?: string | null;
+  /** An artifact's caption, set by a person (spec §7, §11). Absent when there is none. */
+  caption?: string | null;
 }

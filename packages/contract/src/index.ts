@@ -11,3 +11,4 @@ export * from './provenance';
 export * from './work-record';
 export * from './events';
 export * from './retrieval';
+export * from './library';
