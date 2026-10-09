@@ -11,6 +11,8 @@
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import AppHeader from '$lib/AppHeader.svelte';
+  import SuiteFooter from '$kit/SuiteFooter.svelte';
+  import { applyTheme, readTheme } from '$kit/theme.svelte';
   import { autoSignIn, signOut, watchSession } from '$lib/auth/org-plane';
   import { currentPlane, devMode, enableUrl, initSession, planeSessionLost, session } from '$lib/session.svelte';
 
@@ -36,6 +38,7 @@
   }
 
   onMount(async () => {
+    applyTheme(readTheme());
     await start();
     stop = watchSession(currentPlane, { onSignedOut: () => planeSessionLost(null) });
   });
@@ -81,8 +84,9 @@
   </main>
 {:else if session.me}
   <div class="shell">
-    <AppHeader onsignout={logOut} />
+    <AppHeader me={session.me} onsignout={logOut} />
     {@render children()}
+    <SuiteFooter />
   </div>
 {:else}
   <p class="status">Not signed in. <a href="/login">Sign in</a></p>

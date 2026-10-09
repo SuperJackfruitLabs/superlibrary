@@ -4,7 +4,6 @@ code, pre, kbd, samp, .mono { font-family: var(--font-mono); }
 h1, h2, h3 { font-family: var(--font-sans); font-weight: 600; }
 a { color: var(--color-accent); }
 .shell { max-width: 1100px; margin: 0 auto; padding: var(--space-4); }
-.top { display: flex; justify-content: space-between; align-items: center; gap: var(--space-3); padding-bottom: var(--space-3); border-bottom: 1px solid var(--color-border); margin-bottom: var(--space-4); }
 .status, .notice { padding: var(--space-8) var(--space-4); text-align: center; color: var(--color-content-muted); }
 button, input, select, textarea { font: inherit; }
 /* iOS Safari zooms into any field under 16px when it is focused. */
@@ -20,9 +19,6 @@ input:not([type=checkbox]):not([type=radio]):not([type=file]) { width: 100%; pad
 input[type=file] { width: 100%; padding: var(--space-1) 0; }
 input[type=file]::file-selector-button { min-height: 40px; margin-right: var(--space-3); padding: 0 14px; border: 1px solid var(--color-border); border-radius: var(--radius-control); background: transparent; color: inherit; font: inherit; }
 input[type=checkbox] { width: 22px; height: 22px; margin: 0; flex: none; }
-.top nav { display: flex; align-items: center; gap: var(--space-1); }
-.top nav a, .top > a { display: inline-flex; align-items: center; min-height: var(--tap); padding: 0 var(--space-2); }
-.brand { gap: var(--space-2); color: var(--color-content); text-decoration: none; }
 .mark { display: block; flex: none; width: 24px; height: 24px; }
 .mark-hero { width: 72px; height: 72px; margin: 0 auto var(--space-2); }
 .heading { display: flex; justify-content: space-between; align-items: center; gap: var(--space-3); }
