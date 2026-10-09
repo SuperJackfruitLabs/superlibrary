@@ -14,9 +14,7 @@ import { counted, withCost } from './cost';
 import { RETENTION_CRON } from './lifecycle/retention';
 import { RECONCILE_CRON, reconcile } from './indexing/consumer';
 import { searchRoutes } from './search/routes';
-import { subscribeAll } from './sources/subscribe';
-
-const SUBSCRIBE_CRON = '0 * * * *';
+import { SUBSCRIBE_CRON, subscribeAll } from './sources/subscribe';
 
 const handlers: Handler[] = [uploadRoutes, itemRoutes, searchRoutes, sourceRoutes];
 

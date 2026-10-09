@@ -53,7 +53,7 @@ export default defineConfig(async () => {
             HUB_AUDIENCE: 'https://hub.test',
             SUPERPIPELINE_URL: 'https://pipeline.test',
             SUPERPIPELINE_AUDIENCE: 'https://pipeline.test',
-            PUSH_SIGNING_KEY: 'test-push-key',
+            PUSH_SIGNING_KEY: 'test-push-key-0123456789-abcdefghijklmnop',
             OPERATORS: '',
             ROSTER_TTL_SECONDS: '300',
           },
