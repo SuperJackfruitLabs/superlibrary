@@ -1,5 +1,5 @@
 import { SELF, env } from 'cloudflare:test';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { indexItem } from '../src/indexing/consumer';
 import { setIndexingForTests } from '../src/indexing/vector-index';
 import { fakeEmbedder, fakeVectorize } from './helpers/fake-vectors';
@@ -72,6 +72,77 @@ describe('/mcp', () => {
       for (const args of [{}, { cardId: 'card_00000000000000a1', itemId: 'itm_00000000000000a1' }]) {
         const r = (await (await rpc(t, 'tools/call', { name: 'library_related', arguments: args })).json()) as { result?: { isError?: boolean }; error?: unknown };
         expect(r.error ?? r.result?.isError).toBeTruthy();
+      }
+    });
+  });
+  it('a bad token is challenged with the mcp metadata document', async () => {
+    await withOrgPlane(async () => {
+      const r = await rpc('not-a-token', 'tools/list');
+      expect(r.status).toBe(401);
+      expect(r.headers.get('WWW-Authenticate')).toBe('Bearer resource_metadata="https://api.test/.well-known/oauth-protected-resource/mcp"');
+    });
+  });
+  it('answers 405 with Allow: POST to GET and DELETE, but still challenges an unauthenticated GET', async () => {
+    expect((await SELF.fetch('https://api.test/mcp')).status).toBe(401);
+    await withOrgPlane(async () => {
+      const t = await planeToken({ sub: AGENT, principalKind: 'agent' });
+      for (const method of ['GET', 'DELETE']) {
+        const r = await SELF.fetch('https://api.test/mcp', { method, headers: { Authorization: `Bearer ${t}`, accept: 'application/json, text/event-stream' } });
+        expect(r.status).toBe(405);
+        expect(r.headers.get('Allow')).toBe('POST');
+      }
+    });
+  });
+  it('an agent search never returns an unrostered board item', async () => {
+    await withOrgPlane(async () => {
+      const t = await planeToken({ sub: AGENT, principalKind: 'agent' });
+      await rpc(await planeToken({}), 'tools/list');
+      const ws = (await env.DB.prepare(`SELECT id FROM workspaces WHERE external_id = ?`).bind(ORG).first<{ id: string }>())!.id;
+      await seedRecord({ id: 'itm_00000000000000d1', ws, board: 'brd_00000000000000b1', text: 'deploy checklist for payments, rostered' });
+      await seedRecord({ id: 'itm_00000000000000d2', ws, board: 'brd_00000000000000b2', text: 'deploy checklist for payments, HIDDENMARKER' });
+      await indexItem(env, 'itm_00000000000000d1');
+      await indexItem(env, 'itm_00000000000000d2');
+      await env.DB.prepare(`DELETE FROM roster_cache`).run();
+      bag.ORG_PLANE_URL = 'https://accounts.test';
+      bag.SERVICE_CREDENTIALS = JSON.stringify({ [ORG]: 'svc:x' });
+      const inner = globalThis.fetch;
+      globalThis.fetch = (async (i: RequestInfo | URL, init?: RequestInit) => {
+        const u = i instanceof Request ? i.url : String(i);
+        if (u.endsWith('/api/token/service')) return Response.json({ access_token: 't', expires_in: 300 });
+        if (u.startsWith('https://hub.test')) return Response.json({ boards: ['brd_00000000000000b1'] });
+        return inner(i as RequestInfo, init);
+      }) as typeof fetch;
+      try {
+        const r = (await (await rpc(t, 'tools/call', { name: 'library_search', arguments: { query: 'deploy checklist payments' } })).json()) as Call;
+        const text = r.result.content[0]!.text;
+        expect(text).toContain('itm_00000000000000d1');
+        expect(text).not.toContain('HIDDENMARKER');
+        expect(text).not.toContain('itm_00000000000000d2');
+      } finally {
+        globalThis.fetch = inner;
+        bag.ORG_PLANE_URL = '';
+      }
+    });
+  });
+  it('a throwing tool answers a generic error, logs the cause, and leaks nothing', async () => {
+    await withOrgPlane(async () => {
+      const t = await planeToken({ sub: AGENT, principalKind: 'agent' });
+      await rpc(t, 'tools/list');
+      const log = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      const prepare = env.DB.prepare.bind(env.DB);
+      const spy = vi.spyOn(env.DB, 'prepare').mockImplementation(((sql: string) => {
+        if (/FROM items/i.test(sql)) throw new Error('D1_ERROR: SECRETINTERNAL table items');
+        return prepare(sql);
+      }) as typeof env.DB.prepare);
+      try {
+        const r = (await (await rpc(t, 'tools/call', { name: 'library_get', arguments: { itemId: 'itm_00000000000000a1' } })).json()) as Call;
+        expect(r.result.isError).toBe(true);
+        expect(r.result.content[0]!.text).toBe('Superlibrary could not answer; try again.');
+        expect(JSON.stringify(r)).not.toContain('SECRETINTERNAL');
+        expect(log.mock.calls.flat().join(' ')).toContain('SECRETINTERNAL');
+      } finally {
+        spy.mockRestore();
+        log.mockRestore();
       }
     });
   });

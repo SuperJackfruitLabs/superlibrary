@@ -30,6 +30,8 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
       headers.set('WWW-Authenticate', `Bearer resource_metadata="${env.APP_URL}/.well-known/oauth-protected-resource/mcp"`);
       return new Response(v.body, { status: v.status, statusText: v.statusText, headers });
     }
+    // Stateless: there is no session to stream to or delete (a GET would hold a keepalive-only stream).
+    if (request.method !== 'POST') return new Response(JSON.stringify({ error: 'method_not_allowed' }), { status: 405, headers: { Allow: 'POST', 'content-type': 'application/json' } });
     return handleMcp(request, env, v);
   }
   if (url.pathname === '/api/v1/me' && request.method === 'GET') {

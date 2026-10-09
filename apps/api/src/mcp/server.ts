@@ -21,5 +21,7 @@ export async function handleMcp(request: Request, env: Env, v: Viewer): Promise<
   } catch (e) {
     console.error('mcp failed', e instanceof Error ? e.message : String(e));
     return Response.json({ jsonrpc: '2.0', id: null, error: { code: -32603, message: 'internal error' } }, { status: 500 });
+  } finally {
+    await server.close().catch(() => undefined);
   }
 }
