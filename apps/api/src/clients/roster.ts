@@ -8,7 +8,7 @@ const BOARD = /^brd_[0-9a-f]{16}$/;
 /** Spec §4: the boards an agent holds an enabled bridge row on, from the AgentPod hub, cached. */
 export async function rosterBoards(env: Env, a: AgentViewer): Promise<string[]> {
   const ttl = Number(env.ROSTER_TTL_SECONDS ?? '300') * 1000;
-  const row = await env.DB.prepare(`SELECT boards, fetched_at FROM roster_cache WHERE principal_id = ?`).bind(a.principalId).first<{ boards: string; fetched_at: number }>();
+  const row = await env.DB.prepare(`SELECT boards, fetched_at FROM roster_cache WHERE principal_id = ? AND workspace_id = ?`).bind(a.principalId, a.workspaceId).first<{ boards: string; fetched_at: number }>();
   if (row && Date.now() - row.fetched_at < ttl) return JSON.parse(row.boards);
   try {
     const token = await serviceToken(env, a.org, env.HUB_AUDIENCE!);

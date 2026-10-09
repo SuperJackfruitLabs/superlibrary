@@ -244,7 +244,10 @@ async function setExpiry(request: Request, env: Env, p: Person, id: string): Pro
   // rewritten; for a revoked one writeManifest would delete the manifest, never write it.
   const live = (await env.DB.prepare(`SELECT version FROM versions WHERE item_id = ? AND revoked_at IS NULL`).bind(id).all<{ version: number }>()).results;
   for (const v of live) await writeManifest(env, id, v.version);
-  return json({ item: summary((await loadItem(env, id))!) });
+  {
+    const now = (await loadItem(env, id))!;
+    return json({ item: summary(now, (await extrasFor(env, [now])).get(id)) });
+  }
 }
 
 /**
@@ -265,7 +268,10 @@ async function widenScope(request: Request, env: Env, p: Person, id: string): Pr
     ]);
     await itemChanged(env, id, item.workspace_id, 'upserted');
   }
-  return json({ item: summary((await loadItem(env, id))!) });
+  {
+    const now = (await loadItem(env, id))!;
+    return json({ item: summary(now, (await extrasFor(env, [now])).get(id)) });
+  }
 }
 
 const ITEM = /^\/api\/v1\/items\/(itm_[0-9a-f]{16})(\/embed|\/revoke|\/scope|\/versions\/([1-9][0-9]{0,8})\/revoke)?$/;

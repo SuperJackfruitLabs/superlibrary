@@ -11,13 +11,14 @@ export const loadItem = (env: Env, id: string) => env.DB.prepare(`SELECT * FROM 
 
 /**
  * Spec §4, one definition for search, get, related and the prompt. A scope list, computed once per
- * request: people see the workspace's known boards (plan P4) and their own items; agents their
- * roster. The SQL below says the same thing, and a test holds them together.
+ * request: people see the workspace's known boards (plan P4); their own items come from the created_by rule; agents their
+ * roster. The SQL below says the same thing, and visibility-v2.test.ts ('visibleSql and canSee agree') holds them together.
  */
 export async function viewerScopes(env: Env, v: Viewer): Promise<string[]> {
   if (v.kind === 'agent') return ['workspace', ...(await rosterBoards(env, v)).map((b) => `board:${b}`)];
-  const boards = (await env.DB.prepare(`SELECT 'board:' || board_id AS s FROM source_boards WHERE workspace_id = ?1 UNION SELECT DISTINCT scope FROM items WHERE workspace_id = ?1 AND created_by = ?2 AND scope <> 'workspace'`).bind(v.workspaceId, v.principalId).all<{ s: string }>()).results.map((r) => r.s);
-  return ['workspace', ...new Set(boards)];
+  // Their own items stay visible by the created_by rule in canSee and visibleSql, not by scope.
+  const boards = (await env.DB.prepare(`SELECT 'board:' || board_id AS s FROM source_boards WHERE workspace_id = ?`).bind(v.workspaceId).all<{ s: string }>()).results.map((r) => r.s);
+  return ['workspace', ...boards];
 }
 
 export function canSee(v: Viewer, item: ItemRow, scopes: string[]): boolean {
