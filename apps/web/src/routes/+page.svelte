@@ -30,8 +30,10 @@
   }
 
   let loads = 0;
+  let tried: string | null = null;   // the cursor of the last request, so a retry resumes there
   async function load(f: Filters, cursor: string | null = null) {
     const mine = ++loads;
+    tried = cursor;
     loading = true;
     error = null;
     if (rangeProblem(f)) { results = []; items = []; next = null; loading = false; return; }
@@ -57,7 +59,7 @@
 <svelte:head><title>Library · Superlibrary</title></svelte:head>
 <div class="heading">
   <h1>Library</h1>
-  <a class="kit-button kit-button--primary" href="/upload">Upload</a>
+  <Button variant="primary" href="/upload">Upload</Button>
 </div>
 <form class="searchbar" role="search" onsubmit={(e) => { e.preventDefault(); void show({ ...filters, q: words }); }}>
   <label class="visually-hidden" for="q">Search the library</label>
@@ -68,7 +70,7 @@
 <p class="muted" role="status">{loading ? 'Loading…' : error ? '' : summaryLine}</p>
 {#if error}
   <p class="error" role="alert">{error}</p>
-  <button type="button" onclick={() => load(filters)}>Try again</button>
+  <button type="button" onclick={() => load(filters, tried)}>Try again</button>
 {:else if !loading && rows.length === 0}
   {#if searching}
     <EmptyState title="Nothing matches." body="Try other words, or clear the filters." />

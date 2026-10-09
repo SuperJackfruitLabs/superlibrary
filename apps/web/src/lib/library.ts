@@ -47,7 +47,7 @@ export function writeFilters(f: Filters, defaults: Partial<Pick<Filters, 'period
   return p.toString();
 }
 
-export const activeFilters = (f: Filters) => [f.kind, f.board, f.agent, f.station].filter(Boolean).length + f.outcomes.length + (f.period !== 'any' ? 1 : 0);
+export const activeFilters = (f: Filters) => [f.kind, f.board, f.agent, f.station].filter(Boolean).length + f.outcomes.length + (f.period === 'custom' ? (f.from || f.to ? 1 : 0) : f.period !== 'any' ? 1 : 0);
 
 const localDay = (s: string, plusDays = 0) => {
   const [y, m, d] = s.split('-').map(Number) as [number, number, number];

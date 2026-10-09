@@ -24,6 +24,13 @@ describe('filters in the address (spec §11: a view can be kept and shared)', ()
   });
 });
 
+describe('the filter count', () => {
+  it('counts a custom period only once a date is set', () => {
+    expect(activeFilters({ ...EMPTY_FILTERS, period: 'custom' })).toBe(0);
+    expect(activeFilters({ ...EMPTY_FILTERS, period: 'custom', from: '2026-10-01' })).toBe(1);
+  });
+});
+
 describe('periods in the person’s own time zone (Review Focus)', () => {
   it("periodRange starts a month at the person's local midnight", () => {
     process.env.TZ = 'Pacific/Kiritimati';   // UTC+14
