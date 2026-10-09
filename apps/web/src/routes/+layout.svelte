@@ -1,4 +1,10 @@
 <script lang="ts">
+  // IBM Plex only (operator decision): Sans for words, Mono for code and data. Self-hosted ('self').
+  import '@fontsource/ibm-plex-sans/400.css';
+  import '@fontsource/ibm-plex-sans/500.css';
+  import '@fontsource/ibm-plex-sans/600.css';
+  import '@fontsource/ibm-plex-mono/400.css';
+  import '$kit/tokens.css';
   import '../app.css';
   import { onDestroy, onMount } from 'svelte';
   import { goto } from '$app/navigation';

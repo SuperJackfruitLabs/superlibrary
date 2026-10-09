@@ -12,6 +12,8 @@
     "e2e": "node ../../scripts/dev-keys.mjs && playwright test"
   },
   "dependencies": {
+    "@fontsource/ibm-plex-mono": "^5.2.5",
+    "@fontsource/ibm-plex-sans": "^5.2.5",
     "@superlibrary/contract": "workspace:*",
     "@superlibrary/embed": "workspace:*",
     "fflate": "^0.8.2"
