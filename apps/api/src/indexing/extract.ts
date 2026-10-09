@@ -4,7 +4,7 @@ import type { Env } from '../env';
 import { isExpired, type ItemRow } from '../items/visibility';
 import { blobKey } from '../storage/blobs';
 
-const TEXT_VIEWS = new Set<View>(['markdown', 'code', 'text', 'json', 'yaml', 'toml', 'csv', 'tsv', 'mermaid', 'graphviz', 'html', 'ipynb', 'svg']);
+export const TEXT_VIEWS = new Set<View>(['markdown', 'code', 'text', 'json', 'yaml', 'toml', 'csv', 'tsv', 'mermaid', 'graphviz', 'html', 'ipynb', 'svg']);
 /** Per item, so one huge folder cannot dominate the index or a Worker's memory. */
 export const MAX_TEXT = 400_000;
 

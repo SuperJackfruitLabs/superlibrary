@@ -5,6 +5,8 @@ import { estimateTokens } from '@superlibrary/contract';
 import { indexItem } from '../src/indexing/consumer';
 import { setIndexingForTests } from '../src/indexing/vector-index';
 import { getForViewer, related } from '../src/search/related';
+import { upload } from './helpers/upload';
+import { devHeaders } from './helpers/org-plane';
 import { fakeEmbedder, fakeVectorize } from './helpers/fake-vectors';
 import { seedRecord } from './helpers/records';
 import type { AgentViewer } from '../src/auth/caller';
@@ -89,5 +91,59 @@ describe('library_get edge cases', () => {
     expect(g!.result.supersededBy).toBeNull();
     const n = await env.DB.prepare(`SELECT COUNT(*) AS n FROM audit_events WHERE action = 'item.read' AND item_id = 'itm_00000000000000e4'`).first<{ n: number }>();
     expect(n!.n).toBe(1);
+  });
+});
+
+const loadViewer = async (itemId: string): Promise<AgentViewer> => {
+  const row = await env.DB.prepare(`SELECT workspace_id FROM items WHERE id = ?`).bind(itemId).first<{ workspace_id: string }>();
+  return { ...agent, workspaceId: row!.workspace_id };
+};
+const route = (path: string) => SELF.fetch(`https://api.test${path}`, { headers: devHeaders() });
+
+describe('library_get of artifacts', () => {
+  it('missing or revoked versions are null (route 404); bad ?version is 400', async () => {
+    const r1 = await upload([{ path: 'a.md', body: '# first version text' }], { scope: 'workspace' });
+    const id = r1.body.itemId as string;
+    await upload([{ path: 'a.md', body: '# second version text' }], { item: id });
+    const v = await loadViewer(id);
+    expect((await getForViewer(env, v, id, 2))!.text).toContain('second version');
+    expect(await getForViewer(env, v, id, 9)).toBeNull();
+    expect((await route(`/api/v1/library/${id}?version=9`)).status).toBe(404);
+    await env.DB.prepare(`UPDATE versions SET revoked_at = datetime('now'), revoked_by = 'prn_000000000000000000a1' WHERE item_id = ? AND version = 1`).bind(id).run();
+    expect(await getForViewer(env, v, id, 1)).toBeNull();
+    expect((await route(`/api/v1/library/${id}?version=1`)).status).toBe(404);
+    for (const bad of ['0', 'abc', '1.5']) expect((await route(`/api/v1/library/${id}?version=${bad}`)).status).toBe(400);
+    expect((await route(`/api/v1/library/${id}`)).status).toBe(200);
+  });
+  it('an artifact without text answers with a description', async () => {
+    const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0x0d, 0x49, 0x48, 0x44, 0x52, 0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0, 0, 0, 0x1f, 0x15, 0xc4, 0x89]);
+    const r = await upload([{ path: 'hero.png', body: png }], { scope: 'workspace', title: 'Hero banner mockup' });
+    expect(r.status).toBe(201);
+    const id = r.body.itemId as string;
+    const g = await getForViewer(env, await loadViewer(id), id);
+    expect(g!.text).toContain('Hero banner mockup');
+    expect(g!.wrapped).toContain('<library-item id="' + id);
+    const withV = await getForViewer(env, await loadViewer(id), id, 1);
+    expect(withV!.text).toContain('version 1');
+    expect(withV!.text).toContain('image/png');
+  });
+});
+
+describe('library_related basis visibility and audit', () => {
+  it('an invisible basis yields nothing', async () => {
+    await seed('itm_00000000000000f1', 'secret plan wording', 'brd_00000000000000b2');
+    await seed('itm_00000000000000f2', 'secret plan wording again', 'brd_00000000000000b1');
+    expect(await related(env, agent, { cardId: 'card_00000000000000f1', limit: 5, maxTokens: 1500 })).toEqual([]);
+    expect(await related(env, agent, { itemId: 'itm_00000000000000f1', limit: 5, maxTokens: 1500 })).toEqual([]);
+  });
+  it('a direct related() call audits items.related with count and ids, never text', async () => {
+    await seed('itm_00000000000000f3', 'zebra migration plan');
+    await seed('itm_00000000000000f4', 'zebra migration retro');
+    const r = await related(env, agent, { itemId: 'itm_00000000000000f3', limit: 5, maxTokens: 1500 });
+    const row = await env.DB.prepare(`SELECT detail FROM audit_events WHERE action = 'items.related' ORDER BY rowid DESC LIMIT 1`).first<{ detail: string }>();
+    expect(JSON.parse(row!.detail)).toEqual({ count: r.length, itemIds: r.map((x) => x.itemId) });
+    expect(r.map((x) => x.itemId)).toContain('itm_00000000000000f4');
+    expect(r.map((x) => x.itemId)).not.toContain('itm_00000000000000f3');
+    expect(row!.detail).not.toContain('zebra');
   });
 });

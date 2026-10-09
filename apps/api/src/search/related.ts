@@ -4,7 +4,7 @@ import type { Env } from '../env';
 import type { Viewer } from '../auth/caller';
 import { audit } from '../audit';
 import { canSee, isExpired, loadItem, viewerScopes, type ItemRow } from '../items/visibility';
-import { extractText } from '../indexing/extract';
+import { extractText, TEXT_VIEWS } from '../indexing/extract';
 import { search, sourcesOf, supersededByMap, visibleSupersededBy } from './search';
 
 const GET_CAP = 100_000;
@@ -27,11 +27,14 @@ export async function getForViewer(env: Env, v: Viewer, itemId: string, version?
   if (!i || (i.kind === 'work-record' && version !== undefined)) return null;
   const content = await extractText(env, i);
   let text = content?.text ?? '';
-  if (i.kind === 'artifact' && (version !== undefined || !text)) {
+  if (i.kind === 'artifact') {
     const vrow = await env.DB.prepare(`SELECT version, media_type, total_bytes, file_count FROM versions WHERE item_id = ? AND revoked_at IS NULL ${version !== undefined ? 'AND version = ?' : ''} ORDER BY version DESC LIMIT 1`)
       .bind(...(version !== undefined ? [itemId, version] : [itemId])).first<{ version: number; media_type: string; total_bytes: number; file_count: number }>();
     if (!vrow) return null;
-    if (!text || (content && content.version !== vrow.version)) text = `${i.title}\nA ${vrow.media_type} artifact, version ${vrow.version}, ${vrow.file_count} file(s), ${vrow.total_bytes} bytes. Open it at ${itemUrl(env.APP_URL, i.id)}.`;
+    const files = (await env.DB.prepare(`SELECT path, view FROM version_files WHERE item_id = ? AND version = ? ORDER BY path`).bind(itemId, vrow.version).all<{ path: string; view: string }>()).results;
+    // Text only exists for the latest version (extractText); an older version, or one with no text file, is described.
+    const hasText = files.some((f) => TEXT_VIEWS.has(f.view as never)) && content?.version === vrow.version;
+    if (!hasText) text = `${i.title}\nA ${vrow.media_type} artifact, version ${vrow.version}, ${vrow.file_count} file(s), ${vrow.total_bytes} bytes: ${files.map((f) => f.path).join(', ')}. Open it at ${itemUrl(env.APP_URL, i.id)}.`;
   }
   text = text.slice(0, GET_CAP);
   const result = await resultOf(env, v, scopes, i, text.slice(0, 280));
@@ -39,7 +42,14 @@ export async function getForViewer(env: Env, v: Viewer, itemId: string, version?
   return { result, text, wrapped: wrapItem(result, text) };
 }
 
+/** Audited here, not in the route, so every caller (REST, MCP) leaves a row. Never the query text. */
 export async function related(env: Env, v: Viewer, q: RelatedQuery): Promise<RelatedItem[]> {
+  const items = await relatedItems(env, v, q);
+  await audit(env.DB, { workspaceId: v.workspaceId, actor: v.principalId, act: v.act, action: 'items.related', detail: { count: items.length, itemIds: items.map((x) => x.itemId) } }).run();
+  return items;
+}
+
+async function relatedItems(env: Env, v: Viewer, q: RelatedQuery): Promise<RelatedItem[]> {
   let selfId: string | null = null;
   let basis = '';
   if ('cardId' in q) {

@@ -51,7 +51,6 @@ export const searchRoutes: Handler = async (request, env, _ctx, url) => {
     const q = RelatedQuery.safeParse(await request.json().catch(() => null));
     if (!q.success) return error(400, 'invalid');
     const items = await related(env, v, q.data);
-    await audit(env.DB, { workspaceId: v.workspaceId, actor: v.principalId, act: v.act, action: 'items.related', detail: { count: items.length } }).run();
     return json({ items });
   }
   return null;
