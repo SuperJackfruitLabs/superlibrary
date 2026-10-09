@@ -2,6 +2,7 @@
 /** The library page's state (the address), its requests, and its rows. */
 import { BOARD_ID, OUTCOMES, PRN_ID, type BrowsePage, type Facets, type ItemSource, type ItemSummary, type Outcome, type SearchResult } from '@superlibrary/contract';
 import { explain } from './item';
+import { OUTCOME_WORDS } from './kit/outcome';
 
 type Api = (path: string, init?: RequestInit) => Promise<Response>;
 export type Kind = 'artifact' | 'work-record';
@@ -127,3 +128,10 @@ export async function loadJson<T>(api: Api, path: string, body?: unknown): Promi
 export const searchLibrary = (api: Api, f: Filters) => loadJson<{ results: SearchResult[] }>(api, '/api/v1/search', searchBody(f));
 export const browseLibrary = (api: Api, f: Filters, cursor: string | null = null) => loadJson<BrowsePage>(api, '/api/v1/browse', browseBody(f, cursor));
 export const loadFacets = (api: Api) => loadJson<Facets>(api, '/api/v1/facets');
+
+const PERIOD_WORDS: Record<Period, string> = { any: '', week: ' this week', month: ' this month', '30d': ' in the last 30 days', custom: ' between those dates' };
+/** "Everything rejected on Marketing & Community this month" (spec §11's own example). */
+export function viewTitle(outcome: Outcome | null, board: string | null, period: Period): string {
+  const what = outcome ? `Everything ${OUTCOME_WORDS[outcome].toLowerCase()}` : 'Everything';
+  return `${what}${board ? ` on ${board}` : ''}${PERIOD_WORDS[period]}`;
+}

@@ -98,7 +98,7 @@
             <span class="result-meta"><OutcomeBadge outcome={e.item.outcome} /><small>added {when(e.addedAt)}</small></span>
             {#if e.note}<span class="snippet">{e.note}</span>{/if}
           </a>
-          <button type="button" onclick={() => remove(e.item.id, e.item.title)}>Remove<span class="visually-hidden"> “{e.item.title}”</span> from collection</button>
+          <button type="button" onclick={() => remove(e.item.id, e.item.title)}><span>Remove<span class="visually-hidden"> “{e.item.title}”</span> from collection</span></button>
         </li>
       {/each}
     </ul>

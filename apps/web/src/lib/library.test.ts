@@ -1,7 +1,7 @@
 // apps/web/src/lib/library.test.ts
 import { afterEach, describe, expect, it } from 'vitest';
 import type { ItemSummary, SearchResult } from '@superlibrary/contract';
-import { EMPTY_FILTERS, activeFilters, browseBody, periodRange, rangeProblem, readFilters, rowOfItem, rowOfResult, searchBody, writeFilters } from './library';
+import { EMPTY_FILTERS, activeFilters, browseBody, periodRange, rangeProblem, readFilters, rowOfItem, rowOfResult, searchBody, viewTitle, writeFilters } from './library';
 
 const TZ = process.env.TZ;
 afterEach(() => { process.env.TZ = TZ; });
@@ -63,5 +63,21 @@ describe('rows', () => {
     expect(rowOfResult(r, boards).line).toBe('Artifact · Marketing & Community · docs · out/report.md');
     const i = { id: 'itm_0123456789abcde0', kind: 'work-record', title: 'W', outcome: 'rejected', scope: 'board:brd_00000000000000b1', createdBy: 'source:superpipeline', createdAt: '2026-10-01T00:00:00.000Z', latestVersion: 0, expiresAt: null, revokedAt: null } as ItemSummary;
     expect(rowOfItem(i, boards)).toMatchObject({ line: 'Work record · Marketing & Community', snippet: null });
+  });
+});
+
+describe('views by outcome (spec §11)', () => {
+  it('the heading says the view in words', () => {
+    expect(viewTitle('rejected', 'Marketing & Community', 'month')).toBe('Everything rejected on Marketing & Community this month');
+    expect(viewTitle('in-progress', null, '30d')).toBe('Everything in progress in the last 30 days');
+    expect(viewTitle(null, null, 'any')).toBe('Everything');
+  });
+  it('an outcome view: everything rejected on one board this month', () => {
+    process.env.TZ = 'UTC';
+    const f = readFilters(new URLSearchParams('outcome=rejected&board=brd_00000000000000b1'), { period: 'month' });
+    expect(browseBody(f, null, new Date('2026-10-15T12:00:00Z'))).toEqual({
+      outcomes: ['rejected'], board: 'brd_00000000000000b1', since: '2026-10-01T00:00:00.000Z', limit: 50,
+    });
+    expect(viewTitle(f.outcomes[0] ?? null, 'Marketing & Community', f.period)).toBe('Everything rejected on Marketing & Community this month');
   });
 });
