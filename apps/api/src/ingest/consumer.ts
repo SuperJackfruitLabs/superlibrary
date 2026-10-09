@@ -39,6 +39,9 @@ export async function syncCard(
   m: { workspaceId: string; boardId: string; cardId: string },
   snapshots?: SnapshotCache,
 ): Promise<'created' | 'updated' | 'unchanged' | 'deleted'> {
+  // A person removed this card's record from memory (spec §11, decision O5): no event brings it back.
+  const removed = await env.DB.prepare(`SELECT 1 FROM removed_cards WHERE workspace_id = ? AND card_id = ?`).bind(m.workspaceId, m.cardId).first();
+  if (removed) return 'unchanged';
   const existing = await env.DB.prepare(`SELECT item_id, digest, board_id FROM work_records WHERE workspace_id = ? AND card_id = ?`).bind(m.workspaceId, m.cardId).first<{ item_id: string; digest: string; board_id: string }>();
   const boardId = existing?.board_id ?? m.boardId;
   const client = pipelineFor(env, await orgOf(env, m.workspaceId));
@@ -68,7 +71,15 @@ export async function syncCard(
   const statements: D1PreparedStatement[] = [];
   if (existing) {
     statements.push(
-      env.DB.prepare(`UPDATE items SET title = ?, outcome = ?, scope = ? WHERE id = ?`).bind(record.title, record.outcome, scope, itemId),
+      // What a person did stays done (gap G1): a widened record stays workspace-wide, and a
+      // person-set replacement keeps it superseded; the card's own outcome is kept for an undo.
+      env.DB.prepare(
+        `UPDATE items SET title = ?1,
+           outcome = CASE WHEN superseded_by IS NOT NULL THEN 'superseded' ELSE ?2 END,
+           superseded_prior = CASE WHEN superseded_by IS NOT NULL THEN ?2 ELSE superseded_prior END,
+           scope = CASE WHEN scope = 'workspace' THEN scope ELSE ?3 END
+         WHERE id = ?4`,
+      ).bind(record.title, record.outcome, scope, itemId),
       env.DB.prepare(`UPDATE work_records SET digest = ?, body = ?, text = ?, redacted = ?, superseded_by_card = ?, source_updated_at = ?, synced_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE item_id = ?`)
         .bind(digest, body, text, redacted, record.supersededByCard, record.updatedAt, itemId),
       env.DB.prepare(`UPDATE item_sources SET stage = ? WHERE item_id = ?`).bind(record.stage, itemId),

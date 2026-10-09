@@ -1,4 +1,4 @@
-import { CaptionBody, SupersedeBody } from '@superlibrary/contract';
+import { CaptionBody, RemoveBody, SupersedeBody } from '@superlibrary/contract';
 import type { z } from 'zod';
 import type { Env } from '../env';
 import type { Person } from '../auth/caller';
@@ -7,6 +7,7 @@ import { itemChanged } from '../events';
 import { error, json } from '../http';
 import { canManage, canSee, isExpired, loadItem, viewerScopes, type ItemRow } from '../items/visibility';
 import { extrasFor, summary } from '../items/routes';
+import { deleteItem } from '../lifecycle/retention';
 import { issues } from './issues';
 
 /**
@@ -91,4 +92,27 @@ export async function setCaption(request: Request, env: Env, p: Person, id: stri
   ]);
   await itemChanged(env, id, m.item.workspace_id, 'upserted');
   return respond(env, p, id, m.scopes);
+}
+
+/**
+ * Spec §11 "remove an item from memory, with a recorded reason"; spec §12 "deletion removes
+ * everything". A revoked item may still be removed. A work record's card is remembered, so its
+ * next event does not bring it back (decision O5).
+ */
+export async function removeFromMemory(request: Request, env: Env, p: Person, id: string): Promise<Response> {
+  const m = await moderatable(env, p, id, { allowRevoked: true });
+  if (m instanceof Response) return m;
+  const b = RemoveBody.safeParse(await request.json().catch(() => null));
+  if (!b.success) return error(400, 'invalid', { detail: 'a reason of 3 to 500 characters is required' });
+  if (m.item.kind === 'work-record') {
+    const w = await env.DB.prepare(`SELECT card_id FROM work_records WHERE item_id = ?`).bind(id).first<{ card_id: string }>();
+    if (w) {
+      await env.DB.prepare(`INSERT OR REPLACE INTO removed_cards (workspace_id, card_id, item_id, reason, removed_by) VALUES (?, ?, ?, ?, ?)`)
+        .bind(m.item.workspace_id, w.card_id, id, b.data.reason, p.principalId).run();
+    }
+  }
+  // Rows, bytes no other version shares, and (through item.changed 'deleted') chunks, FTS rows and
+  // vectors. Its `item.deleted` audit row records this person and the reason.
+  await deleteItem(env, id, p.principalId, b.data.reason);
+  return json({ removed: true });
 }

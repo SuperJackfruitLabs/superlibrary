@@ -5,7 +5,7 @@ import { BadCursor, browse } from './browse';
 import { facets } from './facets';
 import { addToCollection, collectionDetail, createCollection, deleteCollection, listCollections, loadCollection, patchCollection, removeFromCollection } from './collections';
 import { issues } from './issues';
-import { setCaption, supersede } from './moderation';
+import { removeFromMemory, setCaption, supersede } from './moderation';
 import { recordView } from './record';
 
 /**
@@ -56,12 +56,13 @@ export const libraryRoutes: Handler = async (request, env, _ctx, url) => {
     if (itemId && request.method === 'DELETE') return removeFromCollection(env, p, c, itemId);
     return null;
   }
-  const mod = /^\/api\/v1\/items\/(itm_[0-9a-f]{16})\/(supersede|caption)$/.exec(url.pathname);
+  const mod = /^\/api\/v1\/items\/(itm_[0-9a-f]{16})\/(supersede|caption|remove)$/.exec(url.pathname);
   if (mod) {
     const p = await resolvePerson(request, env);
     if (p instanceof Response) return p;
     if (mod[2] === 'supersede' && request.method === 'POST') return supersede(request, env, p, mod[1]!);
     if (mod[2] === 'caption' && request.method === 'PATCH') return setCaption(request, env, p, mod[1]!);
+    if (mod[2] === 'remove' && request.method === 'POST') return removeFromMemory(request, env, p, mod[1]!);
     return null;
   }
   return null;
