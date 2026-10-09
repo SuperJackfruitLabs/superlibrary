@@ -59,12 +59,15 @@ test.describe('at phone width', () => {
     await page.goto(`/a/${item.itemId}/v/1`);
     await expect(frameOf(page).locator('h1')).toBeVisible();
     await expect(page.locator('select.sl-versions')).toBeAttached();
-    await page.locator('button.sl-files-toggle').click();
+    // At phone width Files lives in the labelled More panel (the toolbar control is hidden).
+    await page.locator('button.sl-more-toggle').click();
+    await expect(page.locator('.sl-more-panel')).toBeVisible();
+    expect(await shortControls(page, 15), 'item, more open').toEqual([]);
+    await page.locator('.sl-more-panel button.sl-more-item', { hasText: 'Files' }).click();
     await expect(page.locator('.sl-files-panel button.sl-file')).toHaveCount(2);
     expect(await shortControls(page, 15), 'item, files open').toEqual([]);
     await expectNoSideways(page, 'item');
-    await page.locator('button.sl-files-toggle').click();
-    await page.locator('button.sl-share-toggle').click();
+    await page.locator('button.sl-share-toggle').click(); // closes the files panel, opens Share
     await expect(page.locator('.sl-share-panel')).toBeVisible();
     expect(await shortControls(page, 15), 'item, share open').toEqual([]);
   });
