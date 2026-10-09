@@ -397,7 +397,29 @@ ahead.
 
 - **The library app:**
   - search, with filters for kind, outcome, board, agent, station and date;
-  - an item page with provenance, versions and related items;
+  - an item page with provenance, versions and related items. Amended 2026-10-09 (operator):
+    - **The viewer** is the same embed as every host (§9, Embedding): `@superlibrary/embed`
+      mounted with the person's own token, at `/a/<id>` (the newest live version) and
+      `/a/<id>/v/<n>`. Choosing a version in the toolbar or in the list switches the frame in
+      place and updates the address.
+    - **Provenance:** who created it (a person or an agent), the station and source path when
+      the source provides them, when it was created, who can see it (the Share panel's words)
+      and its outcome. The card and run show when present (phase 2). A person's upload has no
+      station or path.
+    - **Details** of the version shown, next to the versions list: kind, media type, size, file
+      count and the file it opens on for a folder, SHA-256 with a copy button (for a folder, the
+      hash of its file list), upload time, a recorded secret-scan override and any revocation.
+    - **Versions:** each with its time, size and file count, marked shown, latest or revoked.
+      The uploader or an owner (§12, plan D12, mirrored from `/me` and the item's uploader; the
+      API still decides) can revoke a version or the item, set or clear a delete date, and upload
+      a new version.
+    - **Confirmations are in the page,** never the browser's `confirm()` or `prompt()`: a modal
+      dialog that names the act on its button ("Revoke version 3"). Focus starts on Cancel and
+      stays inside; Escape cancels; the rest of the page is inert; focus then returns to the
+      control that opened it. Revoking the item takes an optional reason in the same dialog.
+    - **Expired:** an item past its delete date reads "This has expired". Until it is swept,
+      the uploader or an owner can keep it by choosing a new date or none.
+    - At phone width every control is at least 44 px tall and nothing scrolls sideways.
   - work-record timelines;
   - collections.
 - **Views by outcome,** for example "everything rejected on Marketing & Community this month".

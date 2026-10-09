@@ -9,6 +9,8 @@ import { injectStyle } from './style';
 import { formatBytes, frameUrl, storeTheme, storedTheme, visibilityWords, type FrameView, type ShareInfo } from './view';
 
 export type { ShareInfo } from './view';
+/** The Share panel's words and the toolbar's sizes, for a host that shows them elsewhere too. */
+export { formatBytes, visibilityWords } from './view';
 export type { Theme } from '@superlibrary/contract';
 
 /** The frame's sandbox: the contract's, so the SDK and the content Worker's CSP cannot drift apart. */

@@ -5,12 +5,22 @@ export interface LocalFile { path: string; bytes: Uint8Array }
 export type Api = (path: string, init?: RequestInit) => Promise<Response>;
 export type Finding = { path: string; line: number; rule: string };
 /** What a refusal's body said beyond its error code (only the fields the upload API sends). */
-export interface RefusalDetail { path?: string; reason?: string; rule?: string; missing?: string[]; limit?: number; used?: number }
+export interface RefusalDetail { path?: string; reason?: string; rule?: string; missing?: string[]; limit?: number; used?: number; entry?: string; detail?: string }
 export type UploadOutcome =
   | { ok: true; result: CommitResult }
   | { ok: false; status: number; error: string; uploadId?: string; findings?: Finding[]; detail?: RefusalDetail };
 export type Refusal = Extract<UploadOutcome, { ok: false }>;
 export type Progress = (sent: number, total: number) => void;
+
+/**
+ * The files an input holds, and the input emptied, so choosing the same file again (after fixing
+ * it, say) fires `change` again.
+ */
+export function takePicked(input: { files: FileList | null; value: string }): File[] {
+  const files = Array.from(input.files ?? []);
+  input.value = '';
+  return files;
+}
 
 /** Files from an <input type=file>, with a folder pick's own name dropped from every path. */
 export async function filesFromPicker(files: ArrayLike<File>): Promise<LocalFile[]> {
@@ -116,6 +126,13 @@ export function describeRefusal(r: Refusal): string {
     case 'size_mismatch': case 'sha256_mismatch': return `${d.path} changed while it was being sent. Upload again.`;
     case 'version_conflict': return 'Someone else added a version of this item at the same moment. Upload again.';
     case 'gone': return 'This upload was committed, but its item has since been deleted.';
+    case 'invalid':
+      if (d.detail === 'expiresAt must be in the future') return `The delete date must be after today. ${NOTHING}`;
+      return d.detail ? `The upload was not accepted: ${d.detail}. ${NOTHING}` : `The upload was not accepted. ${NOTHING}`;
+    case 'not_declared': return `${d.path} was not part of this upload. Upload again.`;
+    case 'already_committed': return 'This upload is already in the library.';
+    case 'nothing_to_override': return 'Nothing in this upload needs an override. Upload it again.';
+    case 'entry_not_found': return `${d.entry}, the file to open first, is not among the chosen files. ${NOTHING}`;
     case 'product_not_enabled': return 'Superlibrary is not enabled for this workspace.';
     default: return `The upload was refused (${r.error}, HTTP ${r.status}). ${NOTHING}`;
   }
@@ -125,7 +142,7 @@ async function sha256Hex(b: Uint8Array): Promise<string> {
   return [...new Uint8Array(await crypto.subtle.digest('SHA-256', b as Uint8Array<ArrayBuffer>))].map((x) => x.toString(16).padStart(2, '0')).join('');
 }
 
-const DETAIL_KEYS = ['path', 'reason', 'rule', 'missing', 'limit', 'used'] as const;
+const DETAIL_KEYS = ['path', 'reason', 'rule', 'missing', 'limit', 'used', 'entry', 'detail'] as const;
 
 async function refusal(res: Response, uploadId?: string): Promise<Refusal> {
   const body = (await res.json().catch(() => ({}))) as { error?: string; findings?: Finding[] } & RefusalDetail;

@@ -4,7 +4,7 @@
   import { page } from '$app/state';
   import { api } from '$lib/session.svelte';
   import {
-    deleteOnToIso, describeRefusal, expandZip, filesFromPicker, overrideAndCommit, precheck, secretRefusal, uploadFiles,
+    deleteOnToIso, describeRefusal, expandZip, filesFromPicker, overrideAndCommit, precheck, secretRefusal, takePicked, uploadFiles,
     type LocalFile, type Refusal, type UploadOutcome,
   } from '$lib/upload';
 
@@ -27,7 +27,7 @@
 
   async function picked(e: Event) {
     const input = e.currentTarget as HTMLInputElement;
-    const raw = Array.from(input.files ?? []);
+    const raw = takePicked(input);
     refused = null;
     reason = '';
     if (raw.length === 0) return;

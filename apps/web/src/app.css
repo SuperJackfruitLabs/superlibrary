@@ -36,3 +36,42 @@ summary { padding: 11px 0; cursor: pointer; }
 .secrets { margin-top: 24px; padding: 16px; border: 1px solid #c0392b; border-radius: 8px; max-width: 560px; overflow-wrap: anywhere; }
 .secrets h2 { margin-top: 0; font-size: 1.1em; }
 .error { color: #c0392b; overflow-wrap: anywhere; }
+
+/* The item page (Task 17). */
+.visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.danger { background: #c0392b; border-color: #c0392b; color: #fff; }
+.danger-outline { border-color: #c0392b; color: #c0392b; }
+.danger-text { color: #c0392b; }
+@media (prefers-color-scheme: dark) { .danger-outline, .danger-text { color: #ff6b5b; border-color: #ff6b5b; } }
+.notice-line { padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; }
+.item-head h1 { margin-bottom: 0; overflow-wrap: anywhere; }
+.item-head p { margin-top: 4px; }
+.viewer { margin: 16px 0; }
+.frame-error { margin: -8px 0 16px; }
+.panel { padding: 0 16px 16px; border: 1px solid var(--line); border-radius: 8px; min-width: 0; }
+.panel h2 { font-size: 1.05em; }
+.item-grid { display: grid; gap: 16px; margin: 16px 0; }
+@media (min-width: 800px) { .item-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; } }
+.item-grid h2, section > h2 { font-size: 1.05em; }
+.versions { list-style: none; margin: 0 0 12px; padding: 0; }
+.versions li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 0; border-bottom: 1px solid var(--line); }
+.versions li.current { border-left: 3px solid var(--accent); padding-left: 9px; }
+.vline { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; min-width: 0; }
+.vname { display: inline-flex; align-items: center; min-height: 44px; min-width: 44px; font-weight: 600; }
+.badges { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+.badge { padding: 1px 8px; border: 1px solid var(--line); border-radius: 999px; font-size: 0.85em; }
+.rows { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 8px 16px; margin: 0; }
+.rows dt { color: var(--muted); }
+.rows dd { margin: 0; overflow-wrap: anywhere; }
+.rows code { overflow-wrap: anywhere; }
+.hash { display: block; font-size: 0.85em; word-break: break-all; }
+.copy { margin-top: 6px; }
+@media (max-width: 480px) { .rows { grid-template-columns: minmax(0, 1fr); gap: 2px; } .rows dd { margin-bottom: 8px; } }
+.manage { display: grid; gap: 16px; margin: 24px 0; }
+@media (min-width: 800px) { .manage { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; } }
+.modal-backdrop { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 16px; background: rgb(0 0 0 / 0.45); }
+.modal { width: min(440px, 100%); max-height: calc(100dvh - 32px); overflow: auto; box-sizing: border-box; padding: 4px 20px 20px; border-radius: 12px; background: var(--bg); color: var(--fg); box-shadow: 0 10px 40px rgb(0 0 0 / 0.3); }
+.modal h2 { font-size: 1.15em; overflow-wrap: anywhere; }
+.modal textarea { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: inherit; }
+.modal-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 16px; }

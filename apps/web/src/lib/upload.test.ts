@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { zipSync } from 'fflate';
 import { LIMITS } from '@superlibrary/contract';
-import { deleteOnToIso, describeRefusal, expandZip, filesFromPicker, overrideAndCommit, precheck, secretRefusal, uploadFiles, zipEntries } from './upload';
+import { deleteOnToIso, describeRefusal, expandZip, filesFromPicker, overrideAndCommit, precheck, secretRefusal, takePicked, uploadFiles, zipEntries } from './upload';
 
 const enc = (s: string) => new TextEncoder().encode(s);
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status });
@@ -180,6 +180,32 @@ describe('what the person is told', () => {
     expect(r('not_found', 404)).toBe('That item does not exist, or you cannot change it.');
     expect(r('duplicate_path', 400, { path: 'a.md' })).toBe('a.md is chosen twice.');
     expect(r('teapot', 418)).toBe('The upload was refused (teapot, HTTP 418). Nothing was added to the library.');
+  });
+
+  it('the remaining refusals read as sentences too, with the server’s detail passed through', () => {
+    const r = (error: string, status: number, detail?: Record<string, unknown>) => describeRefusal({ ok: false, status, error, ...(detail ? { detail } : {}) });
+    // iOS's date picker does not enforce `min`, so a past delete date reaches the server.
+    expect(r('invalid', 400, { detail: 'expiresAt must be in the future' })).toBe('The delete date must be after today. Nothing was added to the library.');
+    expect(r('invalid', 400, { detail: 'a reason is required' })).toBe('The upload was not accepted: a reason is required. Nothing was added to the library.');
+    expect(r('invalid', 400)).toBe('The upload was not accepted. Nothing was added to the library.');
+    expect(r('not_declared', 404, { path: 'x.md' })).toBe('x.md was not part of this upload. Upload again.');
+    expect(r('already_committed', 409)).toBe('This upload is already in the library.');
+    expect(r('nothing_to_override', 409)).toBe('Nothing in this upload needs an override. Upload it again.');
+    expect(r('entry_not_found', 400, { entry: 'index.html' })).toBe('index.html, the file to open first, is not among the chosen files. Nothing was added to the library.');
+  });
+
+  it('keeps what the server said, detail and entry included', async () => {
+    const { api } = fakeApi({ 'POST /api/v1/uploads': () => json(400, { error: 'invalid', detail: 'expiresAt must be in the future' }) });
+    expect(await uploadFiles(api, [{ path: 'a.md', bytes: enc('x') }], { title: 'T' })).toMatchObject({ detail: { detail: 'expiresAt must be in the future' } });
+    const { api: api2 } = fakeApi({ 'POST /api/v1/uploads': () => json(400, { error: 'entry_not_found', entry: 'index.html' }) });
+    expect(await uploadFiles(api2, [{ path: 'a.md', bytes: enc('x') }], { title: 'T' })).toMatchObject({ detail: { entry: 'index.html' } });
+  });
+
+  it('a picked file can be picked again: the input is emptied once its files are taken', () => {
+    const f = new File(['x'], 'a.md');
+    const input = { files: [f] as unknown as FileList, value: 'C:\\fakepath\\a.md' };
+    expect(takePicked(input)).toEqual([f]);
+    expect(input.value).toBe('');
   });
 
   it('a delete date means the start of that day where the person is', () => {
