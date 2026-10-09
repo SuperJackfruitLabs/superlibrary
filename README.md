@@ -2,7 +2,7 @@
 
 **The memory of the stack.** Superlibrary keeps what agents make and what work has been done — artifacts and Superpipeline work history, labelled with how each turned out — and lets agents consult it before they work and people browse it.
 
-Status: phase 1 (Core) live — upload, view and embed artifacts. Plan: docs/superpowers/plans/2026-10-09-superlibrary-phase-1-core.md.
+Status: phase 1 (Core) deployed; live once the custom domains and routes are in place — upload, view and embed artifacts. Plan: docs/superpowers/plans/2026-10-09-superlibrary-phase-1-core.md.
 
 Design: [docs/superpowers/specs/2026-10-09-superlibrary-design.md](docs/superpowers/specs/2026-10-09-superlibrary-design.md).
 

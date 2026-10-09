@@ -75,7 +75,7 @@ describe('repository invariants', () => {
   it('the content Worker is bound to the R2 bucket and its viewer files only', () => {
     for (const file of ['apps/content/wrangler.jsonc', 'apps/content/wrangler.dev.jsonc']) {
       const c = jsonc(file);
-      const allowed = ['$schema', 'name', 'main', 'compatibility_date', 'observability', 'vars', 'r2_buckets', 'assets', 'routes'];
+      const allowed = ['$schema', 'name', 'main', 'compatibility_date', 'workers_dev', 'preview_urls', 'observability', 'vars', 'r2_buckets', 'assets', 'routes'];
       expect(Object.keys(c).filter((k) => !allowed.includes(k)), file).toEqual([]);
       expect(c.r2_buckets, file).toEqual([{ binding: 'BLOBS', bucket_name: 'superlibrary-blobs' }]);
       expect(Object.keys(c.vars as object).sort(), file).toEqual(['CONTENT_DOMAIN', 'FRAME_ANCESTORS']);

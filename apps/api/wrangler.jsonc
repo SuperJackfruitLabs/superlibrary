@@ -4,6 +4,9 @@
   "main": "src/index.ts",
   "compatibility_date": "2025-11-01",
   "compatibility_flags": ["nodejs_compat"],
+  // The routes are the only intended origins: no *.workers.dev name, no preview URLs.
+  "workers_dev": false,
+  "preview_urls": false,
   "observability": { "enabled": true, "logs": { "enabled": true, "invocation_logs": true } },
   // DEV_AUTH is deliberately NOT set here (Superpipeline's rule): dev headers are a full credential,
   // opted into by `pnpm dev` and the test runner only.

@@ -113,6 +113,7 @@ only; every control keeps its accessible name.
 - **Frame to host:** `{ type: "superlibrary:open", url }` — the person clicked an http(s) link in a
   rendered file (Markdown, notebook Markdown, Graphviz node URLs). The sandbox grants no popups,
   so the SDK opens it with `window.open(url, "_blank", "noopener,noreferrer")`, and only for
-  `http:` and `https:` URLs. HTML artifacts render their own page and handle their own links.
+  `http:` and `https:` URLs. Any page in the frame, an HTML artifact's included, may post it; the
+  browser's popup blocker still applies.
 
 The URL lives five minutes; the SDK mints a new one before it opens anything after that.
