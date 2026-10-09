@@ -5,6 +5,7 @@ import { error, json, type Handler } from '../http';
 import { audit } from '../audit';
 import { resolvePerson, type Person } from '../auth/caller';
 import { itemChanged } from '../events';
+import { visibleSupersededBy } from '../search/search';
 import { audienceOf, canManage, canSee, isExpired, loadItem, viewerScopes, visibleBinds, visibleSql, type ItemRow } from './visibility';
 import { deleteManifest, writeManifest } from '../storage/blobs';
 import { contentOrigin, signContent } from './sign';
@@ -50,7 +51,7 @@ export function summary(i: ItemRow, extra: Extras = {}): ItemSummary {
 }
 
 /** Sources, known boards and replacements for these items, in one pass each (a list is never N+1). */
-async function extrasFor(env: Env, items: ItemRow[]): Promise<Map<string, Extras>> {
+async function extrasFor(env: Env, p: Person, items: ItemRow[], scopes?: string[]): Promise<Map<string, Extras>> {
   const out = new Map<string, Extras>(items.map((i) => [i.id, {}]));
   if (items.length === 0) return out;
   const ids = JSON.stringify(items.map((i) => i.id));
@@ -69,7 +70,10 @@ async function extrasFor(env: Env, items: ItemRow[]): Promise<Map<string, Extras
     `SELECT w.item_id AS item_id, n.item_id AS next FROM work_records w LEFT JOIN work_records n ON n.workspace_id = w.workspace_id AND n.card_id = w.superseded_by_card
       WHERE w.item_id IN (SELECT value FROM json_each(?1))`,
   ).bind(ids).all<{ item_id: string; next: string | null }>();
-  for (const r of wr.results) out.get(r.item_id)!.supersededBy = r.next;
+  // A replacement the person cannot see, or that is revoked or expired, is not named (spec §4).
+  const raw = new Map<string, string>(wr.results.flatMap((r) => (r.next ? [[r.item_id, r.next] as [string, string]] : [])));
+  const visible = await visibleSupersededBy(env, p, scopes ?? (await viewerScopes(env, p)), raw);
+  for (const r of wr.results) out.get(r.item_id)!.supersededBy = visible.get(r.item_id) ?? null;
   return out;
 }
 
@@ -108,7 +112,7 @@ async function list(env: Env, p: Person, url: URL): Promise<Response> {
   const page = rows.results.slice(0, limit);
   const last = page.at(-1);
   await audit(env.DB, { workspaceId: p.workspaceId, actor: p.principalId, act: p.act, action: 'items.listed', detail: { count: page.length } }).run();
-  const extras = await extrasFor(env, page);
+  const extras = await extrasFor(env, p, page, scopes);
   return json({ items: page.map((i) => summary(i, extras.get(i.id))), next: rows.results.length > limit && last ? `${last.created_at}|${last.id}` : null });
 }
 
@@ -124,7 +128,7 @@ async function detail(env: Env, p: Person, id: string): Promise<Response> {
     version: v.version, entry: v.entry, view: v.view, mediaType: v.media_type, totalBytes: v.total_bytes, fileCount: v.file_count,
     sha256: v.sha256, createdAt: isoUtc(v.created_at), revokedAt: isoUtc(v.revoked_at), scanOverride: v.scan_override === 1, files: files.get(v.version)!,
   }));
-  return json({ item: summary(item, (await extrasFor(env, [item])).get(id)), versions: out });
+  return json({ item: summary(item, (await extrasFor(env, p, [item])).get(id)), versions: out });
 }
 
 function corsFor(request: Request, env: Env): Record<string, string> {
@@ -246,7 +250,7 @@ async function setExpiry(request: Request, env: Env, p: Person, id: string): Pro
   for (const v of live) await writeManifest(env, id, v.version);
   {
     const now = (await loadItem(env, id))!;
-    return json({ item: summary(now, (await extrasFor(env, [now])).get(id)) });
+    return json({ item: summary(now, (await extrasFor(env, p, [now])).get(id)) });
   }
 }
 
@@ -270,7 +274,7 @@ async function widenScope(request: Request, env: Env, p: Person, id: string): Pr
   }
   {
     const now = (await loadItem(env, id))!;
-    return json({ item: summary(now, (await extrasFor(env, [now])).get(id)) });
+    return json({ item: summary(now, (await extrasFor(env, p, [now])).get(id)) });
   }
 }
 

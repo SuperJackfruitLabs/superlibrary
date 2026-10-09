@@ -2,7 +2,8 @@ import { SELF, env } from 'cloudflare:test';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { parseToken, signingMessage } from '@superlibrary/contract';
 import { API, upload } from './helpers/upload';
-import { HUMAN_2, OTHER_ORG, devHeaders } from './helpers/org-plane';
+import { seedRecord } from './helpers/records';
+import { HUMAN_2, ORG, OTHER_ORG, devHeaders } from './helpers/org-plane';
 import { useSigningKey } from './helpers/signing';
 
 let publicKey: CryptoKey;
@@ -187,5 +188,42 @@ describe('timestamps', () => {
     expect(Date.parse(d.item.expiresAt)).toBe(Date.parse(expiresAt));
     const listed = await (await SELF.fetch(`${API}/api/v1/items?limit=100`, { headers: devHeaders() })).json<{ items: { id: string; createdAt: string }[] }>();
     expect(listed.items.find((i) => i.id === r.body.itemId)!.createdAt).toBe(d.item.createdAt);
+  });
+});
+
+describe('supersededBy on the phase-1 routes names only a replacement the person can see', () => {
+  const B1 = 'brd_00000000000000b1';
+  const B2 = 'brd_00000000000000b2';
+  const oldId = (n: number) => `itm_0000000000000${n}d1`;
+  const newId = (n: number) => `itm_0000000000000${n}d2`;
+  async function setup(n: number) {
+    await SELF.fetch(`${API}/api/v1/items`, { headers: devHeaders() }); // creates the workspace
+    const ws = (await env.DB.prepare(`SELECT id FROM workspaces WHERE external_id = ?`).bind(ORG).first<{ id: string }>())!.id;
+    await env.DB.prepare(`INSERT OR REPLACE INTO source_boards (workspace_id, board_id, name, last_seen_at) VALUES (?, ?, 'B', 't')`).bind(ws, B1).run();
+    await seedRecord({ id: oldId(n), ws, board: B1, text: 'old plan', outcome: 'superseded' });
+    await env.DB.prepare(`UPDATE work_records SET superseded_by_card = ? WHERE item_id = ?`).bind(`card_${newId(n).slice(4)}`, oldId(n)).run();
+    return ws;
+  }
+  const named = async (n: number) => {
+    const l = await (await SELF.fetch(`${API}/api/v1/items?limit=100`, { headers: devHeaders() })).json<{ items: { id: string; supersededBy?: string | null }[] }>();
+    const d = await (await SELF.fetch(`${API}/api/v1/items/${oldId(n)}`, { headers: devHeaders() })).json<{ item: { supersededBy?: string | null } }>();
+    return [l.items.find((i) => i.id === oldId(n))!.supersededBy, d.item.supersededBy];
+  };
+
+  it('names a visible, live replacement', async () => {
+    const ws = await setup(1);
+    await seedRecord({ id: newId(1), ws, board: B1, text: 'new plan' });
+    expect(await named(1)).toEqual([newId(1), newId(1)]);
+  });
+  it('does not name a revoked replacement', async () => {
+    const ws = await setup(2);
+    await seedRecord({ id: newId(2), ws, board: B1, text: 'new plan' });
+    await env.DB.prepare(`UPDATE items SET revoked_at = '2026-01-01T00:00:00.000Z' WHERE id = ?`).bind(newId(2)).run();
+    expect(await named(2)).toEqual([null, null]);
+  });
+  it('does not name a replacement on a board unknown to the person', async () => {
+    const ws = await setup(3);
+    await seedRecord({ id: newId(3), ws, board: B2, text: 'new plan' });
+    expect(await named(3)).toEqual([null, null]);
   });
 });

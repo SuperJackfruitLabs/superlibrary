@@ -62,8 +62,8 @@ export async function visibleSupersededBy(env: Env, v: Viewer, scopes: string[],
 
 const live = `AND i.revoked_at IS NULL AND (i.expires_at IS NULL OR i.expires_at > ?4)`;
 
-export async function search(env: Env, v: Viewer, q: SearchQuery): Promise<SearchResult[]> {
-  const scopes = await viewerScopes(env, v);
+export async function search(env: Env, v: Viewer, q: SearchQuery, precomputedScopes?: string[]): Promise<SearchResult[]> {
+  const scopes = precomputedScopes ?? (await viewerScopes(env, v));
   const boardScope = q.board ? `board:${q.board}` : null;
   // The vector filter only ever carries scopes the viewer can see; a board filter narrows it to that one board.
   const vectorScopes = boardScope ? scopes.filter((s) => s === boardScope) : scopes;

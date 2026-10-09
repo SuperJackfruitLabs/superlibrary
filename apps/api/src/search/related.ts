@@ -50,20 +50,21 @@ export async function related(env: Env, v: Viewer, q: RelatedQuery): Promise<Rel
 }
 
 async function relatedItems(env: Env, v: Viewer, q: RelatedQuery): Promise<RelatedItem[]> {
+  const scopes = await viewerScopes(env, v);
   let selfId: string | null = null;
   let basis = '';
   if ('cardId' in q) {
     const w = await env.DB.prepare(`SELECT item_id, text FROM work_records WHERE workspace_id = ? AND card_id = ?`).bind(v.workspaceId, q.cardId).first<{ item_id: string; text: string }>();
-    if (!w || !(await visibleItem(env, v, w.item_id))) return [];
+    if (!w || !(await visibleItem(env, v, w.item_id, scopes))) return [];
     selfId = w.item_id;
     basis = w.text;
   } else {
-    const i = await visibleItem(env, v, q.itemId);
+    const i = await visibleItem(env, v, q.itemId, scopes);
     if (!i) return [];
     selfId = i.id;
     basis = (await extractText(env, i))?.text ?? i.title;
   }
-  const hits = (await search(env, v, { query: basis.slice(0, 2000), limit: Math.min(25, q.limit * 3) })).filter((r) => r.itemId !== selfId);
+  const hits = (await search(env, v, { query: basis.slice(0, 2000), limit: Math.min(25, q.limit * 3) }, scopes)).filter((r) => r.itemId !== selfId);
   const out: RelatedItem[] = [];
   let used = 0;
   for (const r of hits) {

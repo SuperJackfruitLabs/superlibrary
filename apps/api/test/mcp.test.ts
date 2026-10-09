@@ -36,6 +36,9 @@ describe('/mcp', () => {
     await withOrgPlane(async () => {
       const r = await SELF.fetch('https://api.test/.well-known/oauth-protected-resource/mcp');
       expect(r.status).toBe(200);
+      const body = (await r.json()) as { resource: string; authorization_servers: string[] };
+      expect(body.resource).toBe('https://api.test');
+      expect(body.authorization_servers).toEqual(['https://accounts.test']);
     });
   });
   it('every MCP result is a labelled library-item block, and the search is audited without its text', async () => {
