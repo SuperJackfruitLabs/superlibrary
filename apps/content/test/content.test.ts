@@ -187,6 +187,57 @@ describe('signed URLs', () => {
     expect(res.status).toBe(403);
     expect(await res.json()).toEqual({ error: 'expired' });
   });
+  it('an expired URL that a frame navigates to gets a page that tells the host, not JSON (PR 3 review)', async () => {
+    await seed(ITEM, 1, { 'notes.md': MD }, 'notes.md');
+    await seed(ITEM, 20, { 'index.html': HTML, 'docs/a b.html': HTML }, 'index.html');
+    const old = Math.floor(Date.now() / 1000) - 1;
+    const asFrame = { headers: { 'Sec-Fetch-Dest': 'iframe' } };
+    const cases: [string, string, Record<string, string>, string][] = [
+      ['/_view entry', `/_view?sig=${await token(ITEM, 1, { exp: old })}`, asFrame.headers, 'notes.md'],
+      ['/_view?path=', `/_view?sig=${await token(ITEM, 20, { exp: old })}&path=docs%2Fa%20b.html`, asFrame.headers, 'docs/a b.html'],
+      ['relative link in an HTML page', `/s/${await token(ITEM, 20, { exp: old })}/docs/a%20b.html`, asFrame.headers, 'docs/a b.html'],
+      ['opened top-level', `/s/${await token(ITEM, 20, { exp: old })}/index.html`, { 'Sec-Fetch-Dest': 'document' }, 'index.html'],
+    ];
+    for (const [name, url, headers, path] of cases) {
+      const res = await get(ITEM, url, { headers });
+      expect(res.status, name).toBe(403);
+      expect(res.headers.get('content-type'), name).toBe('text/html; charset=utf-8');
+      expect(res.headers.get('content-security-policy'), name).toBe(DOCUMENT_CSP);
+      expect(res.headers.get('cache-control'), name).toBe('no-store');
+      expect(res.headers.get('cross-origin-resource-policy'), name).toBe('same-site');
+      expect(res.headers.get('x-content-type-options'), name).toBe('nosniff');
+      const html = await res.text();
+      expect(JSON.parse(/<script id="sl-expired" type="application\/json">(.*?)<\/script>/s.exec(html)![1]!), name).toEqual({ host: APP, path });
+      expect(html, name).toContain('<script type="module" src="/_viewer/expired.js"></script>');
+      expect(html, name).not.toMatch(/<script>/);
+    }
+  });
+
+  it('an expired URL fetched as a subresource, or one whose signature fails, stays a JSON 403', async () => {
+    await seed(ITEM, 1, { 'notes.md': MD }, 'notes.md');
+    const old = Math.floor(Date.now() / 1000) - 1;
+    for (const dest of ['image', 'video', 'audio', 'script', 'empty']) {
+      const res = await get(ITEM, `/s/${await token(ITEM, 1, { exp: old })}/notes.md`, { headers: { 'Sec-Fetch-Dest': dest } });
+      expect(res.status, dest).toBe(403);
+      expect(await res.json(), dest).toEqual({ error: 'expired' });
+      // Readable by the opaque-origin frame (plan D2): under CORP same-site the browser blocks the
+      // refusal, and a media element then retries forever instead of failing (measured in Chromium).
+      expect(res.headers.get('cross-origin-resource-policy'), dest).toBe('cross-origin');
+      expect(res.headers.get('cache-control'), dest).toBe('no-store');
+    }
+    const stranger = (await crypto.subtle.generateKey({ name: 'Ed25519' }, true, ['sign', 'verify'])) as CryptoKeyPair;
+    const forged = await get(ITEM, `/_view?sig=${await token(ITEM, 1, { exp: old, key: stranger.privateKey })}`, { headers: { 'Sec-Fetch-Dest': 'iframe' } });
+    expect(await forged.json()).toEqual({ error: 'invalid_signature' });
+    const foreign = await get(ITEM, `/_view?sig=${await token(ITEM, 1, { exp: old, host: 'https://evil.test' })}`, { headers: { 'Sec-Fetch-Dest': 'iframe' } });
+    expect(await foreign.json()).toEqual({ error: 'host_not_allowed' });
+  });
+
+  it('an expired /_view for a version that is gone names no file', async () => {
+    const res = await get(ITEM, `/_view?sig=${await token(ITEM, 98, { exp: Math.floor(Date.now() / 1000) - 1 })}`, { headers: { 'Sec-Fetch-Dest': 'iframe' } });
+    expect(res.status).toBe(403);
+    expect(await res.text()).toContain('{"host":"https://app.test","path":""}');
+  });
+
   it('an expiry further out than five minutes is refused even when signed', async () => {
     const res = await get(ITEM, `/_view?sig=${await token(ITEM, 1, { exp: Math.floor(Date.now() / 1000) + 3600 })}`);
     expect(await res.json()).toEqual({ error: 'invalid_signature' });
@@ -255,9 +306,29 @@ describe('the content origin serves nothing else', () => {
     const etag = direct.headers.get('etag')!;
     const cached = await env.VIEWER.fetch(`https://${contentLabel(ITEM)}.content.test/_viewer/viewer.js`, { headers: { 'If-None-Match': etag } });
     expect(cached.status).toBe(304);
+    // The Worker answers the validator itself (PR 3 review): 304 for the current file, 200 otherwise.
     const again = await get(ITEM, '/_viewer/viewer.js', { headers: { 'If-None-Match': etag } });
-    expect(again.status).toBe(200);
-    expect(await again.text()).toContain('sl-data');
+    expect(again.status).toBe(304);
+    expect(again.headers.get('etag')).toBe(etag);
+    expect(again.headers.get('access-control-allow-origin')).toBe('*');
+    expect(await again.text()).toBe('');
+    const changed = await get(ITEM, '/_viewer/viewer.js', { headers: { 'If-None-Match': '"something-older"' } });
+    expect(changed.status).toBe(200);
+    expect(await changed.text()).toContain('sl-data');
+  });
+
+  it('entry files are revalidated on every use, hashed chunks kept for a year (PR 3 review)', async () => {
+    // An entry cached across a deploy would name lazy chunks that no longer exist.
+    for (const f of ['viewer.js', 'viewer.css', 'expired.js']) {
+      const res = await get(ITEM, `/_viewer/${f}`);
+      expect(res.status, f).toBe(200);
+      expect(res.headers.get('cache-control'), f).toBe('no-cache');
+      expect(res.headers.get('etag'), f).toMatch(/^(W\/)?".+"$/);
+    }
+    const chunk = /chunks\/[\w.-]+-[\w-]+\.js/.exec(await (await get(ITEM, '/_viewer/viewer.js')).text())![0];
+    const res = await get(ITEM, `/_viewer/${chunk}`);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('cache-control')).toBe('public, max-age=31536000, immutable');
   });
   it('an empty frame-ancestors configuration fails closed: 500 and nothing served', async () => {
     await seed(ITEM, 1, { 'notes.md': MD }, 'notes.md');
@@ -295,7 +366,7 @@ describe('caching never outlives the signed URL (plan D7)', () => {
       }
     }
   });
-  it('refusals and the redirect are never stored; the token-independent bundle keeps a short cache', async () => {
+  it('refusals and the redirect are never stored; the token-independent bundle is revalidated', async () => {
     await seed(ITEM, 1, { 'notes.md': MD }, 'notes.md');
     await seed(ITEM, 2, { 'index.html': HTML, 'style.css': CSS }, 'index.html');
     await seed(ITEM, 5, { 'v.txt': TXT }, 'v.txt');
@@ -316,7 +387,7 @@ describe('caching never outlives the signed URL (plan D7)', () => {
       await res.arrayBuffer();
       expect(res.headers.get('cache-control'), name).toBe('no-store');
     }
-    expect((await get(ITEM, '/_viewer/viewer.js')).headers.get('cache-control')).toBe('private, max-age=300');
+    expect((await get(ITEM, '/_viewer/viewer.js')).headers.get('cache-control')).toBe('no-cache');
   });
 });
 

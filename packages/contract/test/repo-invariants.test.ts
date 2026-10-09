@@ -24,10 +24,11 @@ function sources(dir: string): [string, string][] {
 
 describe('repository invariants', () => {
   it('the content Worker never writes R2 (plan D8: the binding cannot be made read-only)', () => {
-    const dir = join(ROOT, 'apps/content/src');
-    for (const f of readdirSync(dir)) {
-      const src = readFileSync(join(dir, f), 'utf8');
-      expect(src, f).not.toMatch(/\.\s*(put|delete|createMultipartUpload|resumeMultipartUpload)\s*\(/);
+    // Every file, at any depth: a helper in a subfolder writes R2 as surely as one at the top.
+    const files = sources('apps/content/src');
+    expect(files.map(([p]) => p)).toContain(join('apps/content/src', 'index.ts'));
+    for (const [p, src] of files) {
+      expect(src, p).not.toMatch(/\.\s*(put|delete|createMultipartUpload|resumeMultipartUpload)\s*\(/);
     }
     expect(read('apps/content/src/index.ts')).toContain(`export type ReadOnlyBucket = Pick<R2Bucket, 'get' | 'head'>;`);
   });
@@ -62,6 +63,13 @@ describe('repository invariants', () => {
       expect(src, p).not.toMatch(/authorization|bearer/i);
       expect(src, p).not.toMatch(/oauth|\bsign-?(in|on)\b|\blog-?(in|on)\b|\/auth\b|well-known|\bsession/i);
     }
+  });
+
+  it('the host SDK takes the frame sandbox from the contract, never its own copy', () => {
+    const files = sources('packages/embed/src');
+    expect(files.map(([p]) => p)).toContain(join('packages/embed/src', 'index.ts'));
+    for (const [p, src] of files) expect(src, p).not.toMatch(/allow-(scripts|popups|same-origin)/);
+    expect(read('packages/embed/src/index.ts')).toContain('export const SANDBOX = FRAME_SANDBOX;');
   });
 
   it('the content Worker is bound to the R2 bucket and its viewer files only', () => {

@@ -5,7 +5,7 @@
  */
 import { SOURCE_VIEWS, TEXT_VIEWS, encodePath, itemIdFromLabel, parseToken, signingMessage, type Manifest, type ViewerData } from '@superlibrary/contract';
 import { cacheUntil, documentHeaders, frameAncestors, subresourceHeaders, unconfiguredHeaders } from './headers';
-import { viewerPage } from './viewer-page';
+import { expiredPage, viewerPage } from './viewer-page';
 
 export type ReadOnlyBucket = Pick<R2Bucket, 'get' | 'head'>;
 
@@ -37,18 +37,42 @@ function verifyKey(env: Env): Promise<CryptoKey> {
   return keyCache.key;
 }
 
-async function verify(env: Env, itemId: string, token: string): Promise<{ version: number; host: string; exp: number } | Response> {
+type Grant = { version: number; host: string; exp: number };
+
+/**
+ * A grant, or `{ expired }` for a token that is genuine but has run out (signature, host and item all
+ * check), so a frame navigating with it can be told to ask its host for a new one.
+ */
+async function verify(env: Env, itemId: string, token: string): Promise<Grant | { expired: Grant } | Response> {
   // Before Task 21 Step 4 sets the key, refuse plainly rather than throw.
   if (!env.URL_SIGNING_PUBLIC_KEY) return refuse(env, 503, 'not_configured');
   const t = parseToken(token);
   if (!t) return refuse(env, 403, 'invalid_signature');
   const now = Math.floor(Date.now() / 1000);
-  if (t.exp <= now) return refuse(env, 403, 'expired');
   if (t.exp > now + MAX_AHEAD_S) return refuse(env, 403, 'invalid_signature');
   if (!frameAncestors(env).includes(t.host)) return refuse(env, 403, 'host_not_allowed');
   // The item comes from the hostname, never from the token: a URL opens only its own item.
   const ok = await crypto.subtle.verify('Ed25519', await verifyKey(env), t.sig, signingMessage({ itemId, version: t.version, exp: t.exp, host: t.host }));
-  return ok ? { version: t.version, host: t.host, exp: t.exp } : refuse(env, 403, 'invalid_signature');
+  if (!ok) return refuse(env, 403, 'invalid_signature');
+  const g = { version: t.version, host: t.host, exp: t.exp };
+  return t.exp <= now ? { expired: g } : g;
+}
+
+/** A navigation of the frame (or of a tab): the only requests that can show a page. */
+const isDocumentRequest = (request: Request) => ['iframe', 'frame', 'document'].includes(request.headers.get('sec-fetch-dest') ?? '');
+
+/**
+ * PR 3 review: a person keeps viewing past the five-minute URL (a relative link in an HTML page, a
+ * reload). A document navigation gets a page that posts `superlibrary:expired` to the signed host,
+ * which mints again; anything else keeps the JSON refusal.
+ */
+function expired(request: Request, env: Env, g: Grant, path: string): Response {
+  if (!isDocumentRequest(request)) {
+    // A subresource of the opaque-origin frame: CORP same-site would hide this refusal from it
+    // (plan D2), and a media element would then retry forever instead of failing.
+    return new Response(JSON.stringify({ error: 'expired' }), { status: 403, headers: subresourceHeaders(env, 'application/json') });
+  }
+  return new Response(request.method === 'HEAD' ? null : expiredPage(g.host, path), { status: 403, headers: documentHeaders(env, 'text/html; charset=utf-8') });
 }
 
 async function manifestOf(env: Env, itemId: string, version: number): Promise<Manifest | Response> {
@@ -135,6 +159,7 @@ async function raw(request: Request, env: Env, itemId: string, url: URL): Promis
   }
   const g = await verify(env, itemId, token);
   if (g instanceof Response) return g;
+  if ('expired' in g) return expired(request, env, g.expired, path);
   const m = await manifestOf(env, itemId, g.version);
   if (m instanceof Response) return m;
   const f = fileOf(m, path);
@@ -182,15 +207,33 @@ async function serve(request: Request, env: Env): Promise<Response> {
     // Unconditional: a 304 from the asset store would otherwise read as "not ok" and become a 404.
     const res = await env.VIEWER.fetch(new Request(url, { method: request.method }));
     if (!res.ok) return refuse(env, 404, 'not_found');
-    // The bundle is the same for every token and holds no artifact bytes: a short cache of its own.
+    // The bundle is the same for every token and holds no artifact bytes. Chunks have content hashes
+    // in their names, so they keep; the entry files (viewer.js, viewer.css, expired.js) are
+    // revalidated on every use, so one cached across a deploy never names a chunk that is gone.
     const headers = subresourceHeaders(env, res.headers.get('content-type') ?? 'application/octet-stream');
-    headers.set('Cache-Control', 'private, max-age=300');
+    const etag = res.headers.get('etag');
+    if (etag) headers.set('ETag', etag);
+    if (url.pathname.startsWith('/_viewer/chunks/')) {
+      headers.set('Cache-Control', 'public, max-age=31536000, immutable');
+    } else {
+      headers.set('Cache-Control', 'no-cache');
+      const asked = request.headers.get('if-none-match');
+      if (etag && asked && asked.split(',').some((t) => t.trim().replace(/^W\//, '') === etag.replace(/^W\//, ''))) {
+        await res.body?.cancel();
+        return new Response(null, { status: 304, headers });
+      }
+    }
     return new Response(res.body, { headers });
   }
   if (url.pathname === '/_view') {
     const token = url.searchParams.get('sig') ?? '';
     const g = await verify(env, itemId, token);
     if (g instanceof Response) return g;
+    if ('expired' in g) {
+      const asked = url.searchParams.get('path');
+      const m = asked === null ? await manifestOf(env, itemId, g.expired.version) : null;
+      return expired(request, env, g.expired, asked ?? (m && !(m instanceof Response) ? m.entry : ''));
+    }
     const m = await manifestOf(env, itemId, g.version);
     if (m instanceof Response) return m;
     // Operator: the host's Files list opens any file of the version (`path`, decoded once by

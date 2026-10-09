@@ -3,7 +3,7 @@
  * mints the URL with its own person's token; the frame needs no sign-in, so it works where
  * third-party storage is partitioned (Safari, iOS). The toolbar lives here, outside the sandbox.
  */
-import { LIMITS, MAX_FRAME_HEIGHT, SOURCE_VIEWS, isResizeMessage, type EmbedGrant, type FileEntry, type Theme } from '@superlibrary/contract';
+import { FRAME_SANDBOX, LIMITS, MAX_FRAME_HEIGHT, SOURCE_VIEWS, isExpiredMessage, isOpenMessage, isResizeMessage, isWebUrl, type EmbedGrant, type FileEntry, type Theme } from '@superlibrary/contract';
 import { icon, type IconName } from './icons';
 import { injectStyle } from './style';
 import { formatBytes, frameUrl, storeTheme, storedTheme, visibilityWords, type FrameView, type ShareInfo } from './view';
@@ -11,7 +11,8 @@ import { formatBytes, frameUrl, storeTheme, storedTheme, visibilityWords, type F
 export type { ShareInfo } from './view';
 export type { Theme } from '@superlibrary/contract';
 
-export const SANDBOX = 'allow-scripts allow-popups-to-escape-sandbox';
+/** The frame's sandbox: the contract's, so the SDK and the content Worker's CSP cannot drift apart. */
+export const SANDBOX = FRAME_SANDBOX;
 
 export interface MountOptions {
   itemId: string;
@@ -51,6 +52,9 @@ export interface Mounted {
 
 /** A grant this close to its expiry is minted again before it is used to open anything. */
 const STALE_MS = 15_000;
+/** An expired message reloads the frame at most this often, whatever the frame says. */
+const EXPIRED_EVERY_MS = 10_000;
+const TTL_MS = LIMITS.embedTtlSeconds * 1000;
 const THEME_NAMES: Record<Theme, string> = { system: 'System', light: 'Light', dark: 'Dark' };
 let mounts = 0;
 
@@ -197,27 +201,44 @@ export async function mountArtifact(el: HTMLElement, opts: MountOptions): Promis
   };
 
   // --- Grant freshness: the URL lives five minutes; anything opened after that needs a new one.
-  // Measured on this device's clock from when the grant arrived, never against `expiresAt` (the
-  // server's clock): a device clock that runs ahead would otherwise see every grant as stale.
+  // Its age is measured on this device's clock from when the grant arrived, never by comparing
+  // `expiresAt` (the server's clock) with now. The lifetime is `expiresAt` minus that arrival when
+  // it is plausible (5 s to 5 min), else five minutes: a clock far ahead or behind cannot make every
+  // grant look stale, so nothing loops.
   let receivedAt = Date.now();
-  const stale = () => Date.now() - receivedAt >= LIMITS.embedTtlSeconds * 1000 - STALE_MS;
-  const fresh = async (): Promise<EmbedGrant> => {
-    if (!stale()) return grant;
-    grant = await opts.getEmbedUrl({ itemId, version: grant.version });
+  const lifetime = () => {
+    const l = Date.parse(grant.expiresAt) - receivedAt;
+    return l >= 5000 && l <= TTL_MS ? l : TTL_MS;
+  };
+  const stale = () => Date.now() - receivedAt >= lifetime() - STALE_MS;
+  const accept = (g: EmbedGrant) => {
+    grant = g;
     receivedAt = Date.now();
+  };
+  // Every person's choice (a version, a file, source) takes a ticket; a grant that arrives for an
+  // older ticket is dropped, so the last choice wins whatever order the host answers in.
+  let epoch = 0;
+  /** The grant to use for ticket `mine`, minted again if stale; null if a later choice superseded it. */
+  const fresh = async (mine: number): Promise<EmbedGrant | null> => {
+    if (!stale()) return grant;
+    const g = await opts.getEmbedUrl({ itemId, version: grant.version });
+    if (mine !== epoch) return null;
+    accept(g);
     renderBar();
     return grant;
   };
 
   /** Point the frame at a view of the current version. */
   const show = async (next: Partial<FrameView>): Promise<void> => {
-    let g: EmbedGrant;
+    const mine = ++epoch;
+    let g: EmbedGrant | null;
     try {
-      g = await fresh();
+      g = await fresh(mine);
     } catch (e) {
-      showError(`This could not be opened: ${message(e)}`);
+      if (mine === epoch) showError(`This could not be opened: ${message(e)}`);
       return;
     }
+    if (!g || mine !== epoch) return;
     const before = view;
     view = { ...view, ...next };
     showError(null);
@@ -232,17 +253,22 @@ export async function mountArtifact(el: HTMLElement, opts: MountOptions): Promis
   };
 
   const setVersion = async (n: number): Promise<boolean> => {
-    if (n === grant.version) return true;
+    const mine = ++epoch;
+    if (n === grant.version) {
+      renderVersion();
+      return true;
+    }
     let g: EmbedGrant;
     try {
       g = await opts.getEmbedUrl({ itemId, version: n });
     } catch (e) {
+      if (mine !== epoch) return false;
       showError(`Version ${n} could not be opened: ${message(e)}`);
       renderVersion();
       return false;
     }
-    grant = g;
-    receivedAt = Date.now();
+    if (mine !== epoch) return false;
+    accept(g);
     explicitVersion = true;
     if (!versions.includes(g.version)) {
       versions.push(g.version);
@@ -265,9 +291,9 @@ export async function mountArtifact(el: HTMLElement, opts: MountOptions): Promis
   download.addEventListener('click', (e) => {
     if (!stale()) return;
     e.preventDefault();
-    fresh().then(
+    fresh(epoch).then(
       (g) => {
-        if (g.downloadUrl && !stale()) download.click(); // never a click loop
+        if (g?.downloadUrl && !stale()) download.click(); // never a click loop
       },
       (err: unknown) => showError(`The download could not start: ${message(err)}`),
     );
@@ -409,8 +435,47 @@ export async function mountArtifact(el: HTMLElement, opts: MountOptions): Promis
   type WebkitDoc = Document & { webkitFullscreenElement?: Element | null; webkitExitFullscreen?: () => void };
   type WebkitEl = HTMLElement & { webkitRequestFullscreen?: () => void };
   const nativeElement = () => document.fullscreenElement ?? (document as WebkitDoc).webkitFullscreenElement ?? null;
+  // While full screen the embed is a modal dialog: focus stays inside it (Tab wraps; a sentinel
+  // after the frame catches Tab out of the frame, one before the toolbar catches Shift+Tab where a
+  // browser skips the first control, as WebKit does without full keyboard access), and everything
+  // else on the page is inert.
+  const sentinel = make('span', { className: 'sl-sentinel', tabIndex: 0 });
+  const sentinelStart = make('span', { className: 'sl-sentinel sl-sentinel-start', tabIndex: 0 });
+  const tabbables = () =>
+    [...root.querySelectorAll<HTMLElement>('button, a[href], select, input, iframe')].filter(
+      (c) => !c.closest('[hidden]') && !(c as HTMLButtonElement).disabled,
+    );
+  sentinel.addEventListener('focus', () => tabbables()[0]?.focus());
+  sentinelStart.addEventListener('focus', () => tabbables().at(-1)?.focus());
+  let inerted: Element[] = [];
+  let contained = false;
+  const contain = (on: boolean) => {
+    if (on === contained) return;
+    contained = on;
+    if (on) {
+      root.setAttribute('role', 'dialog');
+      root.setAttribute('aria-modal', 'true');
+      root.setAttribute('aria-label', `${opts.title ?? 'Superlibrary artifact'}, full screen`);
+      root.prepend(sentinelStart);
+      root.append(sentinel);
+      for (let n: Element = root; n !== document.body && n.parentElement; n = n.parentElement) {
+        for (const sib of n.parentElement.children) {
+          if (sib === n || sib.hasAttribute('inert')) continue;
+          sib.setAttribute('inert', '');
+          inerted.push(sib);
+        }
+      }
+    } else {
+      for (const a of ['role', 'aria-modal', 'aria-label']) root.removeAttribute(a);
+      sentinel.remove();
+      sentinelStart.remove();
+      for (const sib of inerted) sib.removeAttribute('inert');
+      inerted = [];
+    }
+  };
   const syncFullscreen = () => {
     const on = overlay || nativeElement() === root;
+    contain(on);
     const label = on ? 'Exit full screen' : 'Full screen';
     fsBtn.setAttribute('aria-pressed', String(on));
     fsBtn.setAttribute('aria-label', label);
@@ -460,9 +525,33 @@ export async function mountArtifact(el: HTMLElement, opts: MountOptions): Promis
   document.addEventListener('webkitfullscreenchange', onFullscreenChange);
 
   const onKey = (e: KeyboardEvent) => {
+    if (e.defaultPrevented || !root.isConnected) return;
+    if (e.key === 'Tab' && contained) {
+      const stops = tabbables();
+      const first = stops[0];
+      const last = stops.at(-1);
+      const active = document.activeElement;
+      if (!first || !last) return;
+      if (!e.shiftKey && (active === last || !root.contains(active))) {
+        e.preventDefault();
+        first.focus();
+      } else if (e.shiftKey && (active === first || !root.contains(active))) {
+        e.preventDefault();
+        last.focus();
+      }
+      return;
+    }
     if (e.key !== 'Escape') return;
-    if (openPanel) closePanel(true);
-    else if (overlay) exitFullscreen();
+    // Document-wide only for the overlay; a panel answers an Escape from inside the embed. Focus in
+    // the frame never reaches here: the toolbar's exit button is the way out from there.
+    const inside = e.target instanceof Node && root.contains(e.target);
+    if (openPanel && inside) {
+      e.preventDefault();
+      closePanel(true);
+    } else if (overlay) {
+      e.preventDefault();
+      exitFullscreen();
+    }
   };
   const onPointer = (e: Event) => {
     if (openPanel && e.target instanceof Node && !root.contains(e.target)) closePanel(false);
@@ -473,8 +562,38 @@ export async function mountArtifact(el: HTMLElement, opts: MountOptions): Promis
   // The frame's origin is opaque, so its messages arrive with origin "null": identity is the
   // frame's own window (plan D18). Anything else is ignored.
   const onMessage = (e: MessageEvent) => {
-    if (e.source !== iframe.contentWindow || e.origin !== 'null' || !isResizeMessage(e.data)) return;
-    iframe.style.height = `${Math.min(Math.ceil(e.data.height), MAX_FRAME_HEIGHT)}px`;
+    if (e.source !== iframe.contentWindow || e.origin !== 'null') return;
+    if (isResizeMessage(e.data)) iframe.style.height = `${Math.min(Math.ceil(e.data.height), MAX_FRAME_HEIGHT)}px`;
+    // The sandbox grants no popups (spec §9), so a link in a rendered file asks the host. Only
+    // http(s): never javascript:, data: or anything else a file could name.
+    else if (isOpenMessage(e.data) && isWebUrl(e.data.url)) window.open(e.data.url, '_blank', 'noopener,noreferrer');
+    else if (isExpiredMessage(e.data)) void onExpired(e.data.path);
+  };
+
+  // A URL ran out while the frame used it (a relative link, a media range request, a late image):
+  // mint the same version again and reload the same view. Only for a grant old enough to have
+  // expired, and at most once every 10 s, so a file that fails for another reason cannot loop.
+  let lastExpiredReload = -Infinity;
+  const onExpired = async (path: string) => {
+    if (!stale() || Date.now() - lastExpiredReload < EXPIRED_EVERY_MS) return;
+    lastExpiredReload = Date.now();
+    const mine = epoch;
+    let g: EmbedGrant;
+    try {
+      g = await opts.getEmbedUrl({ itemId, version: grant.version });
+    } catch (err) {
+      if (mine === epoch) showError(`This could not be opened again: ${message(err)}`);
+      return;
+    }
+    if (mine !== epoch) return;
+    accept(g);
+    // An HTML page can move to another page of the version by itself; reload where it was.
+    const moved = files().find((f) => f.path === path && f.view === 'html' && path !== view.path);
+    if (moved) view = { ...view, path: moved.path, source: false };
+    iframe.setAttribute('src', frameUrl(g, view));
+    iframe.style.height = initialHeight;
+    renderFiles();
+    renderBar();
   };
   window.addEventListener('message', onMessage);
 
@@ -497,6 +616,7 @@ export async function mountArtifact(el: HTMLElement, opts: MountOptions): Promis
       document.removeEventListener('fullscreenchange', onFullscreenChange);
       document.removeEventListener('webkitfullscreenchange', onFullscreenChange);
       if (overlay) leaveOverlay();
+      contain(false);
       if (nativeElement() === root) exitFullscreen();
       root.remove();
     },

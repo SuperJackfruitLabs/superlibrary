@@ -10,7 +10,7 @@ toolbar around it lives in the host page and has:
 | **View source** | For text-backed kinds (HTML, SVG, Markdown, code, JSON, CSV…): the content viewer shows the file as highlighted source (`/_view?…&source=1`), still sandboxed. |
 | **Theme** | System (default), Light or Dark. Remembered on this device (`localStorage` key `superlibrary:theme`), sent to the frame. |
 | **Download** | Single-file versions only (a folder has none in phase 1). |
-| **Full screen** | The Fullscreen API on the whole embed; a fixed overlay where there is none (iPhone Safari) or it is refused. The same button, or Escape, exits. |
+| **Full screen** | The Fullscreen API on the whole embed; a fixed overlay where there is none (iPhone Safari) or it is refused. While full screen the embed is a modal dialog (`role="dialog"`, `aria-modal`, named "<title>, full screen"): Tab and Shift+Tab wrap inside it, and the rest of the page is `inert`. The same button, or Escape, exits, and focus returns to the button. Escape works while focus is in the toolbar; keys pressed inside the frame never reach the host page, so from there the exit button is the way out. |
 | **Open in new window** | `https://app.superlibrary.dev/a/<id>[/v/<n>]`. |
 | **Share** | Who can see the item, in words; widening it to the workspace, for a person allowed to; **Copy link** and **Share…** (the system share sheet, or a copy where there is none). The link is always the app link, never a content URL. There are no public links. |
 
@@ -67,7 +67,7 @@ view.destroy();
 | Option | Required | |
 |---|---|---|
 | `itemId` | yes | `itm_` + 16 hex. |
-| `getEmbedUrl({ itemId, version? })` | yes | Resolves to the API's `EmbedGrant` (`url`, `expiresAt`, `version`, `entry`, `files`, `downloadUrl`, `itemUrl`). Called at mount, on a version switch, and again when the grant is within 15 s of its five-minute expiry and the person opens a file, a source view or a download. It is then called with the shown `version`. |
+| `getEmbedUrl({ itemId, version? })` | yes | Resolves to the API's `EmbedGrant` (`url`, `expiresAt`, `version`, `entry`, `files`, `downloadUrl`, `itemUrl`). Called at mount and on a version switch. It is called again, with the shown `version`, when the grant is within 15 s of its lifetime and the person opens a file, a source view or a download, and when the frame reports an expired URL. The lifetime is measured on the device's clock from when the grant arrived. When answers arrive out of order, the person's last choice wins. |
 | `version` | | Show this version; the toolbar links to `/a/<id>/v/<n>`. Without it, the newest live version and `/a/<id>`. |
 | `getVersions({ itemId })` | | Live version numbers. A failure only hides the menu. |
 | `getShareInfo({ itemId })` | | `{ scope, boardVisible?, canWiden, title? }`, read each time Share opens. `scope` is the API's `ItemSummary.scope`. The words: `workspace` reads "Everyone in the workspace"; a `board:` item reads "Only you" (in phase 1 only its uploader can see it, plan D11), or "This board" when `boardVisible` is true (phase 3). `canWiden`: the person is the uploader or an owner. Agents never reach this, since the API refuses them (D13). |
@@ -91,8 +91,8 @@ only; every control keeps its accessible name.
   token signs only the item, version, expiry and host, so the toolbar adds `/_view` parameters
   without a new grant: `path=<file>` (absent for the entry; an HTML file answers with a redirect
   to `/s/<token>/<path>`, so its relative links keep working), `source=1` (show the file as source)
-  and `theme=light|dark` (the initial theme, so the frame does not flash the system theme; absent
-  for `system`).
+  and `theme=light|dark|system` (the initial theme, so the frame does not flash the system theme;
+  the SDK leaves it out for `system`, which is the frame's default).
 - **Frame to host:** `{ type: "superlibrary:resize", height }`, posted to the host origin signed
   into the token. The SDK accepts it only from its own frame (`event.source`), with origin `"null"`
   (the frame is sandboxed without `allow-same-origin`, so its origin is opaque), with a finite
@@ -102,5 +102,17 @@ only; every control keeps its accessible name.
   target origin `"*"` (an opaque origin cannot be named). The SDK sends it on every frame load and
   every theme change; the frame accepts it only from the signed host. Without any message, the
   frame follows the system.
+- **Frame to host:** `{ type: "superlibrary:expired", path }` — a URL ran out while the frame used
+  it. The content origin answers a document navigation with an expired but genuine URL (a relative
+  link in an HTML page, a reload) with a small page that posts it; the viewer posts it when an
+  image of the version fails, or an audio or video fails or stalls (Chromium hides a refused range
+  request from the media element, which then retries and stalls instead of failing). The SDK (same `source` and `"null"` checks as resize)
+  mints the same version again through `getEmbedUrl` and reloads the same view (file, source,
+  theme); if the frame had moved to another HTML page of the version, it reloads that page. It acts
+  only when its grant is old enough to have expired, and at most once every 10 seconds.
+- **Frame to host:** `{ type: "superlibrary:open", url }` — the person clicked an http(s) link in a
+  rendered file (Markdown, notebook Markdown, Graphviz node URLs). The sandbox grants no popups,
+  so the SDK opens it with `window.open(url, "_blank", "noopener,noreferrer")`, and only for
+  `http:` and `https:` URLs. HTML artifacts render their own page and handle their own links.
 
 The URL lives five minutes; the SDK mints a new one before it opens anything after that.

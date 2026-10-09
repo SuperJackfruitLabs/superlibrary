@@ -12,8 +12,9 @@ export default defineConfig({
     chunkSizeWarningLimit: 2000,
     modulePreload: { polyfill: false },
     rollupOptions: {
-      input: { viewer: 'viewer/main.ts' },
-      output: { entryFileNames: 'viewer.js', chunkFileNames: 'chunks/[name]-[hash].js', assetFileNames: 'viewer.[ext]' },
+      // Two entries: the viewer, and the expired page's script (content Worker, `expiredPage`).
+      input: { viewer: 'viewer/main.ts', expired: 'viewer/expired.ts' },
+      output: { entryFileNames: '[name].js', chunkFileNames: 'chunks/[name]-[hash].js', assetFileNames: 'viewer.[ext]' },
     },
   },
 });

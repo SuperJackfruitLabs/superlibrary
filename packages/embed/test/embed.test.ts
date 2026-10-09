@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { EmbedGrant } from '@superlibrary/contract';
+import { FRAME_SANDBOX, type EmbedGrant } from '@superlibrary/contract';
 import { SANDBOX, mountArtifact, type ShareInfo } from '../src/index';
 
 const ORIGIN = 'https://itm-00000000000000a1.superlibrarycontent.dev';
@@ -64,6 +64,7 @@ describe('mountArtifact', () => {
     const m = await mount();
     expect(m.iframe.getAttribute('sandbox')).toBe(SANDBOX);
     expect(SANDBOX).toBe('allow-scripts allow-popups-to-escape-sandbox');
+    expect(SANDBOX).toBe(FRAME_SANDBOX);
     expect(m.iframe.getAttribute('referrerpolicy')).toBe('no-referrer');
     expect(m.iframe.getAttribute('src')).toBe(GRANT.url);
     expect(m.iframe.style.height).toBe('480px');
@@ -631,5 +632,261 @@ describe('(3) Open in new window, and the toolbar\'s accessible names', () => {
     await mount({ getEmbedUrl: async () => FOLDER, getVersions: async () => [3, 2] });
     const names = [...el.querySelectorAll<HTMLElement>('.sl-toolbar button, .sl-toolbar a, .sl-toolbar select')].map((c) => c.getAttribute('aria-label') ?? c.textContent);
     expect(names).toEqual(['Version', 'Files (4)', 'View source', 'Theme', 'Full screen', 'Open in new window', 'Share']);
+  });
+});
+
+describe('PR 3 review: full-screen overlay contains focus', () => {
+  const fs = () => q<HTMLButtonElement>('button.sl-fullscreen')!;
+  const tab = (target: Element, shiftKey = false) => {
+    const ev = new KeyboardEvent('keydown', { key: 'Tab', shiftKey, bubbles: true, cancelable: true });
+    target.dispatchEvent(ev);
+    return ev;
+  };
+  const enter = async () => {
+    fs().click();
+    await flush();
+  };
+
+  it('is a named modal dialog while open, and not after', async () => {
+    await mount({ title: 'Q3 notes' });
+    const root = q('.sl-embed')!;
+    expect(root.hasAttribute('role')).toBe(false);
+    await enter();
+    expect(root.getAttribute('role')).toBe('dialog');
+    expect(root.getAttribute('aria-modal')).toBe('true');
+    expect(root.getAttribute('aria-label')).toBe('Q3 notes, full screen');
+    fs().click();
+    expect(root.hasAttribute('role')).toBe(false);
+    expect(root.hasAttribute('aria-modal')).toBe(false);
+  });
+
+  it('makes everything outside the embed inert at every level up to <body>, and restores only what it changed', async () => {
+    document.body.innerHTML = '<header id="h">h</header><main id="m"><p id="s">s</p><section id="w"></section><aside id="a" inert>a</aside></main>';
+    el = document.getElementById('w')!;
+    const before = el.appendChild(document.createElement('span')); // the host's own sibling inside el
+    await mount();
+    const inert = (id: string) => document.getElementById(id)!.hasAttribute('inert');
+    await enter();
+    expect([inert('h'), inert('s'), inert('a'), before.hasAttribute('inert')]).toEqual([true, true, true, true]);
+    expect([inert('m'), inert('w'), q('.sl-embed')!.hasAttribute('inert')]).toEqual([false, false, false]);
+    document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect([inert('h'), inert('s'), before.hasAttribute('inert')]).toEqual([false, false, false]);
+    expect(inert('a')).toBe(true); // it was inert before; it stays so
+  });
+
+  it('Tab from the last control lands on the first; Shift+Tab from the first lands on the last', async () => {
+    const m = await mount({ getVersions: async () => [3, 2] });
+    await enter();
+    const first = q('select.sl-versions')!;
+    // The frame is the last stop: from inside it, the browser moves on to the sentinel after it.
+    m.iframe.focus();
+    expect(tab(m.iframe).defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(first);
+    expect(tab(first, true).defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(m.iframe);
+    q<HTMLElement>('.sl-sentinel:not(.sl-sentinel-start)')!.focus();
+    expect(document.activeElement).toBe(first);
+    q<HTMLElement>('.sl-sentinel-start')!.focus();
+    expect(document.activeElement).toBe(m.iframe);
+    // In between, Tab is the browser's own.
+    fs().focus();
+    expect(tab(fs()).defaultPrevented).toBe(false);
+  });
+
+  it('Tab is left alone when the overlay is not open', async () => {
+    const m = await mount();
+    m.iframe.focus();
+    expect(tab(m.iframe).defaultPrevented).toBe(false);
+    expect(q('.sl-sentinel')).toBeNull();
+  });
+});
+
+describe('PR 3 review: an expired URL is minted again', () => {
+  const later = { ...FOLDER, url: `${ORIGIN}/_view?sig=F`, expiresAt: '2026-10-09T00:10:00.000Z' };
+  const at = (iso: string) => vi.setSystemTime(new Date(iso));
+  const expired = (m: { iframe: HTMLIFrameElement }, path: string, origin = 'null', source: MessageEventSource | null = m.iframe.contentWindow) =>
+    post({ type: 'superlibrary:expired', path }, source, origin);
+
+  it('reloads the same view (file, source, theme) from a new grant for the same version', async () => {
+    localStorage.setItem('superlibrary:theme', 'dark');
+    const getEmbedUrl = vi.fn(async ({ version }: { version?: number }) => (version === undefined ? FOLDER : later));
+    const m = await mount({ getEmbedUrl });
+    q<HTMLButtonElement>('button.sl-files-toggle')!.click();
+    el.querySelectorAll<HTMLButtonElement>('button.sl-file')[3]!.click();
+    await flush();
+    q<HTMLButtonElement>('button.sl-source')!.click();
+    await flush();
+    at('2026-10-09T00:04:50.000Z');
+    expired(m, 'data.csv');
+    await flush();
+    expect(getEmbedUrl).toHaveBeenLastCalledWith({ itemId: ITEM, version: 3 });
+    expect(m.iframe.getAttribute('src')).toBe(`${ORIGIN}/_view?sig=F&path=data.csv&source=1&theme=dark`);
+  });
+
+  it('only from its own frame, with the opaque origin', async () => {
+    const getEmbedUrl = vi.fn(async () => FOLDER);
+    const m = await mount({ getEmbedUrl });
+    at('2026-10-09T00:04:50.000Z');
+    const other = document.body.appendChild(document.createElement('iframe'));
+    expired(m, 'index.html', 'null', other.contentWindow);
+    expired(m, 'index.html', 'https://evil.test');
+    post({ type: 'superlibrary:expired', path: 7 }, m.iframe.contentWindow);
+    await flush();
+    expect(getEmbedUrl).toHaveBeenCalledTimes(1);
+  });
+
+  it('at most once every 10 seconds', async () => {
+    const getEmbedUrl = vi.fn(async ({ version }: { version?: number }) => (version === undefined ? FOLDER : { ...later, expiresAt: '2026-10-09T00:04:56.000Z' }));
+    const m = await mount({ getEmbedUrl });
+    at('2026-10-09T00:04:50.000Z');
+    expired(m, 'index.html');
+    await flush();
+    expect(getEmbedUrl).toHaveBeenCalledTimes(2);
+    at('2026-10-09T00:04:55.000Z'); // the new grant is stale already, but 5 s is too soon
+    expired(m, 'index.html');
+    await flush();
+    expect(getEmbedUrl).toHaveBeenCalledTimes(2);
+    at('2026-10-09T00:05:01.000Z');
+    expired(m, 'index.html');
+    await flush();
+    expect(getEmbedUrl).toHaveBeenCalledTimes(3);
+  });
+
+  it('ignores it while its grant is fresh: a file that fails for another reason never loops', async () => {
+    const getEmbedUrl = vi.fn(async () => FOLDER);
+    const m = await mount({ getEmbedUrl });
+    at('2026-10-09T00:00:10.000Z');
+    expired(m, 'a/pic.png');
+    await flush();
+    expect(getEmbedUrl).toHaveBeenCalledTimes(1);
+  });
+
+  it('a grant shorter than five minutes is stale by its own lifetime', async () => {
+    const short = { ...FOLDER, expiresAt: '2026-10-09T00:00:20.000Z' };
+    const getEmbedUrl = vi.fn(async ({ version }: { version?: number }) => (version === undefined ? short : later));
+    const m = await mount({ getEmbedUrl });
+    at('2026-10-09T00:00:21.000Z');
+    expired(m, 'index.html');
+    await flush();
+    expect(getEmbedUrl).toHaveBeenCalledTimes(2);
+  });
+
+  it('an HTML page the frame navigated to is where it reloads; a failed image is not', async () => {
+    const getEmbedUrl = vi.fn(async ({ version }: { version?: number }) => (version === undefined ? { ...FOLDER, files: [...FOLDER.files, { path: 'about.html', mediaType: 'text/html', view: 'html' as const, bytes: 5 }] } : { ...later, files: [...FOLDER.files, { path: 'about.html', mediaType: 'text/html', view: 'html' as const, bytes: 5 }] }));
+    const m = await mount({ getEmbedUrl });
+    at('2026-10-09T00:04:50.000Z');
+    expired(m, 'about.html');
+    await flush();
+    expect(m.iframe.getAttribute('src')).toBe(`${ORIGIN}/_view?sig=F&path=about.html`);
+    q<HTMLButtonElement>('button.sl-files-toggle')!.click();
+    expect(el.querySelector('button.sl-file[aria-current] .sl-file-path')!.textContent).toBe('about.html');
+    at('2026-10-09T00:10:00.000Z');
+    expired(m, 'a/pic.png');
+    await flush();
+    expect(new URL(m.iframe.getAttribute('src')!).searchParams.get('path')).toBe('about.html');
+  });
+});
+
+describe('PR 3 review: links in rendered files open through the host', () => {
+  const open = (m: { iframe: HTMLIFrameElement }, url: unknown, origin = 'null', source: MessageEventSource | null = m.iframe.contentWindow) =>
+    post({ type: 'superlibrary:open', url }, source, origin);
+
+  it('opens http(s) in a new window without opener or referrer', async () => {
+    const win = vi.spyOn(window, 'open').mockImplementation(() => null);
+    const m = await mount();
+    open(m, 'https://example.com/a?b=1');
+    open(m, 'http://example.com/');
+    expect(win.mock.calls).toEqual([['https://example.com/a?b=1', '_blank', 'noopener,noreferrer'], ['http://example.com/', '_blank', 'noopener,noreferrer']]);
+  });
+
+  it('never opens javascript:, data: or anything else, nor anything from another frame or origin', async () => {
+    const win = vi.spyOn(window, 'open').mockImplementation(() => null);
+    const m = await mount();
+    for (const url of ['javascript:alert(1)', ' JavaScript:alert(1)', 'data:text/html,<script>1</script>', 'blob:https://x.test/1', 'file:///etc/passwd', '/a', 42]) open(m, url);
+    const other = document.body.appendChild(document.createElement('iframe'));
+    open(m, 'https://example.com/', 'null', other.contentWindow);
+    open(m, 'https://example.com/', 'https://evil.test');
+    expect(win).not.toHaveBeenCalled();
+  });
+});
+
+describe('PR 3 review: the last version chosen wins', () => {
+  const deferred = <T,>() => {
+    let resolve!: (v: T) => void;
+    const promise = new Promise<T>((r) => { resolve = r; });
+    return { promise, resolve };
+  };
+  const byVersion = (v: number): EmbedGrant => ({ ...GRANT, version: v, url: `${ORIGIN}/_view?sig=V${v}` });
+
+  it('a slow earlier switch landing last does not undo a later one', async () => {
+    const slow = deferred<EmbedGrant>();
+    const getEmbedUrl = vi.fn(async ({ version }: { version?: number }) => (version === 2 ? slow.promise : byVersion(version ?? 3)));
+    const m = await mount({ getEmbedUrl, getVersions: async () => [3, 2, 1] });
+    const two = m.setVersion(2);
+    const one = await m.setVersion(1);
+    slow.resolve(byVersion(2));
+    expect(await two).toBe(false);
+    expect(one).toBe(true);
+    expect(m.iframe.getAttribute('src')).toBe(`${ORIGIN}/_view?sig=V1`);
+    expect(q('.sl-version')!.textContent).toBe('v1');
+    expect(q<HTMLSelectElement>('select.sl-versions')!.value).toBe('1');
+  });
+
+  it('a re-mint for a file opened on the old version, landing after a switch, is dropped', async () => {
+    const slow = deferred<EmbedGrant>();
+    let calls = 0;
+    const getEmbedUrl = vi.fn(async ({ version }: { version?: number }) => {
+      calls++;
+      if (version === undefined) return FOLDER;
+      if (version === 3) return slow.promise; // the stale grant's re-mint
+      return byVersion(version);
+    });
+    const m = await mount({ getEmbedUrl, getVersions: async () => [3, 2] });
+    vi.setSystemTime(new Date('2026-10-09T00:04:55.000Z'));
+    q<HTMLButtonElement>('button.sl-files-toggle')!.click();
+    el.querySelectorAll<HTMLButtonElement>('button.sl-file')[1]!.click();
+    await m.setVersion(2);
+    slow.resolve({ ...FOLDER, url: `${ORIGIN}/_view?sig=OLD` });
+    await flush();
+    expect(calls).toBe(3);
+    expect(m.iframe.getAttribute('src')).toBe(`${ORIGIN}/_view?sig=V2`);
+    expect(q('.sl-version')!.textContent).toBe('v2');
+    // The dropped grant was not kept either: what opens next is still version 2's.
+    q<HTMLButtonElement>('button.sl-source')!.click();
+    await flush();
+    expect(m.iframe.getAttribute('src')).toBe(`${ORIGIN}/_view?sig=V2&source=1`);
+  });
+});
+
+describe('PR 3 review: Escape belongs to the SDK only when it acts', () => {
+  it('ignores an Escape another handler already took, and one from outside the embed', async () => {
+    await mount();
+    q<HTMLButtonElement>('button.sl-share-toggle')!.click();
+    await flush();
+    const panel = q('.sl-share-panel')!;
+    const taken = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+    taken.preventDefault();
+    q<HTMLElement>('button.sl-copy')!.dispatchEvent(taken);
+    expect(panel.hidden).toBe(false);
+    const outside = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+    document.body.dispatchEvent(outside);
+    expect(panel.hidden).toBe(false);
+    expect(outside.defaultPrevented).toBe(false);
+  });
+
+  it('consumes the Escape it acts on', async () => {
+    await mount();
+    q<HTMLButtonElement>('button.sl-share-toggle')!.click();
+    await flush();
+    const ev = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+    q<HTMLElement>('button.sl-copy')!.dispatchEvent(ev);
+    expect(q('.sl-share-panel')!.hidden).toBe(true);
+    expect(ev.defaultPrevented).toBe(true);
+    q<HTMLButtonElement>('button.sl-fullscreen')!.click();
+    await flush();
+    const ev2 = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+    document.body.dispatchEvent(ev2);
+    expect(ev2.defaultPrevented).toBe(true);
+    expect(q('.sl-embed')!.classList.contains('sl-overlay')).toBe(false);
   });
 });

@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { applyTheme, listenForTheme, reportHeight, themeFromQuery } from '../protocol';
+import { applyTheme, listenForLinks, listenForTheme, reportExpiredMedia, reportHeight, themeFromQuery } from '../protocol';
+import { announceExpired } from '../expired';
 
 const HOST = 'https://app.superlibrary.dev';
 afterEach(() => vi.restoreAllMocks());
@@ -62,5 +63,95 @@ describe('theme (operator: light, dark, or the system’s)', () => {
     const css = readFileSync(resolve('viewer/viewer.css'), 'utf8') // vitest runs from apps/content;
     // The page's own colours turn dark with the system unless the host pinned light.
     expect(css).toMatch(/@media \(prefers-color-scheme: dark\) \{ :root:not\(\[data-theme='light'\]\) \{ --fg: #f5f5f7; --bg: #1c1c1e;/);
+  });
+});
+
+describe('links in rendered files open through the host (PR 3 review: the sandbox has no allow-popups)', () => {
+  const BASE = 'https://itm-00000000000000a1.content.test/s/T/';
+  const click = (a: Element, init: MouseEventInit = {}) => {
+    const ev = new MouseEvent('click', { bubbles: true, cancelable: true, ...init });
+    a.dispatchEvent(ev);
+    return ev;
+  };
+  const setup = (html: string) => {
+    document.body.innerHTML = `<main id="app">${html}</main>`;
+    const post = vi.spyOn(window.parent, 'postMessage').mockImplementation(() => {});
+    const stop = listenForLinks(HOST, document.getElementById('app')!);
+    return { post, stop };
+  };
+
+  it('an http(s) link is posted to the signed host, not followed', () => {
+    const { post, stop } = setup('<article class="markdown"><p><a href="https://example.com/x?y=1"><em>go</em></a> <a href="http://example.org">b</a></p></article>');
+    const ev = click(document.querySelector('em')!);
+    expect(ev.defaultPrevented).toBe(true);
+    expect(post).toHaveBeenCalledWith({ type: 'superlibrary:open', url: 'https://example.com/x?y=1' }, HOST);
+    click(document.querySelectorAll('a')[1]!, { button: 1 });
+    expect(post).toHaveBeenLastCalledWith({ type: 'superlibrary:open', url: 'http://example.org/' }, HOST);
+    stop();
+  });
+
+  it('a Graphviz node URL (an SVG <a>) is posted the same way', () => {
+    const { post, stop } = setup('<figure class="diagram"><svg xmlns="http://www.w3.org/2000/svg"><a href="https://example.com/node"><text>n</text></a><a xlink:href="https://example.com/old" xmlns:xlink="http://www.w3.org/1999/xlink"><text>o</text></a></svg></figure>');
+    click(document.querySelector('text')!);
+    expect(post).toHaveBeenCalledWith({ type: 'superlibrary:open', url: 'https://example.com/node' }, HOST);
+    click(document.querySelectorAll('text')[1]!);
+    expect(post).toHaveBeenLastCalledWith({ type: 'superlibrary:open', url: 'https://example.com/old' }, HOST);
+    stop();
+  });
+
+  it('javascript:, data: and other schemes are neither posted nor followed; in-page anchors and relative links are left alone', () => {
+    const { post, stop } = setup('<a id="j" href="javascript:alert(1)">j</a><a id="d" href="data:text/html,x">d</a><a id="m" href="mailto:a@b.test">m</a><a id="h" href="#part">h</a><a id="r" href="other.md">r</a>');
+    for (const id of ['j', 'd', 'm']) expect(click(document.getElementById(id)!).defaultPrevented, id).toBe(true);
+    for (const id of ['h', 'r']) expect(click(document.getElementById(id)!).defaultPrevented, id).toBe(false);
+    expect(post).not.toHaveBeenCalled();
+    stop();
+  });
+
+  it('a link outside the rendered file is not its business', () => {
+    document.body.innerHTML = '<main id="app"></main><a id="out" href="https://example.com/">x</a>';
+    const post = vi.spyOn(window.parent, 'postMessage').mockImplementation(() => {});
+    const stop = listenForLinks(HOST, document.getElementById('app')!);
+    expect(click(document.getElementById('out')!).defaultPrevented).toBe(false);
+    expect(post).not.toHaveBeenCalled();
+    stop();
+  });
+
+  it('a media element whose signed file fails reports the file as expired, decoded; others are ignored', () => {
+    document.body.innerHTML = '<main id="app"></main>';
+    const post = vi.spyOn(window.parent, 'postMessage').mockImplementation(() => {});
+    const stop = reportExpiredMedia(HOST, { baseUrl: BASE });
+    const app = document.getElementById('app')!;
+    const img = app.appendChild(document.createElement('img'));
+    img.src = `${BASE}docs/a%20b.png?x=1`;
+    img.dispatchEvent(new Event('error'));
+    expect(post).toHaveBeenCalledWith({ type: 'superlibrary:expired', path: 'docs/a b.png' }, HOST);
+    const video = app.appendChild(document.createElement('video'));
+    video.src = `${BASE}clip.mp4`;
+    video.dispatchEvent(new Event('error'));
+    expect(post).toHaveBeenLastCalledWith({ type: 'superlibrary:expired', path: 'clip.mp4' }, HOST);
+    // Chromium never fails a media element whose range request is refused: Opaque Response
+    // Blocking hides the 403, it retries, and only reports 'stalled' (measured on the dev Worker).
+    post.mockClear();
+    const audio = app.appendChild(document.createElement('audio'));
+    audio.src = `${BASE}tone.wav`;
+    audio.dispatchEvent(new Event('stalled'));
+    expect(post).toHaveBeenCalledWith({ type: 'superlibrary:expired', path: 'tone.wav' }, HOST);
+    img.dispatchEvent(new Event('stalled'));
+    expect(post).toHaveBeenCalledTimes(1);
+    post.mockClear();
+    const cdn = app.appendChild(document.createElement('img'));
+    cdn.src = 'https://cdn.jsdelivr.net/x.png';
+    cdn.dispatchEvent(new Event('error'));
+    const script = app.appendChild(document.createElement('script'));
+    script.dispatchEvent(new Event('error'));
+    expect(post).not.toHaveBeenCalled();
+    stop();
+  });
+
+  it('the expired page tells the signed host which file ran out', () => {
+    document.body.innerHTML = '<script id="sl-expired" type="application/json">{"host":"https://app.superlibrary.dev","path":"docs/a b.html"}</script>';
+    const post = vi.spyOn(window.parent, 'postMessage').mockImplementation(() => {});
+    announceExpired();
+    expect(post).toHaveBeenCalledWith({ type: 'superlibrary:expired', path: 'docs/a b.html' }, HOST);
   });
 });

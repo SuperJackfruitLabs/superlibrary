@@ -306,6 +306,18 @@ open it in a new window.
   `{ type: "superlibrary:resize", height }` so the host can size it to its content, and the host
   may send `{ type: "superlibrary:theme", theme: "light" | "dark" | "system" }`, which the frame
   accepts only from the host signed into its URL. Without a message the frame follows the system.
+  Two more messages from the frame (PR 3 review, 2026-10-09):
+  - `{ type: "superlibrary:expired", path }`: the 5-minute URL ran out while the person was still
+    viewing (a relative link in an HTML page, a media range request, a late image). The content
+    origin answers a document navigation with an expired but genuine URL with a small `no-store`
+    403 page (same headers as every document; its one script from `'self'`) that posts it to the
+    signed host; other requests keep the JSON refusal. The viewer posts it when an image of the
+    version fails, or an audio or video fails or stalls. The host SDK mints the same version
+    again and reloads the same view, at most once every 10 seconds and only for a grant old
+    enough to have expired.
+  - `{ type: "superlibrary:open", url }`: a link clicked in a rendered file (Markdown, notebook
+    Markdown, Graphviz node URLs). The sandbox stays exactly as above, without `allow-popups`, so
+    the host opens it with `noopener,noreferrer`, and only for `http:` and `https:` URLs.
 - **Host SDK** `@superlibrary/embed`: `mountArtifact(el, { itemId, version?, getEmbedUrl, … })`
   renders the sandboxed frame and, outside the sandbox, a toolbar. Amended 2026-10-09 (operator):
   1. **Version** label (from the grant, never the item's latest number), with a menu of the live
@@ -320,8 +332,10 @@ open it in a new window.
      it where there is none. There are no public links.
   3. **Open in new window** (the app link).
   4. **Full screen**: the Fullscreen API on the whole embed, or a fixed overlay where there is
-     none (iPhone Safari) or it is refused. The same button and Escape exit; focus stays on the
-     control.
+     none (iPhone Safari) or it is refused. While it is open the embed is a named modal dialog:
+     focus is contained (Tab and Shift+Tab wrap inside it) and the rest of the page is inert. The
+     same button and Escape exit, and focus returns to the button. Keys pressed inside the frame
+     do not reach the host, so from there the button is the way out.
   5. **Theme**: System (default), Light or Dark, remembered per device, sent to the frame by the
      theme message and in the first URL.
   6. **Download** of a single-file version (a folder has none; §9 sandbox has no downloads).
