@@ -1,5 +1,6 @@
 // apps/api/test/ingest.test.ts
 import { createExecutionContext, createMessageBatch, env, getQueueResult } from 'cloudflare:test';
+import wranglerRaw from '../wrangler.jsonc?raw';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { IngestMessage } from '@superlibrary/contract';
 import { ORG, card, fakePipeline, type FakeState } from './helpers/fake-pipeline';
@@ -156,5 +157,63 @@ describe('ingestBatch', () => {
     ]);
     await ingestBatch(batch, env);
     expect(state.calls.filter((c) => c === `GET /v1/boards/${B}/cards/${C1}`)).toHaveLength(1);
+  });
+});
+
+describe('deletion is confirmed against the board', () => {
+  const sync = (cardId: string) => ({ id: 'z' + cardId, timestamp: new Date(), attempts: 1, body: { type: 'card.deleted' as const, workspaceId: ws, boardId: B, cardId } });
+  it('a card 404 while the board is forbidden or missing deletes nothing and retries', async () => {
+    await syncCard(env, { workspaceId: ws, boardId: B, cardId: C1 });
+    const real = globalThis.fetch;
+    globalThis.fetch = (async (i: RequestInfo | URL, init?: RequestInit) => {
+      const u = new URL(String(i instanceof Request ? i.url : i));
+      if (u.origin === 'https://pipeline.test' && u.pathname.includes(C1)) return new Response(null, { status: 404 });
+      if (u.origin === 'https://pipeline.test' && u.pathname === `/v1/boards/${B}`) return new Response(null, { status: 403 });
+      return real(i, init);
+    }) as typeof fetch;
+    try {
+      const batch = createMessageBatch<IngestMessage>('superlibrary-ingest', [sync(C1)]);
+      const ctx = createExecutionContext();
+      await ingestBatch(batch, env);
+      const res = await getQueueResult(batch, ctx);
+      expect(res.retryMessages.map((m: { msgId: string }) => m.msgId)).toEqual(['z' + C1]);
+      expect(await recordOf(C1)).not.toBeNull();
+    } finally { globalThis.fetch = real; }
+  });
+  it('a card 404 while the board answers 404 deletes nothing', async () => {
+    await syncCard(env, { workspaceId: ws, boardId: B, cardId: C1 });
+    state.boards.delete(B);
+    await expect(syncCard(env, { workspaceId: ws, boardId: B, cardId: C1 })).rejects.toThrow();
+    expect(await recordOf(C1)).not.toBeNull();
+  });
+  it('a card 404 with the board listing it is not a delete', async () => {
+    await syncCard(env, { workspaceId: ws, boardId: B, cardId: C1 });
+    const real = globalThis.fetch;
+    globalThis.fetch = (async (i: RequestInfo | URL, init?: RequestInit) => {
+      const u = new URL(String(i instanceof Request ? i.url : i));
+      return u.origin === 'https://pipeline.test' && u.pathname === `/v1/boards/${B}/cards/${C1}` ? new Response(null, { status: 404 }) : real(i, init);
+    }) as typeof fetch;
+    try { await expect(syncCard(env, { workspaceId: ws, boardId: B, cardId: C1 })).rejects.toThrow(); } finally { globalThis.fetch = real; }
+    expect(await recordOf(C1)).not.toBeNull();
+  });
+});
+
+describe('ingest operations', () => {
+  it('a message for an unknown workspace is acked and dropped, not retried', async () => {
+    const batch = createMessageBatch<IngestMessage>('superlibrary-ingest', [{ id: 'u', timestamp: new Date(), attempts: 1, body: { type: 'card.sync', workspaceId: 'wsp_nope', boardId: B, cardId: C1, reason: 'x' } }]);
+    const ctx = createExecutionContext();
+    await ingestBatch(batch, env);
+    const res = await getQueueResult(batch, ctx);
+    expect(res.explicitAcks).toEqual(['u']);
+    expect(res.retryMessages).toEqual([]);
+  });
+  it('the ingest consumer runs one invocation at a time (an older read must not overwrite a newer one)', () => {
+    const w = JSON.parse(wranglerRaw.replace(/("(?:\\.|[^"\\])*")|\/\/[^\n]*|\/\*[\s\S]*?\*\//g, (_: string, s?: string) => s ?? '').replace(/,(\s*[}\]])/g, '$1'));
+    expect(w.queues.consumers.find((c: { queue: string }) => c.queue === 'superlibrary-ingest').max_concurrency).toBe(1);
+  });
+  it('a record is built with its board id inside the size cap', async () => {
+    bundleOf(C1).card = card(C1, { title: 'T'.repeat(950_000) });
+    await syncCard(env, { workspaceId: ws, boardId: B, cardId: C1 });
+    expect(new TextEncoder().encode((await recordOf(C1)).body).length).toBeLessThanOrEqual(900_000);
   });
 });

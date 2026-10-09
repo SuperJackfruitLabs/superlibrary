@@ -54,7 +54,9 @@ export function pipelineFor(env: Env, org: string): SuperpipelineClient {
     async boards() { return (await call<{ boards: Array<{ id: string; name: string }> }>('GET', '/v1/boards')).json?.boards ?? []; },
     async snapshot(boardId) {
       const s = (await call<{ cards: PipelineCard[]; references: PipelineReference[] }>('GET', b(boardId))).json;
-      return { cards: s?.cards ?? [], references: s?.references ?? [] };
+      // A missing board is an error, never an empty one: callers must not read "no cards" from it.
+      if (!s) throw new PipelineError(404, `board ${boardId} not found`);
+      return { cards: s.cards ?? [], references: s.references ?? [] };
     },
     async cardBundle(boardId, cardId, snapshots) {
       const c = `${b(boardId)}/cards/${encodeURIComponent(cardId)}`;

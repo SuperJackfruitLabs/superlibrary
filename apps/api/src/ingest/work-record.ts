@@ -38,7 +38,7 @@ export function flattenSpec(spec: unknown, prefix = ''): string {
 
 const asText = (v: unknown) => (typeof v === 'string' ? v : flattenSpec(v));
 
-export function buildWorkRecord(b: CardBundle, appUrl: string): { record: WorkRecord; text: string } {
+export function buildWorkRecord(b: CardBundle, appUrl: string, boardId = ''): { record: WorkRecord; text: string } {
   const redactions: WorkRecord['redactions'] = [];
   const clean = (field: string, s: string) => {
     const r = redactSecrets(s);
@@ -76,7 +76,7 @@ export function buildWorkRecord(b: CardBundle, appUrl: string): { record: WorkRe
   const attempts = [...b.attempts].sort((x, y) => (x.startedAt ?? '').localeCompare(y.startedAt ?? ''));
   const record: WorkRecord = {
     schema: WORK_RECORD_SCHEMA,
-    boardId: '',
+    boardId,
     cardId: b.card.id,
     title: clean('title', b.card.title),
     spec: cleanValue('spec', b.card.spec),

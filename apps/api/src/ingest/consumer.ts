@@ -10,9 +10,12 @@ import { buildWorkRecord } from './work-record';
 
 const ACTOR = 'source:superpipeline';
 
+/** A message for a workspace that does not exist can never succeed: it is acked and dropped, not retried. */
+export class UnknownWorkspace extends Error {}
+
 async function orgOf(env: Env, workspaceId: string): Promise<string> {
   const w = await env.DB.prepare(`SELECT external_id FROM workspaces WHERE id = ?`).bind(workspaceId).first<{ external_id: string }>();
-  if (!w) throw new Error(`unknown workspace ${workspaceId}`);
+  if (!w) throw new UnknownWorkspace(`unknown workspace ${workspaceId}`);
   return w.external_id;
 }
 
@@ -38,10 +41,18 @@ export async function syncCard(
 ): Promise<'created' | 'updated' | 'unchanged' | 'deleted'> {
   const existing = await env.DB.prepare(`SELECT item_id, digest, board_id FROM work_records WHERE workspace_id = ? AND card_id = ?`).bind(m.workspaceId, m.cardId).first<{ item_id: string; digest: string; board_id: string }>();
   const boardId = existing?.board_id ?? m.boardId;
-  const bundle = await pipelineFor(env, await orgOf(env, m.workspaceId)).cardBundle(boardId, m.cardId, snapshots);
-  if (!bundle) return (await deleteCardRecord(env, m.workspaceId, m.cardId)) ? 'deleted' : 'unchanged';
-  const { record, text } = buildWorkRecord(bundle, env.APP_URL);
-  record.boardId = boardId;   // before hashing, so backfill equals live
+  const client = pipelineFor(env, await orgOf(env, m.workspaceId));
+  const bundle = await client.cardBundle(boardId, m.cardId, snapshots);
+  if (!bundle) {
+    // A 404 on the card alone proves nothing: a board that went forbidden or missing looks the same.
+    // Delete only when the board itself reads 200 and does not list the card; snapshot() throws
+    // otherwise and the message retries.
+    const snap = await (snapshots ? (snapshots.get(boardId) ?? snapshots.set(boardId, client.snapshot(boardId)).get(boardId)!) : client.snapshot(boardId));
+    if (snap.cards.some((c) => c.id === m.cardId)) throw new Error(`card ${m.cardId} read 404 but its board lists it; retry`);
+    return (await deleteCardRecord(env, m.workspaceId, m.cardId)) ? 'deleted' : 'unchanged';
+  }
+  // The board id goes in before the size cap and the hash, so backfill equals live.
+  const { record, text } = buildWorkRecord(bundle, env.APP_URL, boardId);
   const body = JSON.stringify(record);
   const digest = await sha256Hex(body);
   if (existing?.digest === digest) return 'unchanged';
@@ -85,23 +96,30 @@ export async function syncCard(
 
 export async function ingestBatch(batch: MessageBatch<IngestMessage>, env: Env): Promise<void> {
   // One read per card per batch, and one board snapshot per board: later messages share the first's.
+  // The consumer runs with max_concurrency 1 (wrangler.jsonc): that, not this loop, keeps an older
+  // read from overwriting a newer one across invocations.
   const done = new Map<string, Promise<unknown>>();
   const snapshots: SnapshotCache = new Map();
   for (const msg of batch.messages) {
     const m = msg.body;
+    const key = m.type === 'board.backfill' ? null : `${m.workspaceId} ${m.cardId}`;
     try {
       if (m.type === 'card.sync' || m.type === 'card.deleted') {
-        const key = `${m.workspaceId} ${m.cardId}`;
-        if (!done.has(key)) done.set(key, syncCard(env, m, snapshots));
-        await done.get(key);
+        if (!done.has(key!)) done.set(key!, syncCard(env, m, snapshots));
+        await done.get(key!);
       } else if (m.type === 'board.backfill') {
         await backfillBoard(env, m.workspaceId, m.boardId);
       }
       msg.ack();
     } catch (e) {
+      if (key) done.delete(key);
+      if (e instanceof UnknownWorkspace) {
+        console.error('ingest dropped', m.type, e.message);
+        msg.ack();
+        continue;
+      }
       const status = e instanceof PipelineError ? e.status : 0;
       console.error('ingest failed', m.type, status, e instanceof Error ? e.message : String(e));
-      done.delete(`${(m as { workspaceId: string }).workspaceId} ${(m as { cardId?: string }).cardId}`);
       msg.retry({ delaySeconds: Math.min(300, 10 * 2 ** msg.attempts) });
     }
   }
