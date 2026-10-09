@@ -12,9 +12,11 @@ export interface VectorIndex {
   upsert(v: VectorRecord[]): Promise<void>;
   delete(ids: string[]): Promise<void>;
   query(values: number[], o: { namespace: string; topK: number; filter: VectorFilter }): Promise<VectorMatch[]>;
+  /** Stored vectors by id (gap S4); one of another size is not this slot's and is left out. */
+  get(ids: string[]): Promise<Array<{ id: string; values: number[] }>>;
 }
 export interface SlotRow { slot: 'a' | 'b'; embedder_id: string | null; dims: number | null; state: 'active' | 'building' | 'idle'; cursor: string | null }
-export type VectorizeLike = Pick<VectorizeIndex, 'upsert' | 'deleteByIds' | 'query'>;
+export type VectorizeLike = Pick<VectorizeIndex, 'upsert' | 'deleteByIds' | 'query' | 'getByIds'>;
 
 let overrides: { embedders?: Record<string, Embedder>; bindings?: Partial<Record<'a' | 'b', VectorizeLike>> } | null = null;
 export function setIndexingForTests(o: typeof overrides): void { overrides = o; }
@@ -47,6 +49,9 @@ export function indexFor(env: Env, s: SlotRow): VectorIndex {
       if (values.length !== dims) throw new Error(`embedder mismatch for slot ${s.slot}`);
       const r = await raw.query(values, { topK: o.topK, namespace: o.namespace, returnMetadata: 'indexed', filter: { ...o.filter, embedder: { $eq: embedderId } } as VectorizeVectorMetadataFilter });
       return r.matches.map((m) => ({ id: m.id, score: m.score, itemId: String((m.metadata as Record<string, unknown> | undefined)?.itemId ?? m.id.split(':')[0]) }));
+    },
+    async get(ids) {
+      return (await raw.getByIds(ids)).map((v) => ({ id: v.id, values: Array.from(v.values as ArrayLike<number>) })).filter((v) => v.values.length === dims);
     },
   };
 }

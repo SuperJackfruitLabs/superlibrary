@@ -19,6 +19,8 @@ export interface UploadOpts {
   commit?: boolean;
   /** A station link's provenance (Task A10); only the hub acting for an agent may send it. */
   source?: unknown;
+  /** A person's link from their own station (gap S1); Superlibrary asks the hub whose station it is. */
+  stationFile?: unknown;
 }
 
 /** Declare, send every file, optionally override, then commit — the whole client protocol. */
@@ -27,7 +29,7 @@ export async function upload(files: Array<{ path: string; body: string | Uint8Ar
   const declared = await Promise.all(files.map(async (f) => ({ path: f.path, bytes: enc(f.body).length, sha256: await sha256Hex(enc(f.body)) })));
   const created = await SELF.fetch(`${API}/api/v1/uploads`, {
     method: 'POST', headers,
-    body: JSON.stringify({ title: opts.title ?? 'Test upload', scope: opts.scope, item: opts.item, entry: opts.entry, expiresAt: opts.expiresAt, source: opts.source, files: declared }),
+    body: JSON.stringify({ title: opts.title ?? 'Test upload', scope: opts.scope, item: opts.item, entry: opts.entry, expiresAt: opts.expiresAt, source: opts.source, stationFile: opts.stationFile, files: declared }),
   });
   if (created.status !== 201) return { status: created.status, body: await created.json<any>(), uploadId: '' };
   const { uploadId } = await created.json<{ uploadId: string }>();

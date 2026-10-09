@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { LinkSource } from './provenance';
+import { LinkSource, StationFile } from './provenance';
 
 export const OUTCOMES = ['approved', 'completed', 'rejected', 'failed', 'abandoned', 'superseded', 'in-progress'] as const;
 export type Outcome = (typeof OUTCOMES)[number];
@@ -31,6 +31,8 @@ export const UploadCreate = z.object({
   expiresAt: z.iso.datetime().optional(),
   /** Set only by a trusted service linking a station's file (plan P1, Task A10). */
   source: LinkSource.optional(),
+  /** A person's link from their own station (gap S1); never with `source`. */
+  stationFile: StationFile.optional(),
   files: z
     .array(z.object({ path: z.string().min(1).max(1024), bytes: z.number().int().min(0), sha256: z.string().regex(SHA256) }))
     .min(1),
@@ -124,6 +126,8 @@ export interface ItemSource {
   sourceUrl?: string;
   /** The service principal (the hub) that acted for the agent. */
   via?: string;
+  /** The person who linked it from their station in the console (gap S1). */
+  linkedBy?: string;
 }
 
 export interface ItemSummary {

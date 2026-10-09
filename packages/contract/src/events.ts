@@ -23,4 +23,6 @@ export type IndexMessage = ItemChanged | ReindexPage;
 export type IngestMessage =
   | { type: 'card.sync'; workspaceId: string; boardId: string; cardId: string; reason: string }
   | { type: 'card.deleted'; workspaceId: string; boardId: string; cardId: string }
-  | { type: 'board.backfill'; workspaceId: string; boardId: string; /** Card id cursor: the page after it. */ after?: string };
+  | { type: 'board.backfill'; workspaceId: string; boardId: string; /** Card id cursor: the page after it. */ after?: string }
+  /** Gap S5: a board confirmed deleted (Superpipeline sends no event). `removed`: records already deleted by earlier pages. */
+  | { type: 'board.deleted'; workspaceId: string; boardId: string; removed?: number };

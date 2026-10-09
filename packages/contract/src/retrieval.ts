@@ -10,6 +10,16 @@ export const OUTCOME_WEIGHTS: Readonly<Record<Outcome, number>> = {
 };
 /** Reciprocal rank fusion's constant (the usual 60). */
 export const RRF_K = 60;
+/**
+ * Gap S2: the relevance floor (spec §7). A candidate found only by meaning is kept when its best
+ * chunk scores within `vectorGap` (cosine) of the best meaning match for the query; one with an
+ * exact-word match is never dropped (S3-R10/R13). Tuned from the live measurement (Task 26 Step 7).
+ */
+export const RELEVANCE = { vectorGap: 0.1 } as const;
+/** Words that match nearly every item; they count as word matches only when a query has no other word. */
+export const STOPWORDS: ReadonlySet<string> = new Set([
+  'a', 'an', 'and', 'are', 'as', 'at', 'be', 'by', 'for', 'from', 'in', 'into', 'is', 'it', 'of', 'on', 'or', 'that', 'the', 'this', 'to', 'with',
+]);
 /** Spec §8: the related-work section's caps. */
 export const PROMPT_CAPS = { items: 5, tokens: 1500 } as const;
 
@@ -27,7 +37,12 @@ export type SearchQuery = z.infer<typeof SearchQuery>;
 
 const relatedCaps = { limit: z.number().int().min(1).max(10).default(PROMPT_CAPS.items), maxTokens: z.number().int().min(100).max(4000).default(PROMPT_CAPS.tokens) };
 export const RelatedQuery = z.union([
-  z.object({ cardId: z.string().regex(CARD_ID), ...relatedCaps }).strict(),
+  z.object({
+    cardId: z.string().regex(CARD_ID),
+    /** Gap S3: the card's title and spec as the caller has them, used only while the card has no record yet. Never stored. */
+    text: z.string().trim().min(1).max(4000).optional(),
+    ...relatedCaps,
+  }).strict(),
   z.object({ itemId: z.string().regex(ITEM_ID), ...relatedCaps }).strict(),
 ]);
 export type RelatedQuery = z.infer<typeof RelatedQuery>;

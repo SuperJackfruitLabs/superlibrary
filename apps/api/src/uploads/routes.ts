@@ -12,7 +12,7 @@ import { newId } from '../ids';
 import { audit } from '../audit';
 import { resolveUploader, type Uploader } from '../auth/caller';
 import { itemChanged } from '../events';
-import { checkLinkSource, linkSessionItem } from '../sources/link';
+import { checkLinkSource, checkStationFile, linkSessionItem, personStationItem, type PersonStationFile } from '../sources/link';
 import { decodeText, sniff } from '../guard/sniff';
 import { scanText, scanUndecodedText } from '../guard/secrets';
 import { committedUsage, newBytes, newCommittedBytes, workspaceUsage } from '../guard/limits';
@@ -26,6 +26,8 @@ export interface SessionRow {
   override_reason: string | null; override_by: string | null; override_at: string | null; created_at: string;
   /** A station link's LinkSource as JSON (Task A10), or null for a person's own upload. */
   source: string | null;
+  /** A person's station file the hub confirmed is theirs (gap S1), as JSON PersonStationFile, or null. */
+  station_file: string | null;
 }
 
 /** One declared file as Task 8's commit reads it. `quarantined` 1: its bytes are at `quarantineKey`. */
@@ -64,6 +66,10 @@ async function create(request: Request, env: Env, p: Uploader): Promise<Response
   // for the station and the item already belongs to that station path, so canManage does not apply.
   let itemForSource: string | null = null;
   if (source && !body.item) itemForSource = await linkSessionItem(env, p.workspaceId, source);
+  // Gap S1: a person's link from their own station, confirmed by the hub.
+  const file = await checkStationFile(env, p, body);
+  if (file instanceof Response) return file;
+  if (file) itemForSource = await personStationItem(env, p.workspaceId, p.principalId, file, body.scope);
   // One stored form, and the same refusal PATCH gives (Task 10).
   const itemExpiresAt = body.expiresAt ? new Date(body.expiresAt).toISOString() : null;
   if (itemExpiresAt && Date.parse(itemExpiresAt) <= Date.now()) return error(400, 'invalid', { detail: 'expiresAt must be in the future' });
@@ -108,8 +114,8 @@ async function create(request: Request, env: Env, p: Uploader): Promise<Response
   // Read before the session exists, so its own declarations cannot count as held.
   const heldShas = await heldBy(env, p, files.map((f) => f.sha256));
   await env.DB.batch([
-    env.DB.prepare(`INSERT INTO upload_sessions (id, workspace_id, created_by, item_id, title, scope, entry, item_expires_at, expires_at, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-      .bind(id, p.workspaceId, p.principalId, body.item ?? itemForSource, body.title, body.scope, entry, itemExpiresAt, expiresAt, source ? JSON.stringify(source) : null),
+    env.DB.prepare(`INSERT INTO upload_sessions (id, workspace_id, created_by, item_id, title, scope, entry, item_expires_at, expires_at, source, station_file) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .bind(id, p.workspaceId, p.principalId, body.item ?? itemForSource, body.title, body.scope, entry, itemExpiresAt, expiresAt, source ? JSON.stringify(source) : null, file ? JSON.stringify(file) : null),
     // One statement for every declared file: D1 counts each statement of a batch against its
     // per-invocation cap, and a 500-file folder must not spend 500 of them.
     env.DB.prepare(`INSERT INTO upload_files (session_id, path, sha256, bytes) SELECT ?1, json_extract(value, '$.path'), json_extract(value, '$.sha256'), json_extract(value, '$.bytes') FROM json_each(?2)`)
@@ -464,6 +470,8 @@ async function commit(env: Env, p: Uploader, id: string): Promise<Response> {
 
   // Only the hub acting for an agent can have stored one (checkLinkSource at declare).
   const src = s.source ? (JSON.parse(s.source) as LinkSource) : null;
+  // Only a person whose station the hub confirmed at declare can have stored one (checkStationFile).
+  const file = s.station_file ? (JSON.parse(s.station_file) as PersonStationFile) : null;
   let itemId: string;
   let version: number;
   const statements: D1PreparedStatement[] = [];
@@ -489,6 +497,10 @@ async function commit(env: Env, p: Uploader, id: string): Promise<Response> {
       statements.push(env.DB.prepare(`UPDATE item_sources SET card_id = ?, run_id = ?, agent_principal = ?, via_service = ?, station_name = ? WHERE item_id = ? AND source = 'agentpod'`)
         .bind(src.card ?? null, src.run ?? null, p.principalId, p.via, src.stationName ?? null, itemId));
     }
+    // A person's station path linked again: the station's name as the hub names it now.
+    if (file && p.kind === 'human') {
+      statements.push(env.DB.prepare(`UPDATE item_sources SET station_name = ? WHERE item_id = ? AND source = 'agentpod' AND linked_by = ?`).bind(file.stationName, itemId, p.principalId));
+    }
   } else {
     statements.push(
       env.DB.prepare(`INSERT INTO items (id, workspace_id, kind, title, scope, created_by, latest_version, expires_at) VALUES (?, ?, 'artifact', ?, ?, ?, 1, ?)`)
@@ -499,6 +511,11 @@ async function commit(env: Env, p: Uploader, id: string): Promise<Response> {
     if (src && p.kind === 'agent') {
       statements.push(env.DB.prepare(`INSERT INTO item_sources (item_id, source, board_id, card_id, run_id, agent_principal, via_service, station, station_name, source_path) VALUES (?, 'agentpod', ?, ?, ?, ?, ?, ?, ?, ?)`)
         .bind(itemId, src.board, src.card ?? null, src.run ?? null, p.principalId, p.via, src.station, src.stationName ?? null, src.path));
+    }
+    // Gap S1: a person's link names the person, the station the hub confirmed is theirs, and its path.
+    if (file && p.kind === 'human') {
+      statements.push(env.DB.prepare(`INSERT INTO item_sources (item_id, source, station, station_name, source_path, linked_by) VALUES (?, 'agentpod', ?, ?, ?, ?)`)
+        .bind(itemId, file.station, file.stationName, file.path, p.principalId));
     }
   }
   const entry = files.find((f) => f.path === s.entry)!;

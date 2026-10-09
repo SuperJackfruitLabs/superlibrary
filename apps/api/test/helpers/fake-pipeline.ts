@@ -3,7 +3,13 @@ import { env } from 'cloudflare:test';
 import type { CardBundle, PipelineCard } from '../../src/sources/superpipeline';
 
 export interface FakeBoard { id: string; name: string; cards: Map<string, Omit<CardBundle, 'references'> & { references: CardBundle['references'] }> }
-export interface FakeState { boards: Map<string, FakeBoard>; pushConfigs: Array<{ boardId: string; url: string; token: string; events: string[] }>; calls: string[] }
+export interface FakeState {
+  boards: Map<string, FakeBoard>; pushConfigs: Array<{ boardId: string; url: string; token: string; events: string[] }>; calls: string[];
+  /** Any `/v1/boards/<id>…` path of that board answers this status (0: the request itself fails). */
+  boardStatus?: Map<string, number>;
+  /** The `/v1/boards` list answers this status. */
+  listStatus?: number;
+}
 export const ORG = 'org_00000000000000000a01';
 
 export function card(id: string, over: Partial<PipelineCard> = {}): PipelineCard {
@@ -26,6 +32,10 @@ export function fakePipeline(state: FakeState): () => void {
     const m = u.pathname.match(/^\/v1\/boards(?:\/([^/]+)(?:\/cards\/([^/]+)(?:\/(\w+))?|\/(push-configs))?)?$/);
     if (!m) return new Response(null, { status: 404 });
     const [, b, c, sub, push] = m;
+    if (!b && state.listStatus !== undefined) return new Response(null, { status: state.listStatus });
+    const forced = b ? state.boardStatus?.get(b) : undefined;
+    if (forced === 0) throw new TypeError('fetch failed');
+    if (forced !== undefined) return new Response(null, { status: forced });
     if (!b) return Response.json({ boards: [...state.boards.values()].map((x) => ({ id: x.id, name: x.name })) });
     const board = state.boards.get(b);
     if (!board) return new Response(null, { status: 404 });

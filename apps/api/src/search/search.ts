@@ -1,5 +1,5 @@
 // apps/api/src/search/search.ts
-import { OUTCOME_WEIGHTS, RRF_K, itemUrl, type ItemSource, type Outcome, type SearchQuery, type SearchResult } from '@superlibrary/contract';
+import { OUTCOME_WEIGHTS, RELEVANCE, RRF_K, STOPWORDS, itemUrl, type ItemSource, type Outcome, type SearchQuery, type SearchResult } from '@superlibrary/contract';
 import type { Env } from '../env';
 import type { Viewer } from '../auth/caller';
 import { viewerScopes, visibleBinds, visibleSql, type ItemRow } from '../items/visibility';
@@ -12,7 +12,10 @@ import { extraFilterBind, extraFilterSql } from '../library/filters';
 /** Words only: FTS5 syntax a person types is never syntax (Review Focus). */
 export function ftsQuery(text: string): string | null {
   const words = text.match(/[\p{L}\p{N}\p{M}_]+/gu)?.filter((w) => !/^(AND|OR|NOT|NEAR)$/.test(w)) ?? [];
-  return words.length === 0 ? null : words.slice(0, 32).map((w) => `"${w}"`).join(' OR ');
+  // Gap S2: a common word matches nearly everything; it counts only when the query has nothing else.
+  const telling = words.filter((w) => !STOPWORDS.has(w.toLowerCase()));
+  const use = telling.length > 0 ? telling : words;
+  return use.length === 0 ? null : use.slice(0, 32).map((w) => `"${w}"`).join(' OR ');
 }
 
 export async function sourcesOf(env: Env, ids: string[]): Promise<Map<string, ItemSource>> {
@@ -23,6 +26,7 @@ export async function sourcesOf(env: Env, ids: string[]): Promise<Map<string, It
     ...(r.station ? { station: r.station } : {}), ...(r.station_name ? { stationName: r.station_name } : {}), ...(r.station_removed_at ? { stationRemoved: true } : {}), ...(r.source_path ? { path: r.source_path } : {}),
     ...(r.board_id ? { board: r.board_id } : {}), ...(r.card_id ? { card: r.card_id } : {}), ...(r.stage ? { stage: r.stage } : {}), ...(r.run_id ? { run: r.run_id } : {}),
     ...(r.source_id ? { sourceId: r.source_id } : {}), ...(r.source_url ? { sourceUrl: r.source_url } : {}),
+    ...(r.linked_by ? { linkedBy: r.linked_by } : {}),
   } satisfies ItemSource]));
 }
 
@@ -92,8 +96,17 @@ export function fuse(ranks: Ranks, outcome: Outcome): number {
 
 const live = `AND i.revoked_at IS NULL AND (i.expires_at IS NULL OR i.expires_at > ?4)`;
 
-/** Later tasks add fields here; `timer` records each stage's wait (gap S4). */
-export interface SearchOptions { timer?: Timer }
+/**
+ * How the floor treated one candidate (gap S2). `fts` and `vector` are its 1-based ranks in each list
+ * before the floor (so `vector` is not the rank fusion used once others were dropped); `vectorScore`
+ * is its best chunk's cosine; `kept` whether it reached ranking.
+ */
+export interface ExplainRow { itemId: string; fts: number | null; vector: number | null; vectorScore: number | null; kept: boolean }
+/**
+ * `timer` records each stage's wait (gap S4). `exclude`: an item that is never a candidate, in either list,
+ * so it never sets the floor's bar (related's basis item). `explain`: filled with one row per candidate.
+ */
+export interface SearchOptions { timer?: Timer; exclude?: string; explain?: ExplainRow[]; /** Gap S4: the query's vector when the caller already has it (related's basis item); otherwise the query is embedded. */ vector?: number[] }
 
 export async function search(env: Env, v: Viewer, q: SearchQuery, precomputedScopes?: string[], opts: SearchOptions = {}): Promise<SearchResult[]> {
   const t = opts.timer;
@@ -127,13 +140,14 @@ export async function search(env: Env, v: Viewer, q: SearchQuery, precomputedSco
       console.error('full-text search failed; treated as no hits', e instanceof Error ? e.message : String(e));
     }
   }
+  const ftsHits = fts.filter((r) => r.item_id !== opts.exclude);
 
   // 2. Meaning, filtered in the vector query, then re-checked in SQL before anything is ranked.
-  let semantic: Array<{ item_id: string; chunk_id: string }> = [];
+  let semantic: Array<{ item_id: string; chunk_id: string; score: number }> = [];
   try {
     if (vectorScopes.length === 0) throw new Error('no visible scope for the vector query');
     const { active } = await timed('slots', () => readSlots(env));
-    const [values] = await timed('embed', () => embedderFor(env, active.embedder_id!).embed([q.query]));
+    const values = opts.vector && opts.vector.length === active.dims ? opts.vector : (await timed('embed', () => embedderFor(env, active.embedder_id!).embed([q.query])))[0];
     const matches = await timed('vector', () => indexFor(env, active).query(values!, {
       namespace: v.workspaceId, topK: 50,
       filter: { scope: { $in: vectorScopes }, ...(q.kinds ? { kind: { $in: q.kinds } } : {}), ...(q.outcomes ? { outcome: { $in: q.outcomes } } : {}) },
@@ -142,15 +156,28 @@ export async function search(env: Env, v: Viewer, q: SearchQuery, precomputedSco
     const visible = new Set(ids.length === 0 ? [] : (await timed('recheck', () => env.DB.prepare(
       `SELECT i.id FROM items i WHERE i.id IN (SELECT value FROM json_each(?8)) AND ${visibleSql('i')} ${live} ${kindSql} ${outcomeSql} ${boardSql} ${extraSql}`,
     ).bind(...binds, JSON.stringify(ids), filters).all<{ id: string }>())).results.map((r) => r.id));
-    semantic = matches.filter((m) => visible.has(m.itemId)).map((m) => ({ item_id: m.itemId, chunk_id: m.id }));
+    semantic = matches.filter((m) => visible.has(m.itemId) && m.itemId !== opts.exclude).map((m) => ({ item_id: m.itemId, chunk_id: m.id, score: m.score }));
   } catch (e) {
     console.error('vector search unavailable; full-text only', e instanceof Error ? e.message : String(e));
   }
 
+  // Gap S2: the relevance floor. Meaning-only candidates within RELEVANCE.vectorGap of the best
+  // meaning match are kept; an exact-word match always is (spec §7 "never hidden", S3-R10/R13).
+  const words = new Set(ftsHits.map((r) => r.item_id));
+  const top = semantic.reduce((best, m) => Math.max(best, m.score), Number.NEGATIVE_INFINITY);
+  const kept = semantic.filter((m) => words.has(m.item_id) || m.score >= top - RELEVANCE.vectorGap);
+  if (opts.explain) {
+    const before = rankLists(ftsHits, semantic);
+    const best = new Map<string, number>();
+    for (const m of semantic) best.set(m.item_id, Math.max(best.get(m.item_id) ?? Number.NEGATIVE_INFINITY, m.score));
+    const keptIds = new Set([...ftsHits.map((r) => r.item_id), ...kept.map((m) => m.item_id)]);
+    for (const [itemId, r] of before) opts.explain.push({ itemId, fts: r.fts ?? null, vector: r.vector ?? null, vectorScore: best.get(itemId) ?? null, kept: keptIds.has(itemId) });
+  }
+
   // 3. Reciprocal rank fusion per item; the outcome weight is a rank offset on the meaning list only (spec §7).
-  const ranks = rankLists(fts, semantic);
+  const ranks = rankLists(ftsHits, kept);
   const hit = new Map<string, string>();
-  for (const list of [fts, semantic]) for (const r of list) if (!hit.has(r.item_id)) hit.set(r.item_id, r.chunk_id);
+  for (const list of [ftsHits, kept]) for (const r of list) if (!hit.has(r.item_id)) hit.set(r.item_id, r.chunk_id);
   if (ranks.size === 0) return [];
   const ids = [...ranks.keys()];
   const { rows, sources, chunks, superseded } = await timed('hydrate', async () => {
@@ -169,9 +196,9 @@ export async function search(env: Env, v: Viewer, q: SearchQuery, precomputedSco
 }
 
 /** The audited entry for every caller (REST, MCP): one `items.searched` row, never the query text. */
-export async function searchAudited(env: Env, v: Viewer, q: SearchQuery, timer?: Timer): Promise<SearchResult[]> {
-  const results = await search(env, v, q, undefined, { timer });
-  const write = () => audit(env.DB, { workspaceId: v.workspaceId, actor: v.principalId, act: v.act, action: 'items.searched', detail: { count: results.length, queryLength: q.query.length } }).run();
+export async function searchAudited(env: Env, v: Viewer, q: SearchQuery, timer?: Timer, opts: { explain?: ExplainRow[]; detail?: Record<string, unknown> } = {}): Promise<SearchResult[]> {
+  const results = await search(env, v, q, undefined, { timer, explain: opts.explain });
+  const write = () => audit(env.DB, { workspaceId: v.workspaceId, actor: v.principalId, act: v.act, action: 'items.searched', detail: { count: results.length, queryLength: q.query.length, ...opts.detail } }).run();
   await (timer ? timer.time('audit', write) : write());
   return results;
 }

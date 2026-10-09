@@ -18,9 +18,14 @@ describe('stage timings (gap S4)', () => {
   it('related answers its stage timings beside the request cost', async () => {
     const a = (await upload([{ path: 'q.md', body: '# Queue workers drain the backlog' }], { title: 'Queue workers' })).body.itemId as string;
     await indexItem(env, a);
+    // Gap S2: related never returns the item itself, so a second item gives it something to hydrate.
+    const b = (await upload([{ path: 'r.md', body: '# Queue workers and the backlog they drain' }], { title: 'Backlog' })).body.itemId as string;
+    await indexItem(env, b);
     const res = await call('/api/v1/related', { method: 'POST', body: { itemId: a } });
     expect(res.status).toBe(200);
-    expect(stages(res.headers.get('Server-Timing'))).toEqual(expect.arrayContaining(['auth', 'scopes', 'basis', 'slots', 'embed', 'vector', 'fts', 'hydrate', 'fit', 'audit', 'd1rt', 'app']));
+    expect(stages(res.headers.get('Server-Timing'))).toEqual(expect.arrayContaining(['auth', 'scopes', 'basis', 'slots', 'vector', 'fts', 'hydrate', 'fit', 'audit', 'd1rt', 'app']));
+    // Gap S4: the basis item is indexed, so its stored vector is reused and nothing is embedded.
+    expect(stages(res.headers.get('Server-Timing'))).not.toContain('embed');
   });
   it('search answers the same stages', async () => {
     const a = (await upload([{ path: 's.md', body: '# Queue workers in search' }], { title: 'Queue search' })).body.itemId as string;

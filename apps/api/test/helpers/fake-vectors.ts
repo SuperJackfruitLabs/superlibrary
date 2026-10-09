@@ -23,6 +23,7 @@ export function fakeVectorize(): VectorizeLike & { store: Map<string, Stored>; q
   return {
     store, queries,
     async upsert(v: any[]) { for (const x of v) store.set(x.id, x); return { mutationId: 'm', count: v.length } as any; },
+    async getByIds(ids: string[]) { return ids.flatMap((id) => (store.has(id) ? [store.get(id)!] : [])) as any; },
     async deleteByIds(ids: string[]) { for (const id of ids) store.delete(id); return { mutationId: 'm', count: ids.length } as any; },
     async query(values: number[], o: any) {
       queries.push({ namespace: o?.namespace, filter: o?.filter });

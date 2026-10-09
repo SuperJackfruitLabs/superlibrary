@@ -141,7 +141,7 @@ describe('library_related basis visibility and audit', () => {
     await seed('itm_00000000000000f4', 'zebra migration retro');
     const r = await related(env, agent, { itemId: 'itm_00000000000000f3', limit: 5, maxTokens: 1500 });
     const row = await env.DB.prepare(`SELECT detail FROM audit_events WHERE action = 'items.related' ORDER BY rowid DESC LIMIT 1`).first<{ detail: string }>();
-    expect(JSON.parse(row!.detail)).toEqual({ count: r.length, itemIds: r.map((x) => x.itemId) });
+    expect(JSON.parse(row!.detail)).toEqual({ count: r.length, itemIds: r.map((x) => x.itemId), basis: 'item' });
     expect(r.map((x) => x.itemId)).toContain('itm_00000000000000f4');
     expect(r.map((x) => x.itemId)).not.toContain('itm_00000000000000f3');
     expect(row!.detail).not.toContain('zebra');
