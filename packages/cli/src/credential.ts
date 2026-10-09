@@ -1,7 +1,7 @@
 /**
  * Where `suli` gets a person's token: $SUPERLIBRARY_TOKEN as supplied, else `suli login`'s cached
  * token while it has 30 s left, else its device credential exchanged at the plane recorded at login
- * (issuer contract §3.2). Files are written atomically, mode 0600 (supi's credential.ts).
+ * (issuer contract §3.2). Files are written atomically, mode 0600.
  */
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';

@@ -1,5 +1,5 @@
 import { unzipSync } from 'fflate';
-import { LIMITS, checkPath, pathRefusalSentence, type CommitResult, type PathRefusal } from '@superlibrary/contract';
+import { LIMITS, NOTHING_ADDED as NOTHING, checkPath, pathRefusalSentence, sizeRefusal, type CommitResult, type PathRefusal } from '@superlibrary/contract';
 
 export interface LocalFile { path: string; bytes: Uint8Array }
 export type Api = (path: string, init?: RequestInit) => Promise<Response>;
@@ -88,9 +88,9 @@ function partition<T extends { path: string }>(entries: T[]): { kept: T[]; leftO
 /** Spec §8 caps, from sizes alone, so nothing over them is ever read into memory. */
 function overCaps(entries: { path: string; size: number }[]): string | null {
   const big = entries.find((e) => e.size > LIMITS.fileBytes);
-  if (big) return `${big.path} is larger than 25 MB, the limit for one file.`;
-  if (entries.length > LIMITS.folderFiles) return `A folder may have at most ${LIMITS.folderFiles} files; this has ${entries.length}.`;
-  if (entries.reduce((n, e) => n + e.size, 0) > LIMITS.folderBytes) return 'Together these are more than 100 MB, the limit for a folder.';
+  if (big) return sizeRefusal.file(big.path);
+  if (entries.length > LIMITS.folderFiles) return sizeRefusal.files(entries.length);
+  if (entries.reduce((n, e) => n + e.size, 0) > LIMITS.folderBytes) return sizeRefusal.folder();
   return null;
 }
 
@@ -173,10 +173,10 @@ export function precheck(files: LocalFile[]): string | null {
   for (const f of files) {
     const c = checkPath(f.path);
     if (!c.ok) return pathRefusalSentence(c);
-    if (f.bytes.length > LIMITS.fileBytes) return `${f.path} is larger than 25 MB, the limit for one file.`;
+    if (f.bytes.length > LIMITS.fileBytes) return sizeRefusal.file(f.path);
   }
-  if (files.length > LIMITS.folderFiles) return `A folder may have at most ${LIMITS.folderFiles} files.`;
-  if (files.reduce((n, f) => n + f.bytes.length, 0) > LIMITS.folderBytes) return 'Together these are more than 100 MB, the limit for a folder.';
+  if (files.length > LIMITS.folderFiles) return sizeRefusal.files();
+  if (files.reduce((n, f) => n + f.bytes.length, 0) > LIMITS.folderBytes) return sizeRefusal.folder();
   return null;
 }
 
@@ -194,17 +194,15 @@ export function secretRefusal(findings: Finding[]): string {
   return `${where} ${findings.length === 1 ? 'looks like a secret' : 'look like secrets'}. Nothing was added to the library.`;
 }
 
-const NOTHING = 'Nothing was added to the library.';
-
 /** One sentence for each refusal the upload API gives (apps/api/src/uploads/routes.ts). */
 export function describeRefusal(r: Refusal): string {
   const d = r.detail ?? {};
   switch (r.error) {
     case 'path_refused': return d.path && d.reason ? pathRefusalSentence({ path: d.path, reason: d.reason as PathRefusal, rule: d.rule }) : `A path was refused. ${NOTHING}`;
     case 'duplicate_path': return `${d.path} is chosen twice.`;
-    case 'file_too_large': return `${d.path} is larger than 25 MB, the limit for one file.`;
-    case 'folder_too_large': return 'Together these are more than 100 MB, the limit for a folder.';
-    case 'too_many_files': return `A folder may have at most ${LIMITS.folderFiles} files.`;
+    case 'file_too_large': return sizeRefusal.file(d.path!);
+    case 'folder_too_large': return sizeRefusal.folder();
+    case 'too_many_files': return sizeRefusal.files();
     case 'quota_exceeded': return `This would take the workspace over its storage limit. ${NOTHING}`;
     case 'secret_found': return secretRefusal(r.findings ?? []);
     case 'upload_expired': return `This upload was not finished within ${LIMITS.uploadTtlHours} hours and has expired. Upload it again.`;

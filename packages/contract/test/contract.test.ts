@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   ITEM_ID, newId, contentLabel, itemIdFromLabel, SCOPE_RE, LIMITS, UploadCreate,
   FRAME_SANDBOX, contentCsp, encodePath, formatToken, parseToken, signingMessage, b64url, fromB64url,
-  compareTreePaths, orderFiles,
+  compareTreePaths, orderFiles, sizeRefusal,
 } from '../src/index';
 
 describe('ids', () => {
@@ -98,5 +98,15 @@ describe('file order', () => {
     expect([...paths].sort(compareTreePaths)).toEqual(['readme.txt', 's/a/b/c.txt', 's/a/x.css', 's/a-b.css', 's/a.css', 's/index.html', 'z.txt']);
     expect(orderFiles('s/index.html', paths.map((path) => ({ path }))).map((f) => f.path))
       .toEqual(['s/index.html', 'readme.txt', 's/a/b/c.txt', 's/a/x.css', 's/a-b.css', 's/a.css', 'z.txt']);
+  });
+});
+
+describe('sizeRefusal', () => {
+  it('says the limits in MB, derived from LIMITS', () => {
+    expect(sizeRefusal.file('a.bin')).toBe(`a.bin is larger than ${LIMITS.fileBytes / 1048576} MB, the limit for one file.`);
+    expect(sizeRefusal.file('a.bin')).toContain('25 MB');
+    expect(sizeRefusal.folder()).toBe('Together these are more than 100 MB, the limit for a folder.');
+    expect(sizeRefusal.files()).toBe('A folder may have at most 500 files.');
+    expect(sizeRefusal.files(501)).toBe('A folder may have at most 500 files; this has 501.');
   });
 });

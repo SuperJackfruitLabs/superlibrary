@@ -17,7 +17,12 @@ async function main(argv: string[]): Promise<void> {
   const [cmd, ...rest] = argv;
   const pos = positionals(rest);
   const json = rest.includes("--json");
-  if (rest.includes("--help") && cmd) { process.stdout.write(findCommands([cmd]).map(renderCommandHelp).join('\n\n') + '\n'); return; }
+  if (rest.includes("--help") && cmd) {
+    const found = findCommands([cmd]);
+    if (found.length === 0) fail(`unknown command: ${cmd}. Run suli help.`);
+    process.stdout.write(found.map(renderCommandHelp).join('\n\n') + '\n');
+    return;
+  }
   switch (cmd) {
     case undefined:
     case "-h":
@@ -37,7 +42,9 @@ async function main(argv: string[]): Promise<void> {
       return;
 
     case "login": {
-      const target = await discoverPlane(baseUrl()).catch(() => null);
+      // A network error, a timeout or a reply that is not JSON reaches the catch below as itself;
+      // only the server's own answer that it has no plane is "names no sign-in service".
+      const target = await discoverPlane(baseUrl());
       if (!target) fail(`${baseUrl()} names no sign-in service.`);
       const credential = await deviceLogin(target, { print: (l) => process.stdout.write(l + '\n'), sleep: (ms) => new Promise((r) => setTimeout(r, ms)) });
       saveDevice({ credential, plane: target.plane, audience: target.audience });
