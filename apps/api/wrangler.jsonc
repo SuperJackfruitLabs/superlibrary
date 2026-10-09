@@ -43,16 +43,25 @@
     { "binding": "DB", "database_name": "superlibrary-catalog", "database_id": "baecb101-9eb3-4e84-bbe2-8037b1ab2b3f", "migrations_dir": "migrations" }
   ],
   "r2_buckets": [{ "binding": "BLOBS", "bucket_name": "superlibrary-blobs" }],
+  // Spec §7 / plan P9. Slot b is idle until a re-index fills it (Task B8).
+  "ai": { "binding": "AI" },
+  "vectorize": [
+    { "binding": "VEC_A", "index_name": "superlibrary-chunks-a" },
+    { "binding": "VEC_B", "index_name": "superlibrary-chunks-b" }
+  ],
   "queues": {
     "producers": [
       { "binding": "RETENTION", "queue": "superlibrary-retention" },
       { "binding": "INGEST", "queue": "superlibrary-ingest" },
       { "binding": "INDEX", "queue": "superlibrary-index" }
     ],
-    "consumers": [{ "queue": "superlibrary-retention", "max_batch_size": 1, "max_retries": 5 }]
+    "consumers": [
+      { "queue": "superlibrary-retention", "max_batch_size": 1, "max_retries": 5 },
+      { "queue": "superlibrary-index", "max_batch_size": 2, "max_batch_timeout": 5, "max_retries": 8, "max_concurrency": 2 }
+    ]
   },
   // The daily sweep enqueues one message; the consumer does the work (spec §6 `retention` queue).
-  "triggers": { "crons": ["0 3 * * *"] },
+  "triggers": { "crons": ["0 3 * * *", "30 3 * * *"] },
   // Same hostname as the Pages app (plan decision D1). Declared here, not clicked in the dashboard.
   "routes": [
     { "pattern": "app.superlibrary.dev/api/*", "zone_name": "superlibrary.dev" },

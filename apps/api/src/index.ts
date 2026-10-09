@@ -11,8 +11,10 @@ import { itemRoutes } from './items/routes';
 import { queueHandlers } from './queues';
 import { counted, withCost } from './cost';
 import { RETENTION_CRON } from './lifecycle/retention';
+import { RECONCILE_CRON, reconcile } from './indexing/consumer';
+import { searchRoutes } from './search/routes';
 
-const handlers: Handler[] = [uploadRoutes, itemRoutes];
+const handlers: Handler[] = [uploadRoutes, itemRoutes, searchRoutes];
 
 async function route(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
   const url = new URL(request.url);
@@ -56,7 +58,11 @@ export default {
     await handle(batch, env);
   },
   /** The daily cron only enqueues; the consumer does the work (spec §6 `retention` queue). */
-  async scheduled(c: ScheduledController, env: Env, _ctx: ExecutionContext) {
+  async scheduled(c: ScheduledController, env: Env, ctx: ExecutionContext) {
+    if (c.cron === RECONCILE_CRON) {
+      ctx.waitUntil(reconcile(env).catch((e) => console.error('reconcile failed', e instanceof Error ? e.message : String(e))));
+      return;
+    }
     if (c.cron !== RETENTION_CRON) {
       console.error('no handler for cron', c.cron);
       return;
