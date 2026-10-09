@@ -3,14 +3,14 @@
 import { baseUrl, clearCredentials, saveDevice, tokenSource } from './credential.ts';
 import { deviceLogin, discoverPlane } from './plane-login.ts';
 import { findCommands, renderCommandHelp, renderUsage } from './commands.ts';
-import { flag, positionals } from './args.ts';
+import { flag, oneLine, positionals } from './args.ts';
 import { getItem, revoke, upload } from './artifacts.ts';
 import { collect, scope, search } from './library.ts';
 
 const VERSION = '0.0.1';
 
 function fail(message: string): never {
-  process.stderr.write(`suli: ${message}\n`);
+  process.stderr.write(`suli: ${oneLine(message)}\n`);
   process.exit(1);
 }
 
