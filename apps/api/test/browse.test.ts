@@ -31,6 +31,21 @@ describe('browse (spec §11)', () => {
     expect(second.items.map((i) => i.id)).toEqual(['itm_00000000000001a1']);
     expect(second.next).toBeNull();
   });
+  it('items sharing one activity second each appear exactly once across pages', async () => {
+    const BT = 'brd_000000000000c000';
+    await knowBoard(ws, BT, 'Ties');
+    const same = '2026-10-04T10:00:00.000Z';
+    for (const n of ['1', '2', '3']) await seedWorkRecord({ id: `itm_00000000000001e${n}`, ws, board: BT, updatedAt: same });
+    const seen: string[] = [];
+    let cursor: string | undefined;
+    for (let i = 0; i < 5; i++) {
+      const page = await browse({ limit: 1, board: BT, ...(cursor ? { cursor } : {}) });
+      seen.push(...page.items.map((x) => x.id));
+      if (!page.next) break;
+      cursor = page.next;
+    }
+    expect(seen).toEqual(['itm_00000000000001e3', 'itm_00000000000001e2', 'itm_00000000000001e1']);
+  });
   it('an outcome view: everything rejected on one board this month', async () => {
     const BB = 'brd_000000000000b000';
     await knowBoard(ws, BB, 'Outcome view');
