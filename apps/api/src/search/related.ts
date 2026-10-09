@@ -66,7 +66,8 @@ async function relatedItems(env: Env, v: Viewer, q: RelatedQuery, timer?: Timer)
   });
   if (!found) return [];
   const { selfId, basis } = found;
-  const hits = (await search(env, v, { query: basis.slice(0, 2000), limit: Math.min(25, q.limit * 3) }, scopes, { timer })).filter((r) => r.itemId !== selfId);
+  // Gap S2: the item itself is no candidate, so its self-match never sets the floor's bar; the filter stays as a second guard.
+  const hits = (await search(env, v, { query: basis.slice(0, 2000), limit: Math.min(25, q.limit * 3) }, scopes, { timer, exclude: selfId })).filter((r) => r.itemId !== selfId);
   const out: RelatedItem[] = [];
   await timed('fit', async () => {
     let used = 0;

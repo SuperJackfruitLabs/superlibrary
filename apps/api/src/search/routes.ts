@@ -4,7 +4,8 @@ import { error, json, preflight, withCors } from '../http';
 import { Timer } from '../timing';
 import { resolvePerson, resolveViewer, serviceCaller } from '../auth/caller';
 import { RelatedQuery, SearchQuery } from '@superlibrary/contract';
-import { searchAudited } from './search';
+import { search, searchAudited, type ExplainRow } from './search';
+import { audit } from '../audit';
 import { getForViewer, related } from './related';
 import { invalidateRoster } from '../clients/roster';
 import { reconcile } from '../indexing/consumer';
@@ -54,6 +55,18 @@ export const searchRoutes: Handler = async (request, env, _ctx, url) => {
     if (!body?.principal || !/^prn_[0-9a-f]{20}$/.test(body.principal)) return error(400, 'invalid');
     await invalidateRoster(env, body.principal);
     return new Response(null, { status: 204 });
+  }
+  // Gap S2: how the floor treated each candidate, for tuning it live. Operators only, as themselves.
+  if (url.pathname === '/api/v1/admin/search/explain' && request.method === 'POST') {
+    const p = await resolvePerson(request, env);
+    if (p instanceof Response) return p;
+    if (!isOperator(env, p.principalId)) return error(403, 'not_permitted');
+    const q = SearchQuery.safeParse(await request.json().catch(() => null));
+    if (!q.success) return error(400, 'invalid');
+    const explain: ExplainRow[] = [];
+    const results = await search(env, p, q.data, undefined, { explain });
+    await audit(env.DB, { workspaceId: p.workspaceId, actor: p.principalId, act: p.act, action: 'items.searched', detail: { count: results.length, queryLength: q.data.query.length, explain: true } }).run();
+    return json({ results: results.map((r) => ({ itemId: r.itemId, title: r.title, outcome: r.outcome, score: r.score })), candidates: explain });
   }
   if (url.pathname === '/api/v1/search' && request.method === 'POST') {
     const timer = new Timer();
