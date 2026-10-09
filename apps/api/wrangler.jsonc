@@ -24,7 +24,7 @@
   },
   // URL_SIGNING_PRIVATE_KEY is a secret: `wrangler secret put URL_SIGNING_PRIVATE_KEY` (Task 21 Step 4).
   "d1_databases": [
-    { "binding": "DB", "database_name": "superlibrary-catalog", "database_id": "00000000-0000-0000-0000-000000000000", "migrations_dir": "migrations" }
+    { "binding": "DB", "database_name": "superlibrary-catalog", "database_id": "baecb101-9eb3-4e84-bbe2-8037b1ab2b3f", "migrations_dir": "migrations" }
   ],
   "r2_buckets": [{ "binding": "BLOBS", "bucket_name": "superlibrary-blobs" }],
   "queues": {

@@ -48,3 +48,63 @@ jobs:
           name: e2e-results
           path: apps/web/test-results/
           retention-days: 7
+
+  # Continuous deploy, as Superpipeline: after test and e2e pass on main, migrate D1 and ship.
+  deploy-api:
+    needs: [test, e2e]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    concurrency: { group: deploy-api, cancel-in-progress: false }
+    environment: { name: production, url: https://app.superlibrary.dev/api/health }
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: 88acd85618f099112eadc9374996b9f7
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @superlibrary/api db:migrate
+      - run: pnpm --filter @superlibrary/api run deploy
+
+  deploy-content:
+    needs: [test, e2e]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    concurrency: { group: deploy-content, cancel-in-progress: false }
+    environment: { name: content }
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: 88acd85618f099112eadc9374996b9f7
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @superlibrary/content run deploy
+
+  # The SPA to Pages project superlibrary-web. wrangler runs from a neutral directory with an
+  # absolute path: Superpipeline's deploy-docs found that project detection rewrites a checkout.
+  deploy-web:
+    needs: [test, e2e]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    concurrency: { group: deploy-web, cancel-in-progress: false }
+    environment: { name: web, url: https://app.superlibrary.dev }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @superlibrary/web build
+      - name: Deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: 88acd85618f099112eadc9374996b9f7
+        run: |
+          mkdir -p "$RUNNER_TEMP/wrangler-cwd"
+          cd "$RUNNER_TEMP/wrangler-cwd"
+          npx --yes wrangler@4 pages deploy "$GITHUB_WORKSPACE/apps/web/build" --project-name=superlibrary-web --branch=main
