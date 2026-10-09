@@ -2,6 +2,11 @@
 import { COLLECTION_ID, OUTCOMES, type CollectionDetail, type CollectionSummary, type SearchResult } from '@superlibrary/contract';
 import { client, itemId, refused, type Client } from './artifacts.ts';
 
+/** Server text is written by agents and people: no control character (ESC, CSI, OSC, newline) reaches the terminal. */
+export function printable(s: unknown): string {
+  return String(s ?? '').replace(/[\u0000-\u001f\u007f-\u009f]+/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 /** The start of that day, UTC (as `suli upload --expires`); `plus` days later for an inclusive end. */
 function dayStart(d: string, plus = 0): string {
@@ -43,9 +48,9 @@ export function searchBody(words: string, o: SearchOptions): Record<string, unkn
 export function resultLines(results: SearchResult[]): string[] {
   if (results.length === 0) return ['Nothing matches.'];
   return results.flatMap((r) => [
-    `${r.itemId}  [${r.outcome}]  ${r.title}`,
-    ...(r.snippet ? [`    ${r.snippet.replace(/\s+/g, ' ').trim().slice(0, 200)}`] : []),
-    ...(r.supersededBy ? [`    superseded by ${r.supersededBy}`] : []),
+    `${printable(r.itemId)}  [${printable(r.outcome)}]  ${printable(r.title)}`,
+    ...(r.snippet ? [`    ${printable(r.snippet).slice(0, 200)}`] : []),
+    ...(r.supersededBy ? [`    superseded by ${printable(r.supersededBy)}`] : []),
   ]);
 }
 
@@ -93,6 +98,7 @@ export async function collectAddWith(c: Client, ref: string | undefined, rawItem
   const id = itemId(rawItem, 'collect add');
   const col = await resolveCollection(c, ref);
   const res = await c('POST', `/api/v1/collections/${col.id}/items`, note ? { itemId: id, note } : { itemId: id });
+  if (res.status === 404) throw new Error(`${id} does not exist or you cannot see it.`);
   if (!res.ok) return refused(res, id);
 }
 
@@ -100,6 +106,7 @@ export async function collectRemoveWith(c: Client, ref: string | undefined, rawI
   const id = itemId(rawItem, 'collect remove');
   const col = await resolveCollection(c, ref);
   const res = await c('DELETE', `/api/v1/collections/${col.id}/items/${id}`);
+  if (res.status === 404) throw new Error(`${id} does not exist or you cannot see it.`);
   if (!res.ok) return refused(res, id);
 }
 
@@ -112,21 +119,27 @@ export async function scopeWith(c: Client, rawItem: string | undefined, scope: s
   return res.json();
 }
 
+export const collectionLines = (list: CollectionSummary[]): string =>
+  list.length ? list.map((x) => `${printable(x.id)}  ${printable(x.name)}  (${x.itemCount} item${x.itemCount === 1 ? '' : 's'})`).join('\n') : 'No collections yet.';
+export const createdLine = (c: CollectionSummary): string => `Created ${printable(c.name)} (${printable(c.id)}).`;
+export const detailLines = (d: CollectionDetail): string =>
+  [`${printable(d.name)}  (${printable(d.id)})`, ...(d.description ? [printable(d.description)] : []), ...d.entries.map((e) => `  ${printable(e.item.id)}  [${printable(e.item.outcome)}]  ${printable(e.item.title)}`)].join('\n');
+
 const out = (json: boolean, value: unknown, text: string): void => { process.stdout.write(json ? JSON.stringify(value) + '\n' : text + '\n'); };
 
 export async function collect(sub: string | undefined, args: string[], o: { description: string | null; note: string | null; json: boolean }): Promise<void> {
   const c = client();
   if (sub === 'list') {
     const list = await collectListWith(c);
-    return out(o.json, { collections: list }, list.length ? list.map((x) => `${x.id}  ${x.name}  (${x.itemCount} item${x.itemCount === 1 ? '' : 's'})`).join('\n') : 'No collections yet.');
+    return out(o.json, { collections: list }, collectionLines(list));
   }
   if (sub === 'create') {
     const col = await collectCreateWith(c, args.join(' '), o.description);
-    return out(o.json, col, `Created ${col.name} (${col.id}).`);
+    return out(o.json, col, createdLine(col));
   }
   if (sub === 'show') {
     const d = await collectShowWith(c, args[0]);
-    return out(o.json, d, [`${d.name}  (${d.id})`, ...(d.description ? [d.description] : []), ...d.entries.map((e) => `  ${e.item.id}  [${e.item.outcome}]  ${e.item.title}`)].join('\n'));
+    return out(o.json, d, detailLines(d));
   }
   if (sub === 'add') { await collectAddWith(c, args[0], args[1], o.note); return out(o.json, { added: true }, 'Added.'); }
   if (sub === 'remove') { await collectRemoveWith(c, args[0], args[1]); return out(o.json, { removed: true }, 'Removed.'); }

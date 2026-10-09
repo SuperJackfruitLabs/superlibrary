@@ -68,6 +68,14 @@ export function makeClient(base: string, token: TokenSource['token'], fetchImpl:
   };
 }
 
+/** What a 400 says is wrong (zod issues, detail or message), on one line without control characters. */
+function reasonOf(b: { issues?: unknown; detail?: unknown; message?: unknown }): string {
+  const v = b.issues ?? b.detail ?? b.message;
+  if (v === undefined || v === null) return '';
+  const s = typeof v === 'string' ? v : JSON.stringify(v);
+  return s.replace(/[\u0000-\u001f\u007f-\u009f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 300);
+}
+
 /**
  * A refusal as a sentence. `shared` (the upload requests) uses the contract's wording, the same the
  * web app shows; other requests name the code, since those sentences speak of uploads.
@@ -77,7 +85,8 @@ export async function refused(res: Response, what: string, shared = false): Prom
   if (body.error === 'product_not_enabled') throw new Error(`Superlibrary is not enabled for workspace ${body.org}. An owner can enable it in the account settings.`);
   const { error = `http_${res.status}`, findings, ...detail } = body;
   const sentence = shared ? refusalSentence({ ok: false, status: res.status, error, findings, detail }) : null;
-  throw new Error(sentence ?? `${what} was refused (${res.status} ${body.error ?? ''}${body.path ? `: ${body.path}` : ''}${body.rule ? ` matches ${body.rule}` : ''}).`);
+  const why = res.status === 400 ? reasonOf(body as { issues?: unknown; detail?: unknown; message?: unknown }) : '';
+  throw new Error(sentence ?? `${what} was refused (${res.status} ${body.error ?? ''}${body.path ? `: ${body.path}` : ''}${body.rule ? ` matches ${body.rule}` : ''})${why ? `: ${why}` : ''}.`);
 }
 
 /** `--expires` is a calendar date, read as the start of that day in UTC. */
