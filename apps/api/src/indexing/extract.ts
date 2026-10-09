@@ -26,7 +26,7 @@ export async function extractText(env: Env, item: ItemRow): Promise<{ text: stri
   if (item.revoked_at || isExpired(item)) return null;
   if (item.kind === 'work-record') {
     const w = await env.DB.prepare(`SELECT text FROM work_records WHERE item_id = ?`).bind(item.id).first<{ text: string }>();
-    return w && w.text.trim() !== '' ? { text: w.text, view: 'work-record', version: 0 } : null;
+    return w && w.text.trim() !== '' ? { text: w.text.slice(0, MAX_TEXT), view: 'work-record', version: 0 } : null;
   }
   const v = await env.DB.prepare(`SELECT version, view FROM versions WHERE item_id = ? AND revoked_at IS NULL ORDER BY version DESC LIMIT 1`).bind(item.id).first<{ version: number; view: View }>();
   if (!v) return null;

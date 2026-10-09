@@ -60,7 +60,7 @@ export default {
   /** The daily cron only enqueues; the consumer does the work (spec §6 `retention` queue). */
   async scheduled(c: ScheduledController, env: Env, ctx: ExecutionContext) {
     if (c.cron === RECONCILE_CRON) {
-      ctx.waitUntil(reconcile(env));
+      ctx.waitUntil(reconcile(env).catch((e) => console.error('reconcile failed', e instanceof Error ? e.message : String(e))));
       return;
     }
     if (c.cron !== RETENTION_CRON) {

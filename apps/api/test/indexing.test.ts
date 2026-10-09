@@ -2,7 +2,7 @@ import { createExecutionContext, createMessageBatch, env, getQueueResult } from 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { IndexMessage } from '@superlibrary/contract';
 import worker from '../src/index';
-import { indexBatch, indexItem, reconcile } from '../src/indexing/consumer';
+import { indexBatch, indexItem, reconcile, unindexItem } from '../src/indexing/consumer';
 import { setIndexingForTests } from '../src/indexing/vector-index';
 import { fakeEmbedder, fakeVectorize } from './helpers/fake-vectors';
 import { upload } from './helpers/upload';
@@ -91,6 +91,55 @@ describe('indexItem', () => {
   });
 });
 
+describe('vectors failing (B-R10)', () => {
+  const failing = (v: ReturnType<typeof fakeVectorize>, op: 'upsert' | 'deleteByIds', on: { v: boolean }) => {
+    const orig = v[op].bind(v) as (...a: any[]) => Promise<unknown>;
+    (v as any)[op] = async (...a: any[]) => { if (on.v) throw new Error('vectorize down'); return orig(...a); };
+  };
+  it('an item indexed while Vectorize is down is still found by FTS, and indexItem rejects', async () => {
+    const on = { v: true }; failing(vec, 'upsert', on);
+    await seedRecord({ id: 'itm_00000000000000d1', text: 'quokka sanctuary notes' });
+    await expect(indexItem(env, 'itm_00000000000000d1')).rejects.toThrow('vectorize down');
+    const fts = await env.DB.prepare(`SELECT item_id FROM chunks_fts WHERE chunks_fts MATCH '"quokka"'`).all();
+    expect(fts.results).toEqual([{ item_id: 'itm_00000000000000d1' }]);
+  });
+  it('a retry after a failed upsert succeeds, ends with vectors and a final digest', async () => {
+    const on = { v: true }; failing(vec, 'upsert', on);
+    await seedRecord({ id: 'itm_00000000000000d2', text: 'retry me please' });
+    await expect(indexItem(env, 'itm_00000000000000d2')).rejects.toThrow();
+    on.v = false;
+    expect(await indexItem(env, 'itm_00000000000000d2')).toBe('indexed');
+    expect(vec.store.has('itm_00000000000000d2:0:0')).toBe(true);
+    expect(await indexItem(env, 'itm_00000000000000d2')).toBe('unchanged');
+    expect((await env.DB.prepare(`SELECT COUNT(*) AS n FROM chunks WHERE item_id = 'itm_00000000000000d2'`).first<{ n: number }>())!.n).toBe(1);
+  });
+  it('a re-index with fewer chunks deletes the stale old vector ids', async () => {
+    const long = Array.from({ length: 12 }, (_, i) => `Paragraph ${i} ${'word '.repeat(150)}`).join('\n\n');
+    await seedRecord({ id: 'itm_00000000000000d3', text: long });
+    await indexItem(env, 'itm_00000000000000d3');
+    const before = [...vec.store.keys()].filter((k) => k.startsWith('itm_00000000000000d3'));
+    expect(before.length).toBeGreaterThan(1);
+    await env.DB.prepare(`UPDATE work_records SET text = 'short now' WHERE item_id = 'itm_00000000000000d3'`).run();
+    await indexItem(env, 'itm_00000000000000d3');
+    expect([...vec.store.keys()].filter((k) => k.startsWith('itm_00000000000000d3'))).toEqual(['itm_00000000000000d3:0:0']);
+  });
+  it('unindex with Vectorize delete failing keeps the ids in index_state; a later unindex finishes', async () => {
+    const on = { v: false }; failing(vec, 'deleteByIds', on);
+    await seedRecord({ id: 'itm_00000000000000d4', text: 'to unindex' });
+    await indexItem(env, 'itm_00000000000000d4');
+    on.v = true;
+    await expect(unindexItem(env, 'itm_00000000000000d4')).rejects.toThrow('vectorize down');
+    expect((await env.DB.prepare(`SELECT COUNT(*) AS n FROM chunks WHERE item_id = 'itm_00000000000000d4'`).first<{ n: number }>())!.n).toBe(0);
+    expect((await env.DB.prepare(`SELECT COUNT(*) AS n FROM chunks_fts WHERE item_id = 'itm_00000000000000d4'`).first<{ n: number }>())!.n).toBe(0);
+    const st = await env.DB.prepare(`SELECT chunk_ids FROM index_state WHERE item_id = 'itm_00000000000000d4'`).first<{ chunk_ids: string }>();
+    expect(JSON.parse(st!.chunk_ids)).toEqual(['itm_00000000000000d4:0:0']);
+    on.v = false;
+    await unindexItem(env, 'itm_00000000000000d4');
+    expect(vec.store.has('itm_00000000000000d4:0:0')).toBe(false);
+    expect(await env.DB.prepare(`SELECT 1 FROM index_state WHERE item_id = 'itm_00000000000000d4'`).first()).toBeNull();
+  });
+});
+
 describe('reconcile', () => {
   it('queues live items with no index state, and deletions for orphaned state', async () => {
     await seedRecord({ id: 'itm_00000000000000b7', text: 'never indexed' });
@@ -129,5 +178,15 @@ describe('reconcile', () => {
     const { SELF } = await import('cloudflare:test');
     const res = await SELF.fetch('https://api.test/api/v1/admin/index/reconcile', { method: 'POST', headers: devHeaders() });
     expect(res.status).toBe(403);
+  });
+  it('an operator gets 202 and the counts', async () => {
+    const { SELF } = await import('cloudflare:test');
+    const { HUMAN } = await import('./helpers/org-plane');
+    (env as any).OPERATORS = HUMAN;
+    try {
+      const res = await SELF.fetch('https://api.test/api/v1/admin/index/reconcile', { method: 'POST', headers: devHeaders() });
+      expect(res.status).toBe(202);
+      expect(Object.keys(await res.json<any>()).sort()).toEqual(['orphans', 'queued']);
+    } finally { (env as any).OPERATORS = ''; }
   });
 });
