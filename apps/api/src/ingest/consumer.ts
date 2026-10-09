@@ -131,7 +131,8 @@ export async function ingestBatch(batch: MessageBatch<IngestMessage>, env: Env):
  * `syncCard` the live events use (plan P5), so backfill equals live.
  *
  * Bounded work: one invocation reads one snapshot (1 subrequest), one D1 read, and sends at most
- * BACKFILL_PAGE messages in sendBatch calls of <= 100 (<= 5 calls), so about 7 subrequests. The
+ * BACKFILL_PAGE + 1 messages (a full page plus the cursor message) in sendBatch calls of <= 100
+ * (<= 6 calls), so about 8 subrequests. The
  * rest of the board follows as a `board.backfill` carrying a cursor. The expensive part, about 6
  * subrequests per card (cardBundle), happens later in the consumer, 10 messages per invocation.
  */
