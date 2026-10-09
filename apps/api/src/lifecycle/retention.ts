@@ -9,6 +9,9 @@ import { audit } from '../audit';
 import { itemChanged } from '../events';
 import { blobKey, manifestKey } from '../storage/blobs';
 
+/** Must equal `triggers.crons[0]` in wrangler.jsonc (a test holds them together). */
+export const RETENTION_CRON = '0 3 * * *';
+
 export interface SweepReport {
   expired: string[];
   unreferenced: string[];

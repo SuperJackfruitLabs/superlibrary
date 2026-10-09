@@ -10,9 +10,7 @@ import { uploadRoutes } from './uploads/routes';
 import { itemRoutes } from './items/routes';
 import { queueHandlers } from './queues';
 import { counted, withCost } from './cost';
-
-/** Must equal `triggers.crons[0]` in wrangler.jsonc (a test holds them together). */
-export const RETENTION_CRON = '0 3 * * *';
+import { RETENTION_CRON } from './lifecycle/retention';
 
 const handlers: Handler[] = [uploadRoutes, itemRoutes];
 
