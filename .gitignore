@@ -46,3 +46,4 @@ viewer-dist/
 
 # The e2e stack's shared local D1 and R2 (apps/web/playwright.config.ts).
 .wrangler-e2e/
+packages/embed/dist/
