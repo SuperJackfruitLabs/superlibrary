@@ -28,9 +28,18 @@ describe('checkPath (spec §8 path rules)', () => {
       'application_default_credentials.json', '.docker/config.json', '.kube/config', '.git-credentials',
       '.claude/settings.json', '.claude.json', '.codex/auth.json', '.gemini/oauth_creds.json', '.cursor/mcp.json',
       '.config/opencode/auth.json', '.local/share/opencode/auth.json', '.config/goose/config.yaml',
+      // Aligned with the AgentPod node's denylist (spec §8)
+      '.config/gh/hosts.yml', 'home/.config/gh/hosts.yml', '.bash_history', 'u/.zsh_history', '.python_history', '.node_repl_history',
+      '.psql_history', '.mysql_history', 'creds/credentials.json', 'x/auth.json', '.credentials.json',
+      '.hermes/config.yaml', 'p/.openclaw/state.json', '.opencode/x', '.pi/agent/auth.json',
     ]) {
       expect(checkPath(p), p).toMatchObject({ ok: false, reason: 'denied' });
     }
+  });
+
+  it('still accepts ordinary neighbours of the newly denied names', () => {
+    for (const p of ['.config/gh/config.yml', 'docs/history.md', '.config/other/hosts.yml', 'pi/notes.md', 'opencode.md', 'auth.json.md'])
+      expect(checkPath(p), p).toMatchObject({ ok: true });
   });
 
   it('refuses trailing dots and spaces that defeat exact-name and suffix rules', () => {
