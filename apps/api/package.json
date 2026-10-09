@@ -12,6 +12,7 @@
     "db:migrate": "wrangler d1 migrations apply superlibrary-catalog --remote"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@superlibrary/contract": "workspace:*",
     "jose": "^6.2.8",
     "zod": "^4.4.3"

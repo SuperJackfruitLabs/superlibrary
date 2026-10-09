@@ -65,6 +65,8 @@
   // Same hostname as the Pages app (plan decision D1). Declared here, not clicked in the dashboard.
   "routes": [
     { "pattern": "app.superlibrary.dev/api/*", "zone_name": "superlibrary.dev" },
-    { "pattern": "app.superlibrary.dev/.well-known/oauth-protected-resource", "zone_name": "superlibrary.dev" }
+    { "pattern": "app.superlibrary.dev/.well-known/oauth-protected-resource", "zone_name": "superlibrary.dev" },
+    { "pattern": "app.superlibrary.dev/mcp", "zone_name": "superlibrary.dev" },
+    { "pattern": "app.superlibrary.dev/.well-known/oauth-protected-resource/mcp", "zone_name": "superlibrary.dev" }
   ]
 }

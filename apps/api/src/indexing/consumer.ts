@@ -8,6 +8,7 @@ import { extractText } from './extract';
 import { embedderFor } from './embedder';
 import { indexFor, readSlots, type SlotRow } from './vector-index';
 import { estimateTokens } from '@superlibrary/contract';
+import { reindexPage } from './reindex';
 
 /** The daily repair (plan P10). A constant here, not in the Worker entry, which may export only default. */
 export const RECONCILE_CRON = '30 3 * * *';
@@ -122,17 +123,20 @@ export async function reconcile(env: Env): Promise<{ queued: number; orphans: nu
     `SELECT i.id, i.workspace_id FROM items i JOIN index_state s ON s.item_id = i.id
       WHERE i.revoked_at IS NOT NULL OR (i.expires_at IS NOT NULL AND i.expires_at <= ?1) LIMIT 5000`,
   ).bind(new Date().toISOString()).all<{ id: string; workspace_id: string }>()).results;
+  // B-R13: live items whose index_state still records a slot that is neither active nor building
+  // (the old slot after a swap); indexItem deletes their ids from it, so two embedders never mix.
+  const idle = (await env.DB.prepare(`SELECT slot FROM vector_slots WHERE state = 'idle'`).all<{ slot: 'a' | 'b' }>()).results.filter((r) => r.slot === 'a' || r.slot === 'b');
+  const undrained = idle.length === 0 ? [] : (await env.DB.prepare(
+    `SELECT i.id, i.workspace_id FROM items i JOIN index_state s ON s.item_id = i.id
+      WHERE i.revoked_at IS NULL AND (i.expires_at IS NULL OR i.expires_at > ?1)
+        AND (${idle.map((r) => `json_extract(s.slots, '$.${r.slot}') IS NOT NULL`).join(' OR ')}) LIMIT 5000`,
+  ).bind(new Date().toISOString()).all<{ id: string; workspace_id: string }>()).results;
   const orphans = (await env.DB.prepare(`SELECT s.item_id FROM index_state s LEFT JOIN items i ON i.id = s.item_id WHERE i.id IS NULL LIMIT 5000`).all<{ item_id: string }>()).results;
   const at = new Date().toISOString();
   const msgs = [
-    ...[...missing, ...stale].map((r) => ({ body: { type: 'item.changed' as const, itemId: r.id, workspaceId: r.workspace_id, change: 'upserted' as const, at } })),
+    ...[...new Map([...missing, ...stale, ...undrained].map((r) => [r.id, r])).values()].map((r) => ({ body: { type: 'item.changed' as const, itemId: r.id, workspaceId: r.workspace_id, change: 'upserted' as const, at } })),
     ...orphans.map((r) => ({ body: { type: 'item.changed' as const, itemId: r.item_id, workspaceId: '', change: 'deleted' as const, at } })),
   ];
   for (let i = 0; i < msgs.length; i += 100) await env.INDEX.sendBatch(msgs.slice(i, i + 100));
-  return { queued: missing.length + stale.length, orphans: orphans.length };
-}
-
-/** Task B8 fills this in; until then a stray page is retried, never acked. */
-export async function reindexPage(_env: Env, _slot: 'a' | 'b', _after: string | null): Promise<void> {
-  throw new Error('re-index arrives in Task B8');
+  return { queued: new Set([...missing, ...stale, ...undrained].map((r) => r.id)).size, orphans: orphans.length };
 }
