@@ -6,7 +6,12 @@ let cached: { jwk: string; key: Promise<CryptoKey> } | null = null;
 function signingKey(env: Env): Promise<CryptoKey> {
   const jwk = env.URL_SIGNING_PRIVATE_KEY;
   if (!jwk) throw new Error('URL_SIGNING_PRIVATE_KEY is not set');
-  if (cached?.jwk !== jwk) cached = { jwk, key: crypto.subtle.importKey('jwk', JSON.parse(jwk), { name: 'Ed25519' }, false, ['sign']) };
+  if (cached?.jwk !== jwk) {
+    // workerd imports an Ed25519 JWK only when `alg` is absent or "EdDSA"; Node 24+ exports "Ed25519".
+    // The algorithm is fixed here, so `alg` adds nothing: drop it, whichever runtime made the key.
+    const { alg: _alg, ...key } = JSON.parse(jwk) as JsonWebKey;
+    cached = { jwk, key: crypto.subtle.importKey('jwk', key, { name: 'Ed25519' }, false, ['sign']) };
+  }
   return cached.key;
 }
 

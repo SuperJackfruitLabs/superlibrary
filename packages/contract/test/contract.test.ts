@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   ITEM_ID, newId, contentLabel, itemIdFromLabel, SCOPE_RE, LIMITS, UploadCreate,
-  contentCsp, encodePath, formatToken, parseToken, signingMessage, b64url, fromB64url,
+  FRAME_SANDBOX, contentCsp, encodePath, formatToken, parseToken, signingMessage, b64url, fromB64url,
   compareTreePaths, orderFiles,
 } from '../src/index';
 
@@ -62,6 +62,12 @@ describe('content origin', () => {
     // Operator decision D3: inline script and style are allowed; eval and WebAssembly are not.
     expect(csp).not.toContain('unsafe-eval');
     expect(csp).not.toContain('wasm-unsafe-eval');
+  });
+  it('refuses to build a CSP that anyone may frame (ruling T11: an empty frame-ancestors is ignored by browsers)', () => {
+    expect(() => contentCsp([])).toThrow(/frame-ancestors/);
+  });
+  it('the frame sandbox is the spec §9 one: scripts and escaping popups, never same-origin, forms, top navigation or modals', () => {
+    expect(FRAME_SANDBOX).toBe('allow-scripts allow-popups-to-escape-sandbox');
   });
   it('encodes each path segment, keeping the slashes', () => {
     expect(encodePath('img/a b#1?.png')).toBe('img/a%20b%231%3F.png');

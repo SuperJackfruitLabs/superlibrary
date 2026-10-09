@@ -5,8 +5,17 @@ const CDN = ["'self'", 'data:', 'blob:', 'https://cdnjs.cloudflare.com', 'https:
 const FONTS = ['https://fonts.googleapis.com', 'https://fonts.gstatic.com'];
 export const CONTENT_CSP_SOURCES = { cdn: CDN, fonts: FONTS } as const;
 
+/**
+ * The frame's sandbox (spec §9): scripts and popups that escape it, and nothing else — no
+ * `allow-same-origin`, so every artifact runs in an opaque origin. The host SDK puts it on the
+ * `<iframe>`; the content Worker repeats it as a CSP `sandbox` directive on HTML and SVG documents.
+ */
+export const FRAME_SANDBOX = 'allow-scripts allow-popups-to-escape-sandbox';
+
 /** The content origin's CSP. No `form-action` (spec §9); `connect-src 'none'`. */
 export function contentCsp(frameAncestors: string[]): string {
+  // A `frame-ancestors` with no sources is dropped by browsers, which would let anyone frame it.
+  if (frameAncestors.length === 0) throw new Error('contentCsp: frame-ancestors needs at least one host');
   const cdn = CDN.join(' ');
   const withFonts = `${cdn} ${FONTS.join(' ')}`;
   return [
