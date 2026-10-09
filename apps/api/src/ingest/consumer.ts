@@ -68,7 +68,13 @@ export async function syncCard(
   const refIds = [...new Set(record.references.map((r) => r.itemId).filter((x): x is string => x !== null))];
   const owned = refIds.length === 0 ? [] : (await env.DB.prepare(`SELECT id FROM items WHERE workspace_id = ?1 AND id IN (SELECT value FROM json_each(?2))`).bind(m.workspaceId, JSON.stringify(refIds)).all<{ id: string }>()).results.map((r) => r.id);
 
-  const statements: D1PreparedStatement[] = [];
+  // The tombstone is also checked inside the batch (decision O5): a removal that lands after the
+  // read at the top aborts this write, and the retry returns 'unchanged'. Inserting the tombstone's
+  // own key again violates its primary key, which aborts the whole batch.
+  const statements: D1PreparedStatement[] = [
+    env.DB.prepare(`INSERT INTO removed_cards (workspace_id, card_id, item_id, reason, removed_by) SELECT workspace_id, card_id, item_id, reason, removed_by FROM removed_cards WHERE workspace_id = ? AND card_id = ?`)
+      .bind(m.workspaceId, m.cardId),
+  ];
   if (existing) {
     statements.push(
       // What a person did stays done (gap G1): a widened record stays workspace-wide, and a
@@ -96,7 +102,8 @@ export async function syncCard(
       audit(env.DB, { workspaceId: m.workspaceId, actor: ACTOR, action: 'item.created', itemId, detail: { cardId: m.cardId } }),
     );
   }
-  for (const id of owned) statements.push(env.DB.prepare(`INSERT OR IGNORE INTO item_references (item_id, from_kind, from_id) VALUES (?, 'work-record', ?)`).bind(id, itemId));
+  // Only while the record still exists: a record removed mid-sync must not leave references that keep artifacts (spec §12).
+  for (const id of owned) statements.push(env.DB.prepare(`INSERT OR IGNORE INTO item_references (item_id, from_kind, from_id) SELECT ?1, 'work-record', ?2 WHERE EXISTS (SELECT 1 FROM items WHERE id = ?2)`).bind(id, itemId));
   if (redacted) statements.push(audit(env.DB, { workspaceId: m.workspaceId, actor: ACTOR, action: 'record.redacted', itemId, detail: { redactions: record.redactions } }));
   // A racing first delivery makes the loser's INSERT hit work_records_card; it throws, the message
   // retries and the retry updates.

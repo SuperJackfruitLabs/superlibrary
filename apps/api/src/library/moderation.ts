@@ -104,6 +104,8 @@ export async function removeFromMemory(request: Request, env: Env, p: Person, id
   if (m instanceof Response) return m;
   const b = RemoveBody.safeParse(await request.json().catch(() => null));
   if (!b.success) return error(400, 'invalid', { detail: 'a reason of 3 to 500 characters is required' });
+  // The tombstone goes in before the delete, deliberately: if the delete fails, the card stays frozen
+  // (no sync can change it) and a second remove succeeds; the other order could let a sync recreate it.
   if (m.item.kind === 'work-record') {
     const w = await env.DB.prepare(`SELECT card_id FROM work_records WHERE item_id = ?`).bind(id).first<{ card_id: string }>();
     if (w) {

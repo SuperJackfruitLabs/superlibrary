@@ -4,8 +4,9 @@ import { ORG, card, fakePipeline, type FakeState } from './helpers/fake-pipeline
 import { syncCard } from '../src/ingest/consumer';
 import { ensureWorkspace } from '../src/auth/caller';
 import { __resetServiceTokensForTests } from '../src/clients/plane';
+import { deleteItem, sweep } from '../src/lifecycle/retention';
 import { loadItem } from '../src/items/visibility';
-import { AGENT, HUMAN_2, devHeaders, planeToken, withOrgPlane } from './helpers/org-plane';
+import { AGENT, HUMAN_2, planeToken, withOrgPlane } from './helpers/org-plane';
 import { upload } from './helpers/upload';
 import { call, knowBoard, workspaceOf } from './helpers/library';
 
@@ -79,6 +80,62 @@ describe('remove from memory (spec §11, §12)', () => {
     const id = (await recordId())!;
     expect((await call(`/api/v1/items/${id}/remove`, { method: 'POST', body: { reason: 'not mine' }, principal: HUMAN_2 })).status).toBe(403);
     const mine = (await upload([{ path: 'o.md', body: '# o' }], { title: 'Owner file' })).body.itemId as string;
-    expect((await call(`/api/v1/items/${mine}/remove`, { method: 'POST', body: { reason: 'not mine' }, headers: devHeaders(HUMAN_2) })).status).toBe(403);
+    expect((await call(`/api/v1/items/${mine}/remove`, { method: 'POST', body: { reason: 'not mine' }, principal: HUMAN_2 })).status).toBe(403);
+  });
+});
+
+/** Runs `hook` once, when the sync first asks the pipeline for the card: the sync is then past its reads. */
+const duringFetch = (cardId: string, hook: () => Promise<unknown>) => {
+  const inner = globalThis.fetch;
+  let armed = true;
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    if (armed && new URL(new Request(input as RequestInfo).url).pathname.endsWith(`/cards/${cardId}`)) { armed = false; await hook(); }
+    return inner(input as RequestInfo, init);
+  }) as typeof fetch;
+};
+const refsOf = (itemId: string) => env.DB.prepare(`SELECT 1 FROM item_references WHERE item_id = ?`).bind(itemId).first();
+
+describe('a removal that lands mid-sync (decision O5, spec §12)', () => {
+  it('a tombstone that appears after the sync read its state aborts the write', async () => {
+    const C2 = 'card_00000000000000c8';
+    state.boards.get(B)!.cards.set(C2, { card: card(C2), attempts: [], comments: [], links: [], gates: [], references: [] });
+    await env.DB.prepare(`DELETE FROM removed_cards WHERE card_id = ?`).bind(C2).run();
+    duringFetch(C2, () => env.DB.prepare(`INSERT INTO removed_cards (workspace_id, card_id, item_id, reason, removed_by) VALUES (?, ?, 'itm_00000000000009f9', 'raced', 'prn_000000000000000000a1')`).bind(ws, C2).run());
+    await syncCard(env, { workspaceId: ws, boardId: B, cardId: C2 }).catch(() => 'retry');
+    expect(await env.DB.prepare(`SELECT 1 FROM work_records WHERE card_id = ?`).bind(C2).first()).toBeNull();
+    expect(await syncCard(env, { workspaceId: ws, boardId: B, cardId: C2 })).toBe('unchanged');
+  });
+  it('removing a record during its own sync leaves it gone and no reference keeping an artifact', async () => {
+    const art = (await upload([{ path: 'k.md', body: '# k' }], { title: 'Kept' })).body.itemId as string;
+    state.boards.get(B)!.cards.get(C)!.references = [{ cardId: C, url: `https://api.test/a/${art}`, title: null, provider: 'superlibrary', externalId: art }];
+    touch({ title: 'Changed so the sync writes' });
+    await syncCard(env, { workspaceId: ws, boardId: B, cardId: C });
+    expect(await refsOf(art)).not.toBeNull();
+    const id = (await recordId())!;
+    touch({ title: 'Changed again' });
+    duringFetch(C, async () => { expect((await call(`/api/v1/items/${id}/remove`, { method: 'POST', body: { reason: 'raced removal' } })).status).toBe(200); });
+    await syncCard(env, { workspaceId: ws, boardId: B, cardId: C }).catch(() => 'retry');
+    expect(await recordId()).toBeNull();
+    expect(await refsOf(art)).toBeNull();
+    expect(await syncCard(env, { workspaceId: ws, boardId: B, cardId: C })).toBe('unchanged');
+  });
+  it('a record deleted by other means mid-sync gets no references either', async () => {
+    const art = (await upload([{ path: 'j.md', body: '# j' }], { title: 'Kept too' })).body.itemId as string;
+    state.boards.get(B)!.cards.get(C)!.references = [{ cardId: C, url: `https://api.test/a/${art}`, title: null, provider: 'superlibrary', externalId: art }];
+    const id = (await recordId())!;
+    touch({ title: 'Changed' });
+    duringFetch(C, () => deleteItem(env, id, 'prn_000000000000000000a1', 'gone'));
+    await syncCard(env, { workspaceId: ws, boardId: B, cardId: C });
+    expect(await refsOf(art)).toBeNull();
+  });
+  it("removing a work record frees the artifacts it referenced for the retention sweep", async () => {
+    const art = (await upload([{ path: 'free.md', body: '# free' }], { title: 'Free' })).body.itemId as string;
+    state.boards.get(B)!.cards.get(C)!.references = [{ cardId: C, url: `https://api.test/a/${art}`, title: null, provider: 'superlibrary', externalId: art }];
+    touch({ title: 'References one' });
+    await syncCard(env, { workspaceId: ws, boardId: B, cardId: C });
+    expect(await refsOf(art)).not.toBeNull();
+    const id = (await recordId())!;
+    expect((await call(`/api/v1/items/${id}/remove`, { method: 'POST', body: { reason: 'cleanup' } })).status).toBe(200);
+    expect((await sweep(env, Date.now() + 31 * 86_400_000)).unreferenced).toContain(art);
   });
 });
