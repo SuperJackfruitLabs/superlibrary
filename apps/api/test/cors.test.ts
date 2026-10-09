@@ -22,7 +22,6 @@ describe('CORS for embedding hosts (spec §9 Embedding, Tasks 22-23)', () => {
   it('another origin gets no CORS, and the library routes stay same-origin', async () => {
     const a = (await upload([{ path: 'd.md', body: '# d' }], { title: 'D' })).body.itemId as string;
     expect(acao(await call(`/api/v1/items/${a}`, { headers: EVIL }))).toBeNull();
-    expect(acao(await call(`/api/v1/items/${a}/revoke`, { method: 'POST', body: {}, headers: HOST }))).toBeNull();
     // A refusal on a route a host does not use carries no CORS either, and neither does its preflight.
     expect(acao(await call(`/api/v1/items/${a}/revoke`, { method: 'POST', body: {}, headers: { Origin: 'https://host.test' } }))).toBeNull();
     const pre = await call(`/api/v1/items/${a}/revoke`, { method: 'OPTIONS', headers: { Origin: 'https://host.test', 'Access-Control-Request-Method': 'POST' } });
@@ -34,6 +33,11 @@ describe('CORS for embedding hosts (spec §9 Embedding, Tasks 22-23)', () => {
     const item = await pre('/api/v1/items/itm_0123456789abcdef');
     expect(item.status).toBe(204);
     expect(item.headers.get('Access-Control-Allow-Methods')).toBe('GET');
+    expect(item.headers.get('Access-Control-Allow-Origin')).toBe('https://host.test');
+    expect(item.headers.get('Access-Control-Allow-Headers')).toContain('authorization');
+    expect(item.headers.get('Access-Control-Allow-Credentials')).toBeNull();
+    const evil = await call('/api/v1/items/itm_0123456789abcdef', { method: 'OPTIONS', headers: { Origin: 'https://evil.test', 'Access-Control-Request-Method': 'GET' } });
+    expect(evil.headers.get('Access-Control-Allow-Origin')).toBeNull();
     expect((await pre('/api/v1/items/itm_0123456789abcdef/scope')).headers.get('Access-Control-Allow-Methods')).toBe('POST');
     expect((await pre('/api/v1/related')).headers.get('Access-Control-Allow-Methods')).toBe('POST');
     expect((await pre('/api/v1/me')).headers.get('Access-Control-Allow-Methods')).toBe('GET');
