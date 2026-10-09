@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Mark from '$lib/Mark.svelte';
   import { beginSignIn } from '$lib/auth/org-plane';
   import { currentPlane } from '$lib/session.svelte';
   let error = $state<string | null>(null);
@@ -11,6 +12,7 @@
 
 <svelte:head><title>Sign in · Superlibrary</title></svelte:head>
 <main class="notice">
+  <Mark class="mark-hero" />
   <h1>Superlibrary</h1>
   <p>Sign in with your Super Jackfruit Labs account.</p>
   <button type="button" onclick={signIn}>Sign in</button>
