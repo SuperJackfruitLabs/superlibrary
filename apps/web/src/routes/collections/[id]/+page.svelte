@@ -1,6 +1,6 @@
 <!-- apps/web/src/routes/collections/[id]/+page.svelte -->
 <script lang="ts">
-  import { untrack } from 'svelte';
+  import { tick, untrack } from 'svelte';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import { COLLECTION_ID, type CollectionDetail } from '@superlibrary/contract';
@@ -18,6 +18,8 @@
   let error = $state<string | null>(null);
   let notice = $state<string | null>(null);
   let editing = $state(false);
+  let renameBtn = $state<HTMLElement | null>(null);
+  async function stopEditing() { editing = false; await tick(); renameBtn?.focus(); }
   let name = $state('');
   let description = $state('');
   let editError = $state<string | null>(null);
@@ -35,11 +37,12 @@
   function startEdit() { name = c!.name; description = c!.description; editError = null; editing = true; }
   async function save(e: SubmitEvent) {
     e.preventDefault();
+    if (!name.trim()) { editError = 'Give the collection a name.'; return; }
     const err = await updateCollection(api, id, { name: name.trim(), description: description.trim() });
     if (err) { editError = err; return; }
-    editing = false;
     notice = 'Saved.';
     await load();
+    await stopEditing();
   }
   async function remove(itemId: string, title: string) {
     const err = await removeFromCollection(api, id, itemId);
@@ -74,12 +77,12 @@
         <label class="field">Name <input bind:value={name} maxlength="120" /></label>
         <label class="field">Description <input bind:value={description} maxlength="1000" /></label>
         <Button variant="primary" type="submit">Save</Button>
-        <button type="button" onclick={() => (editing = false)}>Cancel</button>
+        <button type="button" onclick={stopEditing}>Cancel</button>
       </form>
       {#if editError}<p class="error" role="alert">{editError}</p>{/if}
     {:else}
-      <div class="actions">
-        <button type="button" onclick={startEdit}>Rename or describe</button>
+      <div class="actions collection-actions">
+        <button type="button" bind:this={renameBtn} onclick={startEdit}>Rename or describe</button>
         <Button variant="danger" onclick={(e) => { dialogError = null; deleting = e.currentTarget as HTMLElement; }}>Delete collection</Button>
       </div>
     {/if}

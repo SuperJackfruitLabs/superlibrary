@@ -31,4 +31,18 @@ describe('a collection page', () => {
     await settle();
     expect(document.body.textContent).toContain('Delete collection');
   });
+  it('rename needs a name, and focus returns to the Rename button afterwards', async () => {
+    canEdit = true;
+    c = mount(Page, { target: document.body });
+    await settle();
+    const rename = () => [...document.querySelectorAll('button')].find((b) => b.textContent === 'Rename or describe')!;
+    rename().click(); flushSync();
+    const name = document.querySelector<HTMLInputElement>('form input')!;
+    name.value = '  '; name.dispatchEvent(new Event('input', { bubbles: true })); flushSync();
+    document.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); await settle();
+    expect(document.querySelector('[role=alert]')!.textContent).toBe('Give the collection a name.');
+    [...document.querySelectorAll('button')].find((b) => b.textContent === 'Cancel')!.click();
+    await settle();
+    expect(document.activeElement).toBe(rename());
+  });
 });
