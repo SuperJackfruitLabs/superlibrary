@@ -4,10 +4,8 @@ import { resolvePerson } from '../auth/caller';
 import { BadCursor, browse } from './browse';
 import { facets } from './facets';
 import { addToCollection, collectionDetail, createCollection, deleteCollection, listCollections, loadCollection, patchCollection, removeFromCollection } from './collections';
+import { issues } from './issues';
 import { recordView } from './record';
-
-export const issues = (e: { issues: Array<{ path: PropertyKey[]; message: string }> }) =>
-  e.issues.map((i) => ({ path: i.path.map(String).join('.'), message: i.message }));
 
 /**
  * The library app's routes (phase 4). People only: agents read through search, get, related and

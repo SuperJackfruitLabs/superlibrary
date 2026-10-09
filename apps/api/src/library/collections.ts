@@ -6,7 +6,7 @@ import { audit } from '../audit';
 import { error, json } from '../http';
 import { canSee, isExpired, loadItem, viewerScopes, visibleBinds, visibleSql, type ItemRow } from '../items/visibility';
 import { extrasFor, summary } from '../items/routes';
-import { issues } from './routes';
+import { issues } from './issues';
 
 interface ColRow { id: string; workspace_id: string; name: string; description: string; created_by: string; created_at: string; updated_at: string }
 

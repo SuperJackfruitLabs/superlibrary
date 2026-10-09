@@ -85,6 +85,17 @@ describe('retention (spec §12)', () => {
     await sweep(env, later);
     expect(await env.DB.prepare(`SELECT 1 FROM items WHERE id = ?`).bind(a.body.itemId).first()).toBeNull();
   });
+  it('leaving one collection keeps the references from a second collection and from a work record', async () => {
+    const c1 = await create('Ref one');
+    const c2 = await create('Ref two');
+    const a = await upload([{ path: 'refs.md', body: '# refs' }], { title: 'Refs' });
+    await add(c1.body.id, a.body.itemId);
+    await add(c2.body.id, a.body.itemId);
+    await env.DB.prepare(`INSERT INTO item_references (item_id, from_kind, from_id) VALUES (?, 'work-record', 'itm_00000000000004a1')`).bind(a.body.itemId).run();
+    expect((await call(`/api/v1/collections/${c1.body.id}/items/${a.body.itemId}`, { method: 'DELETE' })).status).toBe(204);
+    const left = (await env.DB.prepare(`SELECT from_kind, from_id FROM item_references WHERE item_id = ? ORDER BY from_kind`).bind(a.body.itemId).all<{ from_kind: string; from_id: string }>()).results;
+    expect(left).toEqual([{ from_kind: 'collection', from_id: c2.body.id }, { from_kind: 'work-record', from_id: 'itm_00000000000004a1' }]);
+  });
   it('deleting an item takes it out of every collection', async () => {
     const c = await create('Delete test');
     const a = await upload([{ path: 'd.md', body: '# d' }], { title: 'D', expiresAt: new Date(Date.now() + 86_400_000).toISOString() });
