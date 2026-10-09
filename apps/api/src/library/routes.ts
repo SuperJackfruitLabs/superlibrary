@@ -3,6 +3,7 @@ import { error, json, type Handler } from '../http';
 import { resolvePerson } from '../auth/caller';
 import { BadCursor, browse } from './browse';
 import { facets } from './facets';
+import { recordView } from './record';
 
 export const issues = (e: { issues: Array<{ path: PropertyKey[]; message: string }> }) =>
   e.issues.map((i) => ({ path: i.path.map(String).join('.'), message: i.message }));
@@ -27,6 +28,11 @@ export const libraryRoutes: Handler = async (request, env, _ctx, url) => {
   if (url.pathname === '/api/v1/facets' && request.method === 'GET') {
     const p = await resolvePerson(request, env);
     return p instanceof Response ? p : json(await facets(env, p));
+  }
+  const rec = /^\/api\/v1\/items\/(itm_[0-9a-f]{16})\/record$/.exec(url.pathname);
+  if (rec && request.method === 'GET') {
+    const p = await resolvePerson(request, env);
+    return p instanceof Response ? p : recordView(env, p, rec[1]!);
   }
   return null;
 };
