@@ -58,6 +58,9 @@ describe('sources to retrieval, through the item.changed seam', () => {
     await drainIndex();
     const itemId = (await env.DB.prepare(`SELECT item_id FROM work_records WHERE card_id = ?`).bind(C2).first<{ item_id: string }>())!.item_id;
     expect(vec.store.size).toBeGreaterThan(0);
+    const rows = (table: string) => env.DB.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE ${table === 'items' ? 'id' : 'item_id'} = ?`).bind(itemId).first<{ n: number }>().then((r) => r!.n);
+    expect(await rows('chunks_fts')).toBeGreaterThan(0);
+    expect(await rows('chunks')).toBeGreaterThan(0);
     // card.deleted is only a hint (plan P5): the record goes when the read-back finds the card gone from its board.
     state.boards.get(B)!.cards.delete(C2);
     await ingest({ type: 'card.deleted', workspaceId: ws, boardId: B, cardId: C2 });
@@ -65,6 +68,8 @@ describe('sources to retrieval, through the item.changed seam', () => {
     expect(vec.store.size).toBe(0);
     expect((await env.DB.prepare(`SELECT COUNT(*) AS n FROM chunks_fts WHERE item_id = ?`).bind(itemId).first<{ n: number }>())!.n).toBe(0);
     expect(await env.DB.prepare(`SELECT 1 FROM work_records WHERE card_id = ?`).bind(C2).first()).toBeNull();
+    expect(await rows('chunks')).toBe(0);
+    expect(await rows('items')).toBe(0);
   });
   it("an agent's linked file is searchable by agents on its board, not by others", async () => {
     bag.HUB_SERVICE_PRINCIPAL = HUB_SVC;
