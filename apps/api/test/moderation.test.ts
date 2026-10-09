@@ -1,0 +1,93 @@
+import { env } from 'cloudflare:test';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { ItemSummary } from '@superlibrary/contract';
+import { extractText } from '../src/indexing/extract';
+import { loadItem } from '../src/items/visibility';
+import { supersededByMap } from '../src/search/search';
+import { AGENT, HUMAN_2, devHeaders, planeToken, withOrgPlane } from './helpers/org-plane';
+import { upload } from './helpers/upload';
+import { B1, call, knowBoard, seedWorkRecord, workspaceOf } from './helpers/library';
+
+const HUMAN_3 = 'prn_000000000000000000a6';
+let ws: string;
+beforeEach(async () => { ws = await workspaceOf(); await workspaceOf(HUMAN_2); await workspaceOf(HUMAN_3); await knowBoard(ws, B1); });
+const art = async (title: string, principal?: string) => (await upload([{ path: `${title}.md`, body: `# ${title}` }], { title, ...(principal ? { headers: devHeaders(principal) } : {}) })).body.itemId as string;
+const supersede = (id: string, by: string | null, principal?: string) => call(`/api/v1/items/${id}/supersede`, { method: 'POST', body: { by }, ...(principal ? { principal } : {}) });
+
+describe('mark superseded by another item (spec §11)', () => {
+  it('supersede marks the outcome, names the replacement, and clears back to the prior outcome', async () => {
+    const old = await art('Old plan');
+    const next = await art('New plan');
+    const send = vi.spyOn(env.INDEX, 'send');
+    const res = await supersede(old, next);
+    expect(res.status).toBe(200);
+    expect((await res.json<{ item: ItemSummary }>()).item).toMatchObject({ outcome: 'superseded', supersededBy: next });
+    expect(send).toHaveBeenCalledWith(expect.objectContaining({ itemId: old, change: 'upserted' }));
+    expect((await supersededByMap(env, [old])).get(old)).toBe(next);   // search results name it too
+    const audited = await env.DB.prepare(`SELECT detail FROM audit_events WHERE item_id = ? AND action = 'item.superseded'`).bind(old).first<{ detail: string }>();
+    expect(JSON.parse(audited!.detail)).toEqual({ by: next, prior: 'completed' });
+    const undone = await (await supersede(old, null)).json<{ item: ItemSummary }>();
+    expect(undone.item.outcome).toBe('completed');
+    expect(undone.item.supersededBy ?? null).toBeNull();
+    send.mockRestore();
+  });
+  it('refuses itself, a loop, and a replacement the person cannot see', async () => {
+    const a = await art('A');
+    const b = await art('B');
+    expect((await supersede(a, a)).status).toBe(400);
+    expect((await supersede(a, b)).status).toBe(200);
+    const loop = await supersede(b, a);
+    expect(loop.status).toBe(400);
+    expect(await loop.json()).toMatchObject({ error: 'invalid', detail: 'that would make a loop of replacements' });
+    const hidden = (await upload([{ path: 'h.md', body: '# h' }], { title: 'H', scope: 'board:brd_00000000000000b9', headers: devHeaders(HUMAN_2) })).body.itemId as string;
+    expect((await supersede(b, hidden)).status).toBe(404);
+    expect((await loadItem(env, b))!.outcome).toBe('completed');
+  });
+  it('a replacement revoked later is no longer named (spec §4; reconciled, A3)', async () => {
+    const old = await art('Old guide');
+    const next = await art('New guide');
+    expect((await supersede(old, next)).status).toBe(200);
+    expect((await call(`/api/v1/items/${next}/revoke`, { method: 'POST', body: {} })).status).toBe(200);
+    const shown = await (await call(`/api/v1/items/${old}`)).json<{ item: ItemSummary }>();
+    expect(shown.item).toMatchObject({ outcome: 'superseded', supersededBy: null });
+  });
+  it('a work record keeps its card-derived replacement unless a person sets one', async () => {
+    await seedWorkRecord({ id: 'itm_00000000000003a1', ws });
+    const next = await art('Replacement');
+    expect((await supersede('itm_00000000000003a1', next)).status).toBe(200);   // HUMAN is the owner
+    expect((await loadItem(env, 'itm_00000000000003a1'))).toMatchObject({ outcome: 'superseded', superseded_by: next, superseded_prior: 'approved' });
+  });
+  it('only the uploader or an owner; an agent never', async () => {
+    const theirs = await art('Theirs', HUMAN_2);
+    const other = await art('Other', HUMAN_2);
+    expect((await supersede(theirs, other, HUMAN_3)).status).toBe(403);
+    expect((await supersede(theirs, other, HUMAN_2)).status).toBe(200);
+    await seedWorkRecord({ id: 'itm_00000000000003a2', ws });
+    expect((await supersede('itm_00000000000003a2', other, HUMAN_2)).status).toBe(403);   // records: owners only (O1)
+    await withOrgPlane(async () => {
+      const t = await planeToken({ sub: AGENT, principalKind: 'agent' });
+      const res = await call(`/api/v1/items/${theirs}/supersede`, { method: 'POST', body: { by: null }, headers: { Authorization: `Bearer ${t}` } });
+      expect(res.status).toBe(403);
+    });
+  });
+});
+
+describe('caption (spec §7, §11)', () => {
+  it('a caption is indexed, shown and audited', async () => {
+    const id = await art('Queue diagram');
+    const send = vi.spyOn(env.INDEX, 'send');
+    const res = await call(`/api/v1/items/${id}/caption`, { method: 'PATCH', body: { caption: 'Three workers drain one queue' } });
+    expect(res.status).toBe(200);
+    expect((await res.json<{ item: ItemSummary }>()).item.caption).toBe('Three workers drain one queue');
+    expect((await extractText(env, (await loadItem(env, id))!))!.text).toContain('Three workers drain one queue');
+    expect(send).toHaveBeenCalledWith(expect.objectContaining({ itemId: id, change: 'upserted' }));
+    expect(await env.DB.prepare(`SELECT 1 FROM audit_events WHERE item_id = ? AND action = 'item.caption_set'`).bind(id).first()).not.toBeNull();
+    const cleared = await (await call(`/api/v1/items/${id}/caption`, { method: 'PATCH', body: { caption: null } })).json<{ item: ItemSummary }>();
+    expect(cleared.item.caption ?? null).toBeNull();
+    send.mockRestore();
+  });
+  it('a work record takes no caption', async () => {
+    await seedWorkRecord({ id: 'itm_00000000000003b1', ws });
+    expect((await call('/api/v1/items/itm_00000000000003b1/caption', { method: 'PATCH', body: { caption: 'x' } })).status).toBe(400);
+  });
+});

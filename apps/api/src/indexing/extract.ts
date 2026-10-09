@@ -59,7 +59,9 @@ export async function extractText(env: Env, item: ItemRow): Promise<{ text: stri
     parts.push(piece.slice(0, MAX_TEXT - size));
     size += Math.min(piece.length, MAX_TEXT - size);
   }
-  const head = `${item.title}\n${files.map((f) => f.path).join('\n')}`;
+  // Spec §7: an artifact is also found by its caption, if a person added one.
+  const titled = item.caption ? `${item.title}\n${item.caption}` : item.title;
+  const head = `${titled}\n${files.map((f) => f.path).join('\n')}`;
   const body = parts.join('\n\n').trim();
-  return { text: body ? `${item.title}\n\n${body}` : head, view: files.length === 1 ? v.view : 'text', version: v.version };
+  return { text: body ? `${titled}\n\n${body}` : head, view: files.length === 1 ? v.view : 'text', version: v.version };
 }

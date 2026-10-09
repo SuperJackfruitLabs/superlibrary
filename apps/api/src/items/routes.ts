@@ -48,6 +48,7 @@ export function summary(i: ItemRow, extra: Extras = {}): ItemSummary {
   const a = audienceOf(i);
   out.audience = a === 'board' && extra.boardKnown === false ? 'uploader' : a;
   if (extra.supersededBy !== undefined) out.supersededBy = extra.supersededBy;
+  if (i.caption) out.caption = i.caption;
   return out;
 }
 
@@ -67,14 +68,17 @@ export async function extrasFor(env: Env, p: Person, items: ItemRow[], scopes?: 
     for (const r of rows.results) known.add(r.board_id);
   }
   for (const i of items) out.get(i.id)!.boardKnown = !i.scope.startsWith('board:') || known.has(i.scope.slice(6));
-  const wr = await env.DB.prepare(
-    `SELECT w.item_id AS item_id, n.item_id AS next FROM work_records w LEFT JOIN work_records n ON n.workspace_id = w.workspace_id AND n.card_id = w.superseded_by_card
-      WHERE w.item_id IN (SELECT value FROM json_each(?1))`,
-  ).bind(ids).all<{ item_id: string; next: string | null }>();
-  // A replacement the person cannot see, or that is revoked or expired, is not named (spec §4).
-  const raw = new Map<string, string>(wr.results.flatMap((r) => (r.next ? [[r.item_id, r.next] as [string, string]] : [])));
+  // A person's replacement first (spec §11), else the card's `supersedes` link (spec §15). A
+  // replacement the person cannot see, or that is revoked or expired, is not named (spec §4).
+  const sup = await env.DB.prepare(
+    `SELECT i.id AS item_id, i.kind AS kind, COALESCE(i.superseded_by, n.item_id) AS next FROM items i
+       LEFT JOIN work_records w ON w.item_id = i.id
+       LEFT JOIN work_records n ON n.workspace_id = w.workspace_id AND n.card_id = w.superseded_by_card
+      WHERE i.id IN (SELECT value FROM json_each(?1))`,
+  ).bind(ids).all<{ item_id: string; kind: string; next: string | null }>();
+  const raw = new Map<string, string>(sup.results.flatMap((r) => (r.next ? [[r.item_id, r.next] as [string, string]] : [])));
   const visible = await visibleSupersededBy(env, p, scopes ?? (await viewerScopes(env, p)), raw);
-  for (const r of wr.results) out.get(r.item_id)!.supersededBy = visible.get(r.item_id) ?? null;
+  for (const r of sup.results) if (r.next !== null || r.kind === 'work-record') out.get(r.item_id)!.supersededBy = visible.get(r.item_id) ?? null;
   return out;
 }
 

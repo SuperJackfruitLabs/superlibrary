@@ -5,6 +5,8 @@ import { rosterBoards } from '../clients/roster';
 export interface ItemRow {
   id: string; workspace_id: string; kind: 'artifact' | 'work-record'; title: string; scope: string; outcome: string;
   created_by: string; latest_version: number; expires_at: string | null; revoked_at: string | null; created_at: string;
+  /** Phase 4 (0040): a person's caption and replacement, and the outcome the replacement replaced. */
+  caption?: string | null; superseded_by?: string | null; superseded_prior?: string | null;
 }
 
 export const loadItem = (env: Env, id: string) => env.DB.prepare(`SELECT * FROM items WHERE id = ?`).bind(id).first<ItemRow>();

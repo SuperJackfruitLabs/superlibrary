@@ -28,8 +28,10 @@ export async function sourcesOf(env: Env, ids: string[]): Promise<Map<string, It
 export async function supersededByMap(env: Env, ids: string[]): Promise<Map<string, string>> {
   if (ids.length === 0) return new Map();
   const rows = (await env.DB.prepare(
-    `SELECT w.item_id AS old, n.item_id AS new FROM work_records w JOIN work_records n ON n.workspace_id = w.workspace_id AND n.card_id = w.superseded_by_card
-      WHERE w.item_id IN (SELECT value FROM json_each(?))`,
+    `SELECT i.id AS old, COALESCE(i.superseded_by, n.item_id) AS new FROM items i
+       LEFT JOIN work_records w ON w.item_id = i.id
+       LEFT JOIN work_records n ON n.workspace_id = w.workspace_id AND n.card_id = w.superseded_by_card
+      WHERE i.id IN (SELECT value FROM json_each(?)) AND COALESCE(i.superseded_by, n.item_id) IS NOT NULL`,
   ).bind(JSON.stringify(ids)).all<{ old: string; new: string }>()).results;
   return new Map(rows.map((r) => [r.old, r.new]));
 }
