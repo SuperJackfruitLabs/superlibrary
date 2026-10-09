@@ -2,6 +2,7 @@ import { createMessageBatch, createScheduledController, env, getQueueResult, cre
 import { describe, expect, it, vi } from 'vitest';
 import worker from '../src/index';
 import wranglerRaw from '../wrangler.jsonc?raw';
+import { RECONCILE_CRON } from '../src/indexing/consumer';
 import type { RetentionMessage } from '../src/env';
 import { deleteItem, sweep, RETENTION_CRON } from '../src/lifecycle/retention';
 import { sha256Hex, upload } from './helpers/upload';
@@ -141,7 +142,8 @@ describe('retention sweep (spec §12, plan D14)', () => {
   });
 
   it('the retention cron constant is the one wrangler.jsonc declares', () => {
-    expect(wranglerRaw).toContain(`"crons": ["${RETENTION_CRON}"]`);
+    // Pins the retention cron exactly; the reconcile cron (lane B) is the only other entry.
+    expect(wranglerRaw).toContain(`"crons": ["${RETENTION_CRON}", "${RECONCILE_CRON}"]`);
   });
 
   it('the cron enqueues one sweep; the consumer runs it and acks', async () => {
