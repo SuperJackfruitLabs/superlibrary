@@ -16,7 +16,7 @@ export interface Person {
   org: string;
   workspaceId: string;
   role: 'owner' | 'member';
-  /** `act.sub` of the person's token, when present. Recorded, never a trust signal: every hub-minted token carries the hub here. Trust keys on `via`. */
+  /** Always null for an accepted person: a token with `act` (or amr `assertion`) is refused (R-H1). Kept so the type does not ripple. */
   act: string | null;
 }
 export interface AgentViewer {
@@ -116,6 +116,7 @@ export function isHubService(env: Env, prn: string | null): boolean {
   return hub !== null && prn === hub;
 }
 
+const DELEGATED_PERSON = 'a token minted for a person by a service is refused; sign in as yourself';
 const ON_BEHALF = ['X-On-Behalf-Of', 'X-On-Behalf-Kind', 'X-On-Behalf-Token'] as const;
 const carriesOnBehalf = (request: Request) => ON_BEHALF.some((h) => request.headers.has(h));
 const where = (request: Request) => ({ method: request.method, path: new URL(request.url).pathname });
@@ -124,11 +125,13 @@ const where = (request: Request) => ({ method: request.method, path: new URL(req
  * A refused X-On-Behalf use, audited (guard d). The audit is best effort: a failed write must not
  * turn a refusal into a 500.
  */
-async function refusal(env: Env, request: Request, sub: string, reason: string, res = error(403, 'principal_not_supported', { detail: reason })): Promise<Response> {
+async function refusal(
+  env: Env, request: Request, sub: string, reason: string, res = error(403, 'principal_not_supported', { detail: reason }), act: string | null = null,
+): Promise<Response> {
   const named = request.headers.get('X-On-Behalf-Of');
   try {
     await audit(env.DB, {
-      workspaceId: null, actor: sub, act: null, action: 'on_behalf.refused',
+      workspaceId: null, actor: sub, act, action: 'on_behalf.refused',
       detail: { reason, named: named !== null && PRN.test(named) ? named : null, ...where(request) },
     }).run();
   } catch (e) {
@@ -189,6 +192,11 @@ async function principalOf(request: Request, env: Env): Promise<Resolved | Respo
   }
   if (carries) return refusal(env, request, claims.sub, 'only the AgentPod hub may act for another principal');
   const act = typeof claims.act?.sub === 'string' ? claims.act.sub : null;
+  // Operator ruling R-H1: the hub never acts for a person. A human token a service minted for the person
+  // (Accounts §3.4b: `act` present, or amr `assertion`) is refused; a person's own token carries neither.
+  if (claims.principalKind === 'human' && (claims.act !== undefined || (Array.isArray(claims.amr) && claims.amr.includes('assertion')))) {
+    return refusal(env, request, claims.sub, 'delegated_person', error(403, 'principal_not_supported', { detail: DELEGATED_PERSON }), act);
+  }
   return { kind: claims.principalKind, principalId: claims.sub, org: claims.org, act, via: null };
 }
 
