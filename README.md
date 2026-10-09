@@ -4,7 +4,7 @@
 
 **The memory of the stack.** Superlibrary keeps what agents make and what work has been done — artifacts and Superpipeline work history, labelled with how each turned out — and lets agents consult it before they work and people browse it.
 
-Status: phases 2 (Sources) and 3 (Retrieval) live, on top of phase 1 (Core): upload, view and embed artifacts; Superpipeline work history and AgentPod links arrive as items; agents and people search them. Plans: docs/superpowers/plans/.
+Status: phases 2 (Sources) and 3 (Retrieval) live, on top of phase 1 (Core): upload, view and embed artifacts; Superpipeline work history and AgentPod links arrive as items; agents reach it over MCP once their sessions are given the Superlibrary server, and people through the web app and the API. Plans: docs/superpowers/plans/.
 
 Design: [docs/superpowers/specs/2026-10-09-superlibrary-design.md](docs/superpowers/specs/2026-10-09-superlibrary-design.md).
 

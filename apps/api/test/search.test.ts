@@ -120,10 +120,12 @@ describe('supersededBy visibility', () => {
 describe('ranking (spec §7)', () => {
   it('outcome weights reorder equal matches', async () => {
     await env.DB.prepare(`INSERT OR REPLACE INTO source_boards (workspace_id, board_id, name, last_seen_at) VALUES (?, 'brd_00000000000000b1', 'B', 't')`).bind(WS).run();
+    // Identical texts tie in both lists, so insertion order is the rank order. The words list carries no outcome offset
+    // (spec §7), so this order keeps each pair's rank gap inside what the meaning-list offset can cover.
+    await seed('itm_00000000000000e4', 'onboarding flow redesign', { outcome: 'superseded' });
     await seed('itm_00000000000000e1', 'onboarding flow redesign', { outcome: 'rejected' });
     await seed('itm_00000000000000e2', 'onboarding flow redesign', { outcome: 'approved' });
     await seed('itm_00000000000000e3', 'onboarding flow redesign', { outcome: 'in-progress' });
-    await seed('itm_00000000000000e4', 'onboarding flow redesign', { outcome: 'superseded' });
     const r = await search(env, person, { query: 'onboarding flow redesign', limit: 10 });
     expect(r.map((x) => x.outcome)).toEqual(['approved', 'in-progress', 'superseded', 'rejected']);
     expect(r.every((x) => x.provenance.sourceKind === 'superpipeline')).toBe(true);
@@ -187,7 +189,7 @@ describe('outcome weights rank lower and never hide (spec §7, ruling S3-R10)', 
     expect(r[0]!.itemId).toBe('itm_0000000000009201');
   });
   it('ties between outcomes keep the spec order', () => {
-    const at = (o: Parameters<typeof fuse>[1]) => fuse([3, 3], o);
+    const at = (o: Parameters<typeof fuse>[1]) => fuse({ fts: 3, vector: 3 }, o);
     expect(at('approved')).toBe(at('completed'));
     expect(at('approved')).toBeGreaterThan(at('in-progress'));
     expect(at('in-progress')).toBeGreaterThan(at('superseded'));
@@ -195,11 +197,12 @@ describe('outcome weights rank lower and never hide (spec §7, ruling S3-R10)', 
     expect(at('rejected')).toBe(at('failed'));
     expect(at('failed')).toBe(at('abandoned'));
   });
-  it('offsets are the ruling: 0, 12, 30, 36 ranks', () => {
-    expect(fuse([1], 'approved')).toBeCloseTo(1 / 61, 8);
-    expect(fuse([1], 'in-progress')).toBeCloseTo(1 / 73, 8);
-    expect(fuse([1], 'superseded')).toBeCloseTo(1 / 91, 8);
-    expect(fuse([1], 'abandoned')).toBeCloseTo(1 / 97, 8);
+  it('the offset applies to the meaning list only: 0, 12, 30, 36 ranks', () => {
+    expect(fuse({ vector: 1 }, 'approved')).toBeCloseTo(1 / 61, 8);
+    expect(fuse({ vector: 1 }, 'in-progress')).toBeCloseTo(1 / 73, 8);
+    expect(fuse({ vector: 1 }, 'superseded')).toBeCloseTo(1 / 91, 8);
+    expect(fuse({ vector: 1 }, 'abandoned')).toBeCloseTo(1 / 97, 8);
+    for (const o of ['approved', 'in-progress', 'superseded', 'rejected', 'failed', 'abandoned'] as const) expect(fuse({ fts: 1 }, o), o).toBeCloseTo(1 / 61, 8);
   });
   it('is never hidden: one abandoned best match among fifty approved vector-only candidates is within limit 10', async () => {
     await known();
@@ -207,5 +210,16 @@ describe('outcome weights rank lower and never hide (spec §7, ruling S3-R10)', 
     for (let i = 0; i < 50; i++) await seed(`itm_00000000000094${hex(i)}`, `gardening notes batch ${i}`, { outcome: 'approved' });
     const r = await search(env, person, { query: 'qwertyuiop handover checklist', limit: 10 });
     expect(r.map((x) => x.itemId)).toContain('itm_0000000000009300');
+  });
+  it('a rejected item found only by its exact words is not pushed out by 60 approved items found by meaning', async () => {
+    await known();
+    await seed('itm_0000000000009500', 'xkcdqz stack trace ENOTFOUND', { outcome: 'rejected' });
+    const first = vec.store.size;
+    for (let i = 0; i < 60; i++) await seed(`itm_00000000000096${hex(i)}`, `meadow weather log ${i}`, { outcome: 'approved' });
+    // Found by words only: drop its vectors, as a failed or partial index would leave it.
+    for (const id of [...vec.store.keys()]) if (id.startsWith('itm_0000000000009500:')) vec.store.delete(id);
+    expect(first).toBeGreaterThan(0);
+    const r = await search(env, person, { query: 'xkcdqz ENOTFOUND', limit: 10 });
+    expect(r.map((x) => x.itemId)).toContain('itm_0000000000009500');
   });
 });

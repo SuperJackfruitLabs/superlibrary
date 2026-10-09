@@ -34,7 +34,7 @@ export const visibleSql = (a: string) =>
 export const visibleBinds = (v: Viewer, scopes: string[]) => [v.workspaceId, JSON.stringify(scopes), v.kind === 'human' ? v.principalId : ''] as const;
 
 /** Revoke and expire (spec §12, plan D12): the uploader, or an owner of the workspace. */
-export function canManage(p: Person, item: ItemRow, scopes: string[] = []): boolean {
+export function canManage(p: Person, item: ItemRow, scopes: string[]): boolean {
   return canSee(p, item, scopes) && (item.created_by === p.principalId || p.role === 'owner');
 }
 
