@@ -175,7 +175,7 @@
   </form>
 {/snippet}
 
-{#if notice}<div tabindex="-1" bind:this={noticeEl}><Toast message={notice} onclose={() => (notice = null)} /></div>{/if}
+{#if notice}<Toast message={notice} onclose={() => (notice = null)} bind:el={noticeEl} />{/if}
 
 {#if phase === 'loading'}
   <p class="muted" role="status">Loading…</p>

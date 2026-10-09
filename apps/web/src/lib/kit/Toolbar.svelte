@@ -13,6 +13,7 @@
 </script>
 
 <!-- Every action keeps its words (operator review): at phone width the secondary ones fold into More. -->
+<div class="kit-toolbar-wrap">
 <div class="kit-toolbar" role="toolbar" aria-label={label}>
   {#each items as i (i.label)}
     {#if i.href}
@@ -33,4 +34,5 @@
       <button type="button" class="kit-button kit-button--ghost" onclick={() => run(i)}>{i.label}</button>
     {/if}
   {/each}
+</div>
 </div>

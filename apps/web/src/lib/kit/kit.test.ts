@@ -16,10 +16,17 @@ describe('the kit reads tokens only (a working direction: a change must be a tok
     expect(scanned.some((f) => f.endsWith('kit.css'))).toBe(true);
     const offenders = scanned.flatMap((f) => {
       const text = readFileSync(f, 'utf8');
-      const hits = [...text.matchAll(/#[0-9a-fA-F]{3}(?:[0-9a-fA-F]{3})?\b(?![\w-])|rgba?\(|hsla?\(|font-family:\s*(?!\s|var\()|'IBM Plex/g)].map((m) => m[0]);
+      const hits = [...text.matchAll(/#[0-9a-fA-F]{3}(?:[0-9a-fA-F]{3})?\b(?![\w-])|rgba?\(|hsla?\(|font-family:\s*(?!\s|var\()|font:[^;}]*['"]|font:[^;}]*\b(?:Inter|Arial|Helvetica|Georgia|Roboto|serif|sans-serif|monospace|system-ui)\b|'IBM Plex/g)].map((m) => m[0]);
       return hits.length ? [`${f}: ${hits.join(', ')}`] : [];
     });
     expect(offenders).toEqual([]);
+  });
+  it('a primary or danger button keeps its own background on hover (the sunken hover would leave 1:1 text)', () => {
+    const kit = readFileSync(join(import.meta.dirname, 'kit.css'), 'utf8');
+    for (const v of ['primary', 'danger']) {
+      const rule = kit.split('\n').find((l) => l.startsWith(`.kit-button--${v},`) && l.includes(`.kit-button--${v}:hover`));
+      expect(rule, v).toMatch(/background: var\(--color-(accent|danger)\)/);
+    }
   });
   it('every outcome has a word, a place, and a token', () => {
     expect(Object.keys(OUTCOME_WORDS).sort()).toEqual([...OUTCOMES].sort());
