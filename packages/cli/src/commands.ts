@@ -8,13 +8,14 @@ export interface FlagSpec { name: string; value?: string; type: FlagType; requir
 export interface ArgSpec { name: string; description: string; optional?: boolean }
 export interface Access { person: 'member' | 'uploader-or-owner' | null; agent: 'refused' | null; note?: string }
 export interface Route { method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'; path: string }
-export type GroupId = 'session' | 'artifacts';
+export type GroupId = 'session' | 'artifacts' | 'library';
 export interface CommandSpec { path: string[]; group: GroupId; args: ArgSpec[]; flags: FlagSpec[]; summary: string; description: string; routes: Route[]; access: Access; output: string; fails: string[]; examples: string[] }
 export interface GroupSpec { id: GroupId; title: string; label: string; description: string; intro: string }
 
 export const GROUPS: GroupSpec[] = [
   { id: 'session', title: 'Signing in', label: 'Session', description: 'suli login, logout, whoami, help and version.', intro: 'Signing in through your Super Jackfruit Labs account, and seeing which identity is in force. `help`, `version` and `logout` send no credential anywhere.' },
   { id: 'artifacts', title: 'Artifacts', label: 'Artifacts', description: 'suli upload, get and revoke.', intro: 'Uploading files and folders, reading what is there, and revoking. Every upload passes the path rules, size caps and secret scan before anything is stored.' },
+  { id: 'library', title: 'Finding and curating', label: 'Library', description: 'suli search, collect and scope.', intro: 'Searching the library with the same filters as the app, keeping collections, and widening who can see an item. Search shows only what you can see; collections and widening are a person\'s acts and are recorded.' },
 ];
 
 const LOCAL: Access = { person: null, agent: null };
@@ -62,6 +63,29 @@ export const COMMANDS: CommandSpec[] = [
     routes: [{ method: 'POST', path: '/api/v1/items/:id/revoke' }, { method: 'POST', path: '/api/v1/items/:id/versions/:n/revoke' }],
     access: { ...PERSON, person: 'uploader-or-owner' }, output: '"Revoked."', fails: ['you are not the uploader or an owner (403)'], examples: ['suli revoke itm_0123456789abcdef --reason "posted by mistake"', 'suli revoke itm_0123456789abcdef --version 2'],
   },
+  {
+    path: ['search'], group: 'library', args: [{ name: 'words', description: 'What to look for; several words are one query' }],
+    flags: [
+      { name: '--kind', value: '<artifact|work-record>', type: 'string', description: 'Only artifacts, or only work records' },
+      { name: '--outcome', value: '<a,b>', type: 'string', description: 'Only these outcomes, comma-separated: approved, completed, in-progress, superseded, rejected, failed, abandoned' },
+      { name: '--board', value: '<brd_…>', type: 'string', description: 'Only this board' },
+      { name: '--agent', value: '<prn_…>', type: 'string', description: 'Only items made by this agent' },
+      { name: '--station', value: '<id or name>', type: 'string', description: 'Only items linked from this station' },
+      { name: '--since', value: '<YYYY-MM-DD>', type: 'date', description: 'Last activity on or after the start of this day, UTC' },
+      { name: '--until', value: '<YYYY-MM-DD>', type: 'date', description: 'Last activity on or before this day, UTC' },
+      { name: '--limit', value: '<n>', type: 'integer', default: '10', description: 'At most this many results (1 to 25)' },
+    ],
+    summary: 'Search the library', description: 'Ranked results with their outcome: approved and completed work first, rejected and failed lower but never hidden. Only items you can see are searched, and none you cannot see is ever shown, even as a snippet.',
+    routes: [{ method: 'POST', path: '/api/v1/search' }], access: { person: 'member', agent: null, note: 'Agents search through MCP (`library_search`), not through suli.' },
+    output: 'one line per result (id, outcome, title), its snippet and its replacement', fails: ['a flag is not one of its values'],
+    examples: ['suli search deploy checklist', 'suli search launch post --outcome rejected,failed --since 2026-10-01'],
+  },
+  { path: ['collect', 'list'], group: 'library', args: [], flags: [], summary: 'Every collection in the workspace', description: 'Lists the collections with how many items in each you can see.', routes: [{ method: 'GET', path: '/api/v1/collections' }], access: PERSON, output: 'one line per collection', fails: [], examples: ['suli collect list'] },
+  { path: ['collect', 'create'], group: 'library', args: [{ name: 'name', description: 'The collection’s name; unique in the workspace, in any case' }], flags: [{ name: '--description', value: '<text>', type: 'string', description: 'What it is for' }], summary: 'Start a collection', description: 'Creates an empty collection. An artifact in a collection is kept however old it is.', routes: [{ method: 'POST', path: '/api/v1/collections' }], access: PERSON, output: '"Created <name> (<id>)."', fails: ['the name is taken (409)'], examples: ['suli collect create "Building in public — week 41"'] },
+  { path: ['collect', 'show'], group: 'library', args: [{ name: 'collection', description: 'Its id (col_…) or its name' }], flags: [], summary: 'The items in a collection', description: 'Shows the collection and the items in it you can see, newest added first.', routes: [{ method: 'GET', path: '/api/v1/collections' }, { method: 'GET', path: '/api/v1/collections/:id' }], access: PERSON, output: 'the collection and one line per item', fails: ['no collection has that id or name'], examples: ['suli collect show "week 41"'] },
+  { path: ['collect', 'add'], group: 'library', args: [{ name: 'collection', description: 'Its id (col_…) or its name' }, { name: 'item', description: 'The item id (itm_…)' }], flags: [{ name: '--note', value: '<text>', type: 'string', description: 'Why it is in the collection' }], summary: 'Add an item to a collection', description: 'Any member may add an item they can see. While it is in a collection, an artifact is not deleted by the 30-day sweep.', routes: [{ method: 'GET', path: '/api/v1/collections' }, { method: 'POST', path: '/api/v1/collections/:id/items' }], access: PERSON, output: '"Added."', fails: ['the item does not exist or you cannot see it (404)'], examples: ['suli collect add "week 41" itm_0123456789abcdef --note "the launch post"'] },
+  { path: ['collect', 'remove'], group: 'library', args: [{ name: 'collection', description: 'Its id (col_…) or its name' }, { name: 'item', description: 'The item id (itm_…)' }], flags: [], summary: 'Take an item out of a collection', description: 'The item stays in the library; only the collection no longer holds it.', routes: [{ method: 'GET', path: '/api/v1/collections' }, { method: 'DELETE', path: '/api/v1/collections/:id/items/:item' }], access: PERSON, output: '"Removed."', fails: [], examples: ['suli collect remove "week 41" itm_0123456789abcdef'] },
+  { path: ['scope'], group: 'library', args: [{ name: 'item', description: 'The item id (itm_…)' }, { name: 'scope', description: 'workspace (the only value: an item is never narrowed)' }], flags: [], summary: 'Show an item to the whole workspace', description: 'Widens who can see an item from its board to everyone in the workspace, agents included. Recorded in the audit log. Only the uploader or an owner may; it cannot be undone.', routes: [{ method: 'POST', path: '/api/v1/items/:id/scope' }], access: { ...PERSON, person: 'uploader-or-owner' }, output: '"Everyone in the workspace can now see it."', fails: ['the scope is not workspace', 'you are not the uploader or an owner (403)'], examples: ['suli scope itm_0123456789abcdef workspace'] },
 ];
 
 export const ENV_VARS: Array<{ name: string; description: string }> = [
@@ -99,7 +123,7 @@ export function renderUsage(): string {
   const lines = ['suli — Superlibrary from a terminal', ''];
   for (const g of GROUPS) {
     lines.push(`${g.title}:`);
-    for (const c of COMMANDS.filter((x) => x.group === g.id)) lines.push(`  ${commandName(c).padEnd(16)} ${plain(c.summary)}`);
+    for (const c of COMMANDS.filter((x) => x.group === g.id)) lines.push(`  ${commandName(c).padEnd(22)} ${plain(c.summary)}`);
     lines.push('');
   }
   lines.push('  --json              machine-stable output, on any command', '  suli help <verb>    one command in full (or: suli <verb> --help)', '', `Credential, first found wins: $SUPERLIBRARY_TOKEN, then suli login's cached token, then its device credential.`, 'Exit status: 0 on success, 1 otherwise.');

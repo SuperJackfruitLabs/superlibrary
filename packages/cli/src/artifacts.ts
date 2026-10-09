@@ -72,7 +72,7 @@ export function makeClient(base: string, token: TokenSource['token'], fetchImpl:
  * A refusal as a sentence. `shared` (the upload requests) uses the contract's wording, the same the
  * web app shows; other requests name the code, since those sentences speak of uploads.
  */
-async function refused(res: Response, what: string, shared = false): Promise<never> {
+export async function refused(res: Response, what: string, shared = false): Promise<never> {
   const body = (await res.json().catch(() => ({}))) as { error?: string; path?: string; rule?: string; org?: string; findings?: UploadRefusal['findings'] } & NonNullable<UploadRefusal['detail']>;
   if (body.error === 'product_not_enabled') throw new Error(`Superlibrary is not enabled for workspace ${body.org}. An owner can enable it in the account settings.`);
   const { error = `http_${res.status}`, findings, ...detail } = body;
@@ -87,7 +87,7 @@ function expiryIso(date: string): string {
   return at.toISOString();
 }
 
-const itemId = (id: string | undefined, verb: string): string => {
+export const itemId = (id: string | undefined, verb: string): string => {
   if (!id) throw new Error(`name an item: suli ${verb} <itm_…>`);
   if (!ITEM_ID.test(id)) throw new Error(`${id} is not an item id (itm_ and 16 hex digits).`);
   return id;
@@ -165,7 +165,7 @@ export function progressLine(write: (s: string) => void, tty: boolean): Progress
   };
 }
 
-const client = () => {
+export const client = () => {
   const src = tokenSource();
   return makeClient(baseUrl(), (o) => src.token(o), fetch, src.kind);
 };

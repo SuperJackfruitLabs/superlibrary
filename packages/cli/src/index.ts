@@ -5,6 +5,7 @@ import { deviceLogin, discoverPlane } from './plane-login.ts';
 import { findCommands, renderCommandHelp, renderUsage } from './commands.ts';
 import { flag, positionals } from './args.ts';
 import { getItem, revoke, upload } from './artifacts.ts';
+import { collect, scope, search } from './library.ts';
 
 const VERSION = '0.0.1';
 
@@ -75,6 +76,18 @@ async function main(argv: string[]): Promise<void> {
 
     case "revoke":
       return revoke(pos[0], { version: flag(rest, "--version"), reason: flag(rest, "--reason"), json });
+
+    case "search":
+      return search(pos.join(' '), { kind: flag(rest, "--kind"), outcome: flag(rest, "--outcome"), board: flag(rest, "--board"), agent: flag(rest, "--agent"), station: flag(rest, "--station"), since: flag(rest, "--since"), until: flag(rest, "--until"), limit: flag(rest, "--limit"), json });
+
+    case "collect": {
+      const [sub, ...args] = pos;
+      if (sub === "list" || sub === "create" || sub === "show" || sub === "add" || sub === "remove") return collect(sub, args, { description: flag(rest, "--description"), note: flag(rest, "--note"), json });
+      fail(`unknown command: collect ${sub ?? ''}. Run suli help collect.`);
+    }
+
+    case "scope":
+      return scope(pos[0], pos[1], { json });
 
     default:
       fail(`unknown command: ${cmd}. Run suli help.`);
