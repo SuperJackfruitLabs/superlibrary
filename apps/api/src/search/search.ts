@@ -4,6 +4,7 @@ import type { Env } from '../env';
 import type { Viewer } from '../auth/caller';
 import { viewerScopes, visibleBinds, visibleSql, type ItemRow } from '../items/visibility';
 import { embedderFor } from '../indexing/embedder';
+import { audit } from '../audit';
 import { indexFor, readSlots } from '../indexing/vector-index';
 
 /** Words only: FTS5 syntax a person types is never syntax (Review Focus). */
@@ -135,4 +136,11 @@ export async function search(env: Env, v: Viewer, q: SearchQuery): Promise<Searc
     }))
     .sort((a, b) => b.score - a.score || a.itemId.localeCompare(b.itemId))
     .slice(0, q.limit);
+}
+
+/** The audited entry for every caller (REST, MCP): one `items.searched` row, never the query text. */
+export async function searchAudited(env: Env, v: Viewer, q: SearchQuery): Promise<SearchResult[]> {
+  const results = await search(env, v, q);
+  await audit(env.DB, { workspaceId: v.workspaceId, actor: v.principalId, act: v.act, action: 'items.searched', detail: { count: results.length, queryLength: q.query.length } }).run();
+  return results;
 }

@@ -3,8 +3,7 @@ import type { Handler } from '../http';
 import { error, json } from '../http';
 import { resolvePerson, resolveViewer, serviceCaller } from '../auth/caller';
 import { RelatedQuery, SearchQuery } from '@superlibrary/contract';
-import { audit } from '../audit';
-import { search } from './search';
+import { searchAudited } from './search';
 import { getForViewer, related } from './related';
 import { invalidateRoster } from '../clients/roster';
 import { reconcile } from '../indexing/consumer';
@@ -31,9 +30,7 @@ export const searchRoutes: Handler = async (request, env, _ctx, url) => {
     if (v instanceof Response) return v;
     const q = SearchQuery.safeParse(await request.json().catch(() => null));
     if (!q.success) return error(400, 'invalid', { issues: q.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message })) });
-    const results = await search(env, v, q.data);
-    await audit(env.DB, { workspaceId: v.workspaceId, actor: v.principalId, act: v.act, action: 'items.searched', detail: { count: results.length, queryLength: q.data.query.length } }).run();
-    return json({ results });
+    return json({ results: await searchAudited(env, v, q.data) });
   }
   const lib = /^\/api\/v1\/library\/(itm_[0-9a-f]{16})$/.exec(url.pathname);
   if (lib && request.method === 'GET') {

@@ -12,6 +12,7 @@ import { queueHandlers } from './queues';
 import { counted, withCost } from './cost';
 import { RETENTION_CRON } from './lifecycle/retention';
 import { RECONCILE_CRON, reconcile } from './indexing/consumer';
+import { handleMcp } from './mcp/server';
 import { searchRoutes } from './search/routes';
 
 const handlers: Handler[] = [uploadRoutes, itemRoutes, searchRoutes];
@@ -20,6 +21,17 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
   const url = new URL(request.url);
   if (url.pathname === '/api/health') return json({ ok: true, service: 'superlibrary-api' });
   if (url.pathname === '/.well-known/oauth-protected-resource') return protectedResourceMetadata(env) ?? error(404, 'not_found');
+  if (url.pathname === '/.well-known/oauth-protected-resource/mcp') return protectedResourceMetadata(env) ?? error(404, 'not_found');
+  if (url.pathname === '/mcp') {
+    const v = await resolveViewer(request, env);
+    if (v instanceof Response) {
+      if (v.status !== 401) return v;
+      const headers = new Headers(v.headers);
+      headers.set('WWW-Authenticate', `Bearer resource_metadata="${env.APP_URL}/.well-known/oauth-protected-resource/mcp"`);
+      return new Response(v.body, { status: v.status, statusText: v.statusText, headers });
+    }
+    return handleMcp(request, env, v);
+  }
   if (url.pathname === '/api/v1/me' && request.method === 'GET') {
     const p = await resolvePerson(request, env);
     if (p instanceof Response) return p;
