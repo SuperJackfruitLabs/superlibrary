@@ -2,17 +2,20 @@
 import { expect, test } from '@playwright/test';
 import { DEV, devWorkspace, seedWorkRecordLocal, uploadViaApi } from './helpers';
 
+/** The local D1 persists between runs: every seeded title and board is unique to this run. */
+const tag = () => Date.now().toString(16).slice(-8);
 const API = 'http://localhost:8787';
 
 test.describe('the library app (phase 4)', () => {
   test('search with filters finds a work record, and the address keeps the view', async ({ page, request }) => {
     const ws = await devWorkspace(request);
-    seedWorkRecordLocal({ ws, title: 'Spring campaign retrospective', text: 'budget overrun on the spring campaign', outcome: 'rejected' });
+    const t = tag();
+    seedWorkRecordLocal({ ws, title: `Spring campaign retro${t}`, text: 'budget overrun on the spring campaign', outcome: 'rejected' });
     await page.goto('/');
-    await page.getByLabel('Search the library').fill('retrospective');
+    await page.getByLabel('Search the library').fill(`retro${t}`);
     await page.getByRole('button', { name: 'Search', exact: true }).click();
-    await expect(page).toHaveURL(/[?&]q=retrospective/);
-    const hit = page.getByRole('list', { name: 'Search results' }).getByRole('listitem').filter({ hasText: 'Spring campaign retrospective' });
+    await expect(page).toHaveURL(new RegExp(`[?&]q=retro${t}`));
+    const hit = page.getByRole('list', { name: 'Search results' }).getByRole('listitem').filter({ hasText: `Spring campaign retro${t}` });
     await expect(hit).toContainText('Rejected');
     await expect(hit).toContainText('Marketing & Community');
     await page.getByRole('checkbox', { name: 'Approved' }).check();
@@ -26,7 +29,7 @@ test.describe('the library app (phase 4)', () => {
 
   test('an outcome view: everything rejected on one board this month', async ({ page, request }) => {
     const ws = await devWorkspace(request);
-    const board = 'brd_00000000000000e2';
+    const board = `brd_00000000${tag()}`;
     seedWorkRecordLocal({ ws, title: 'Rejected press note', text: 'press note', outcome: 'rejected', board, boardName: 'Press' });
     seedWorkRecordLocal({ ws, title: 'Approved press note', text: 'press note', outcome: 'approved', board, boardName: 'Press' });
     await page.goto(`/outcomes?outcome=rejected&board=${board}`);
@@ -59,7 +62,7 @@ test.describe('the library app (phase 4)', () => {
     await page.getByRole('button', { name: 'Create collection' }).click();
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(name);
     await page.goto(`/a/${a.itemId}`);
-    await page.getByLabel('Collection', { exact: true }).selectOption({ label: name });
+    await page.getByRole('region', { name: 'Collections' }).getByRole('combobox').selectOption({ label: name });
     await page.getByRole('button', { name: 'Add to collection' }).click();
     await expect(page.getByRole('status').filter({ hasText: `Added to “${name}”.` })).toBeVisible();
     await page.goto('/collections');

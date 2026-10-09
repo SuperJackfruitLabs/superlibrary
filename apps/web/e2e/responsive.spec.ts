@@ -6,6 +6,9 @@ import { devWorkspace, expectNoSideways, seedWorkRecordLocal, shortControls, upl
 const WIDTHS = [390, 768, 1024, 1280, 1920];
 
 for (const width of WIDTHS) {
+  test.describe(`${width}px`, () => {
+  // A phone is a touch device: the embed's 44px targets answer to `pointer: coarse`.
+  if (width === 390) test.use({ hasTouch: true, isMobile: true });
   test(`at ${width}px nothing scrolls sideways${width === 390 ? ' and every control is at least 44px tall' : ''}`, async ({ page, request }) => {
     await page.setViewportSize({ width, height: 900 });
     const ws = await devWorkspace(request);
@@ -28,9 +31,33 @@ for (const width of WIDTHS) {
       const words = await control.evaluate((el) => [...el.querySelectorAll('.sl-label, .sl-version')].some((l) => (l as HTMLElement).offsetWidth > 1 && l.textContent!.trim() !== ''));
       expect(words, 'no toolbar control is an icon alone').toBe(true);
     }
+    if (width === 390) {
+      // The embed's own toolbar at phone width: secondaries fold into a labelled More, whose items are tap-sized.
+      const more = bar.locator('.sl-more-toggle');
+      await expect(more).toBeVisible();
+      await expect(more).toContainText('More');
+      await expect(bar.locator('.sl-secondary:visible')).toHaveCount(0);
+      await more.click();
+      const panel = page.locator('.sl-more-panel:not([hidden])');
+      await expect(panel).toBeVisible();
+      const heights = await panel.locator('.sl-more-item:visible, .sl-more-field select:visible').evaluateAll((els) => els.map((e) => e.getBoundingClientRect().height));
+      expect(heights.length, 'More has items').toBeGreaterThan(0);
+      expect(heights.filter((h) => h < 43.5), 'every More item is at least 44px tall').toEqual([]);
+      await expectNoSideways(page, 'the open More panel at 390px');
+    }
     const header = page.locator('header.suite-shell');
     await expect(header.locator('.suite-shell-brand')).toContainText('Superlibrary');
     await expect(header.locator('.suite-shell-account')).toBeVisible();
     await expect(header.getByRole('button', { name: 'Sign out' })).toBeHidden();   // inside the account menu
+    // The suite shell rule on a phone: the nav is a full-width row under the brand row; wider, one row.
+    const brand = (await header.locator('.suite-shell-brand').boundingBox())!;
+    const nav = (await header.locator('.suite-shell-nav').boundingBox())!;
+    if (width < 768) {
+      expect(nav.y, 'the nav sits under the brand row on a phone').toBeGreaterThanOrEqual(brand.y + brand.height - 1);
+      expect(nav.width, 'and spans the width').toBeGreaterThan(width - 40);
+    } else {
+      expect(nav.y, 'the nav shares the brand row when wide').toBeLessThan(brand.y + brand.height);
+    }
+  });
   });
 }

@@ -12,7 +12,7 @@
     <li class="result" style:--o={outcomeVar(r.outcome)}>
       <a class="result-link" href={`/a/${r.id}`}>
         <span class="result-title">{r.title}</span>
-        <span class="result-meta"><OutcomeBadge outcome={r.outcome} /><small>{r.line}</small></span>
+        <span class="result-meta"><OutcomeBadge outcome={r.outcome} /><small>{r.line}</small>{#if r.visibility}<small>{r.visibility}</small>{/if}</span>
         {#if r.snippet}<span class="snippet">{r.snippet}</span>{/if}
       </a>
       {#if r.supersededBy}<a class="replaced" href={`/a/${r.supersededBy}`}>See what replaced it</a>{/if}

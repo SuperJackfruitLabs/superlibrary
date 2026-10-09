@@ -10,7 +10,7 @@ test.describe('at phone width', () => {
     await uploadViaApi(request, [{ path: 'r.md', body: '# r2' }], { item: item.itemId });
 
     await page.goto('/');
-    await expect(page.locator('.items a').first()).toBeVisible();
+    await expect(page.locator('.results .result-link').first()).toBeVisible();
     expect(await shortControls(page, 5), 'library').toEqual([]);
     await expectNoSideways(page, 'library');
 
