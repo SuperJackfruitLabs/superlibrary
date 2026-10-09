@@ -168,8 +168,9 @@ A workspace without the entitlement gets `403 product_not_enabled`.
 1. **Semantic:** Workers AI embeddings (`@cf/baai/bge-m3`, multilingual, 1024 dimensions), stored
    in Vectorize with metadata for `workspace`, `scope`, `kind`, `outcome` and `itemId`.
 2. **Exact words:** D1 FTS5 over the same chunks.
-3. **Fusion:** the two lists are merged with reciprocal rank fusion, then multiplied by an outcome
-   weight:
+3. **Fusion:** the two lists are merged with reciprocal rank fusion. The outcome weight below works
+   as a rank offset, (1 − w) × 60 ranks, on the meaning list only: lower outcomes rank lower among
+   comparable matches, and an exact-word match is never pushed out. Weights:
    - `approved` / `completed`: 1.0
    - `in-progress`: 0.8
    - `superseded`: 0.5

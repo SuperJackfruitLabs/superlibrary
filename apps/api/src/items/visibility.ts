@@ -33,11 +33,8 @@ export const visibleSql = (a: string) =>
   `(${a}.workspace_id = ?1 AND (${a}.scope IN (SELECT value FROM json_each(?2)) OR (?3 <> '' AND ${a}.created_by = ?3)))`;
 export const visibleBinds = (v: Viewer, scopes: string[]) => [v.workspaceId, JSON.stringify(scopes), v.kind === 'human' ? v.principalId : ''] as const;
 
-/** Phase 1's rule, kept only for sources/routes.ts until Task I3 moves it to visibleSql. Stricter, never wider. */
-export const VISIBLE_SQL = `workspace_id = ?1 AND (scope = 'workspace' OR created_by = ?2)`;
-
 /** Revoke and expire (spec §12, plan D12): the uploader, or an owner of the workspace. */
-export function canManage(p: Person, item: ItemRow, scopes: string[] = []): boolean {
+export function canManage(p: Person, item: ItemRow, scopes: string[]): boolean {
   return canSee(p, item, scopes) && (item.created_by === p.principalId || p.role === 'owner');
 }
 

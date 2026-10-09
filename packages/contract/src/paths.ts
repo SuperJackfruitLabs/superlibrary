@@ -17,11 +17,15 @@ const sub = (...parts: string[]) => (segs: string[]) => {
   return false;
 };
 
-/** Each harness's own config, session and token files. Phase 2 aligns this with AgentPod's harness list. */
+/** Each harness's own config, session and token files. Aligned with the AgentPod node's list (apps/node-agent descriptor/artifact.go); keep the two in step, stricter only. */
 const HARNESS = [
   dirSeg('.claude'), base((b) => b === '.claude.json'), dirSeg('.codex'), dirSeg('.gemini'), dirSeg('.cursor'),
+  dirSeg('.hermes'), dirSeg('.openclaw'), dirSeg('.opencode'), dirSeg('.pi'), base((b) => b === 'auth.json' || b === '.credentials.json'),
   sub('.config', 'opencode'), sub('.local', 'share', 'opencode'), sub('.config', 'goose'),
 ];
+
+/** Shell and REPL history, which routinely hold pasted secrets (spec §8; mirrors the AgentPod node's list). */
+const SHELL_HISTORY = new Set(['.bash_history', '.zsh_history', '.python_history', '.node_repl_history', '.psql_history', '.mysql_history']);
 
 export const DENIED_RULES: ReadonlyArray<{ rule: string; test: (segments: string[]) => boolean }> = [
   { rule: '.env*', test: anySeg((s) => s.startsWith('.env')) },
@@ -34,8 +38,10 @@ export const DENIED_RULES: ReadonlyArray<{ rule: string; test: (segments: string
   { rule: '.netrc', test: base((b) => b === '.netrc') },
   { rule: '.npmrc', test: base((b) => b === '.npmrc') },
   { rule: '.pypirc', test: base((b) => b === '.pypirc') },
+  { rule: '.config/gh/hosts.yml', test: sub('.config', 'gh', 'hosts.yml') },
+  { rule: 'shell history', test: base((b) => SHELL_HISTORY.has(b)) },
   { rule: '.git-credentials', test: base((b) => b === '.git-credentials') },
-  { rule: 'cloud credentials', test: (s) => dirSeg('.aws')(s) || dirSeg('.azure')(s) || dirSeg('.kube')(s) || sub('.config', 'gcloud')(s) || sub('.docker', 'config.json')(s) || base((b) => b === 'application_default_credentials.json')(s) },
+  { rule: 'cloud credentials', test: (s) => dirSeg('.aws')(s) || dirSeg('.azure')(s) || dirSeg('.kube')(s) || sub('.config', 'gcloud')(s) || sub('.docker', 'config.json')(s) || base((b) => b === 'application_default_credentials.json' || b === 'credentials.json')(s) },
   { rule: 'harness files', test: (s) => HARNESS.some((t) => t(s)) },
 ];
 

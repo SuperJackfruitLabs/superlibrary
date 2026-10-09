@@ -3,7 +3,7 @@ import { SELF, env } from 'cloudflare:test';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { indexItem } from '../src/indexing/consumer';
 import { setIndexingForTests } from '../src/indexing/vector-index';
-import { ftsQuery, search } from '../src/search/search';
+import { fuse, ftsQuery, search } from '../src/search/search';
 import { fakeEmbedder, fakeVectorize } from './helpers/fake-vectors';
 import { seedRecord } from './helpers/records';
 import type { AgentViewer, Person } from '../src/auth/caller';
@@ -120,10 +120,12 @@ describe('supersededBy visibility', () => {
 describe('ranking (spec §7)', () => {
   it('outcome weights reorder equal matches', async () => {
     await env.DB.prepare(`INSERT OR REPLACE INTO source_boards (workspace_id, board_id, name, last_seen_at) VALUES (?, 'brd_00000000000000b1', 'B', 't')`).bind(WS).run();
+    // Identical texts tie in both lists, so insertion order is the rank order. The words list carries no outcome offset
+    // (spec §7), so this order keeps each pair's rank gap inside what the meaning-list offset can cover.
+    await seed('itm_00000000000000e4', 'onboarding flow redesign', { outcome: 'superseded' });
     await seed('itm_00000000000000e1', 'onboarding flow redesign', { outcome: 'rejected' });
     await seed('itm_00000000000000e2', 'onboarding flow redesign', { outcome: 'approved' });
     await seed('itm_00000000000000e3', 'onboarding flow redesign', { outcome: 'in-progress' });
-    await seed('itm_00000000000000e4', 'onboarding flow redesign', { outcome: 'superseded' });
     const r = await search(env, person, { query: 'onboarding flow redesign', limit: 10 });
     expect(r.map((x) => x.outcome)).toEqual(['approved', 'in-progress', 'superseded', 'rejected']);
     expect(r.every((x) => x.provenance.sourceKind === 'superpipeline')).toBe(true);
@@ -172,5 +174,52 @@ describe('POST /api/v1/search', () => {
   it('answers 400 to a bad body', async () => {
     const r = await SELF.fetch('https://api.test/api/v1/search', { method: 'POST', headers: { 'X-Dev-Principal': person.principalId, 'X-Dev-Org': ORG, 'content-type': 'application/json' }, body: JSON.stringify({ query: '', extra: 1 }) });
     expect(r.status).toBe(400);
+  });
+});
+
+describe('outcome weights rank lower and never hide (spec §7, ruling S3-R10)', () => {
+  const known = () => env.DB.prepare(`INSERT OR REPLACE INTO source_boards (workspace_id, board_id, name, last_seen_at) VALUES (?, 'brd_00000000000000b1', 'B', 't')`).bind(WS).run();
+  const hex = (n: number) => n.toString(16).padStart(2, '0');
+
+  it("an abandoned record's own exact title outranks approved items that only match by meaning", async () => {
+    await known();
+    await seed('itm_0000000000009201', 'zyxwv dispatch canary run', { outcome: 'abandoned' });
+    for (let i = 0; i < 5; i++) await seed(`itm_00000000000092${hex(i + 2)}`, `quarterly budget memo ${i}`, { outcome: 'approved' });
+    const r = await search(env, person, { query: 'zyxwv dispatch canary', limit: 10 });
+    expect(r[0]!.itemId).toBe('itm_0000000000009201');
+  });
+  it('ties between outcomes keep the spec order', () => {
+    const at = (o: Parameters<typeof fuse>[1]) => fuse({ fts: 3, vector: 3 }, o);
+    expect(at('approved')).toBe(at('completed'));
+    expect(at('approved')).toBeGreaterThan(at('in-progress'));
+    expect(at('in-progress')).toBeGreaterThan(at('superseded'));
+    expect(at('superseded')).toBeGreaterThan(at('rejected'));
+    expect(at('rejected')).toBe(at('failed'));
+    expect(at('failed')).toBe(at('abandoned'));
+  });
+  it('the offset applies to the meaning list only: 0, 12, 30, 36 ranks', () => {
+    expect(fuse({ vector: 1 }, 'approved')).toBeCloseTo(1 / 61, 8);
+    expect(fuse({ vector: 1 }, 'in-progress')).toBeCloseTo(1 / 73, 8);
+    expect(fuse({ vector: 1 }, 'superseded')).toBeCloseTo(1 / 91, 8);
+    expect(fuse({ vector: 1 }, 'abandoned')).toBeCloseTo(1 / 97, 8);
+    for (const o of ['approved', 'in-progress', 'superseded', 'rejected', 'failed', 'abandoned'] as const) expect(fuse({ fts: 1 }, o), o).toBeCloseTo(1 / 61, 8);
+  });
+  it('is never hidden: one abandoned best match among fifty approved vector-only candidates is within limit 10', async () => {
+    await known();
+    await seed('itm_0000000000009300', 'qwertyuiop handover checklist', { outcome: 'abandoned' });
+    for (let i = 0; i < 50; i++) await seed(`itm_00000000000094${hex(i)}`, `gardening notes batch ${i}`, { outcome: 'approved' });
+    const r = await search(env, person, { query: 'qwertyuiop handover checklist', limit: 10 });
+    expect(r.map((x) => x.itemId)).toContain('itm_0000000000009300');
+  });
+  it('a rejected item found only by its exact words is not pushed out by 60 approved items found by meaning', async () => {
+    await known();
+    await seed('itm_0000000000009500', 'xkcdqz stack trace ENOTFOUND', { outcome: 'rejected' });
+    const first = vec.store.size;
+    for (let i = 0; i < 60; i++) await seed(`itm_00000000000096${hex(i)}`, `meadow weather log ${i}`, { outcome: 'approved' });
+    // Found by words only: drop its vectors, as a failed or partial index would leave it.
+    for (const id of [...vec.store.keys()]) if (id.startsWith('itm_0000000000009500:')) vec.store.delete(id);
+    expect(first).toBeGreaterThan(0);
+    const r = await search(env, person, { query: 'xkcdqz ENOTFOUND', limit: 10 });
+    expect(r.map((x) => x.itemId)).toContain('itm_0000000000009500');
   });
 });

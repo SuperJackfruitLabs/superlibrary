@@ -60,6 +60,32 @@ export async function visibleSupersededBy(env: Env, v: Viewer, scopes: string[],
   return new Map([...raw].filter(([, n]) => ok.has(n)));
 }
 
+/** An item's 1-based rank in each list it appears in (an item counts once per list). */
+export interface Ranks { fts?: number; vector?: number }
+export function rankLists(fts: Array<{ item_id: string }>, vector: Array<{ item_id: string }>): Map<string, Ranks> {
+  const out = new Map<string, Ranks>();
+  for (const [key, list] of [['fts', fts], ['vector', vector]] as const) {
+    const seen = new Set<string>();
+    for (const r of list) {
+      if (seen.has(r.item_id)) continue;
+      seen.add(r.item_id);
+      out.set(r.item_id, { ...out.get(r.item_id), [key]: seen.size });
+    }
+  }
+  return out;
+}
+
+/**
+ * Spec §7: reciprocal rank fusion where the outcome weight w works as a rank offset on the meaning
+ * (vector) list only: (1 - w) * RRF_K ranks. Lower outcomes rank lower among comparable matches, and an
+ * exact-word match is never pushed out by a crowd of vector-only candidates. The words list contributes
+ * plain 1 / (RRF_K + rank). The one scoring function for search and related.
+ */
+export function fuse(ranks: Ranks, outcome: Outcome): number {
+  const offset = (1 - OUTCOME_WEIGHTS[outcome]) * RRF_K;
+  return (ranks.fts === undefined ? 0 : 1 / (RRF_K + ranks.fts)) + (ranks.vector === undefined ? 0 : 1 / (RRF_K + ranks.vector + offset));
+}
+
 const live = `AND i.revoked_at IS NULL AND (i.expires_at IS NULL OR i.expires_at > ?4)`;
 
 export async function search(env: Env, v: Viewer, q: SearchQuery, precomputedScopes?: string[]): Promise<SearchResult[]> {
@@ -109,22 +135,12 @@ export async function search(env: Env, v: Viewer, q: SearchQuery, precomputedSco
     console.error('vector search unavailable; full-text only', e instanceof Error ? e.message : String(e));
   }
 
-  // 3. Reciprocal rank fusion per item, then the outcome weight (spec §7).
-  const score = new Map<string, number>();
+  // 3. Reciprocal rank fusion per item; the outcome weight is a rank offset on the meaning list only (spec §7).
+  const ranks = rankLists(fts, semantic);
   const hit = new Map<string, string>();
-  for (const list of [fts, semantic]) {
-    const seen = new Set<string>();
-    let rank = 0;
-    for (const r of list) {
-      if (seen.has(r.item_id)) continue;
-      seen.add(r.item_id);
-      rank++;
-      score.set(r.item_id, (score.get(r.item_id) ?? 0) + 1 / (RRF_K + rank));
-      if (!hit.has(r.item_id)) hit.set(r.item_id, r.chunk_id);
-    }
-  }
-  if (score.size === 0) return [];
-  const ids = [...score.keys()];
+  for (const list of [fts, semantic]) for (const r of list) if (!hit.has(r.item_id)) hit.set(r.item_id, r.chunk_id);
+  if (ranks.size === 0) return [];
+  const ids = [...ranks.keys()];
   const rows = (await env.DB.prepare(`SELECT * FROM items WHERE id IN (SELECT value FROM json_each(?))`).bind(JSON.stringify(ids)).all<ItemRow>()).results;
   const [sources, rawSuperseded, chunks] = await Promise.all([sourcesOf(env, ids), supersededByMap(env, ids), bestChunks(env, ids, hit)]);
   const superseded = await visibleSupersededBy(env, v, scopes, rawSuperseded);
@@ -132,7 +148,7 @@ export async function search(env: Env, v: Viewer, q: SearchQuery, precomputedSco
     .map((i) => ({
       itemId: i.id, kind: i.kind, title: i.title, outcome: i.outcome as Outcome, scope: i.scope,
       provenance: sources.get(i.id) ?? { sourceKind: 'upload' as const }, snippet: snippet(chunks.get(i.id) ?? i.title, q.query),
-      url: itemUrl(env.APP_URL, i.id), score: score.get(i.id)! * OUTCOME_WEIGHTS[i.outcome as Outcome], supersededBy: superseded.get(i.id) ?? null,
+      url: itemUrl(env.APP_URL, i.id), score: fuse(ranks.get(i.id)!, i.outcome as Outcome), supersededBy: superseded.get(i.id) ?? null,
     }))
     .sort((a, b) => b.score - a.score || a.itemId.localeCompare(b.itemId))
     .slice(0, q.limit);

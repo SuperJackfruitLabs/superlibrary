@@ -1,5 +1,6 @@
 import { SELF, env } from 'cloudflare:test';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { ensureWorkspace } from '../src/auth/caller';
 import { AGENT, HUMAN, planeToken, withOrgPlane } from './helpers/org-plane';
 import { API, HUB_SVC, hubHeaders, sha256Hex, upload } from './helpers/upload';
 
@@ -178,12 +179,38 @@ describe('an agent links through the hub (spec §5)', () => {
     });
   });
 
+  it("lists a board-scoped agent link on a board the workspace knows, and not on one it does not (plan P4)", async () => {
+    await withOrgPlane(async () => {
+      const ws = (await env.DB.prepare(`SELECT id FROM workspaces WHERE external_id = 'org_00000000000000000a01'`).first<{ id: string }>())?.id
+        ?? (await ensureWorkspace(env.DB, 'org_00000000000000000a01'));
+      const h = await hubHeaders(AGENT);
+      const mine = 'brd_00000000000000b6'; // a board only this test uses, so its source_boards row cannot leak
+      const known = await upload([{ path: 'k.md', body: 'k' }], { headers: h, scope: `board:${mine}`, source: { ...SRC, board: mine, station: 'stn_11', path: 'k.md' } });
+      const strange = 'brd_00000000000000b7';
+      const unknown = await upload([{ path: 'u.md', body: 'u' }], { headers: h, scope: `board:${strange}`, source: { ...SRC, board: strange, station: 'stn_11', path: 'u.md' } });
+      await env.DB.prepare(`INSERT OR REPLACE INTO source_boards (workspace_id, board_id, name, last_seen_at) VALUES (?, ?, 'B', 't')`).bind(ws, mine).run();
+      const res = await SELF.fetch(`${API}/api/v1/sources/agentpod/items?station=stn_11`, { headers: { Authorization: `Bearer ${await planeToken()}` } });
+      expect(((await res.json()) as { items: Array<{ id: string }> }).items.map((i) => i.id)).toEqual([known.body.itemId]);
+      expect(unknown.status).toBe(201);
+      await env.DB.prepare(`DELETE FROM source_boards WHERE board_id = ?`).bind(mine).run();
+    });
+  });
+
+  it('a source path on the denylist is refused, as a file path would be', async () => {
+    await withOrgPlane(async () => {
+      for (const path of ['.config/gh/hosts.yml', 'out/.env', '.bash_history']) {
+        const r = await upload([{ path: 'a.md', body: 'a' }], { headers: await hubHeaders(AGENT), scope: SCOPE, source: { ...SRC, path } });
+        expect([r.status, r.body.error, r.body.reason], path).toEqual([400, 'path_refused', 'denied']);
+      }
+    });
+  });
+
   it("lists a station's items for the console, with the person's own token", async () => {
     await withOrgPlane(async () => {
       const h = await hubHeaders(AGENT);
       const a = await upload([{ path: 'l.md', body: 'l' }], { headers: h, scope: SCOPE, source: { ...SRC, station: 'stn_9', path: 'l.md' } });
       const other = await upload([{ path: 'm.md', body: 'm' }], { headers: h, scope: SCOPE, source: { ...SRC, station: 'stn_8', path: 'm.md' } });
-      // Phase-1 visibility: a person sees an agent's link once it is workspace-scoped (Task B4 adds boards).
+      // A workspace-scoped link is listed whatever the board; the board-scoped case has its own test above.
       await env.DB.prepare(`UPDATE items SET scope = 'workspace' WHERE id IN (?, ?)`).bind(a.body.itemId, other.body.itemId).run();
       const res = await SELF.fetch(`${API}/api/v1/sources/agentpod/items?station=stn_9`, { headers: { Authorization: `Bearer ${await planeToken()}` } });
       expect(res.status).toBe(200);
