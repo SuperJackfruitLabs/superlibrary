@@ -6,7 +6,11 @@
 import { LIMITS } from '@superlibrary/contract';
 import type { Env } from '../env';
 import { audit } from '../audit';
+import { itemChanged } from '../events';
 import { blobKey, manifestKey } from '../storage/blobs';
+
+/** Must equal `triggers.crons[0]` in wrangler.jsonc (a test holds them together). */
+export const RETENTION_CRON = '0 3 * * *';
 
 export interface SweepReport {
   expired: string[];
@@ -63,10 +67,15 @@ export async function deleteItem(env: Env, itemId: string, actor: string, reason
   await env.DB.batch([
     env.DB.prepare(`DELETE FROM version_files WHERE item_id = ?`).bind(itemId),
     env.DB.prepare(`DELETE FROM versions WHERE item_id = ?`).bind(itemId),
-    env.DB.prepare(`DELETE FROM item_references WHERE item_id = ?`).bind(itemId),
+    // Also the references a deleted work record held: once its card's record is gone, an artifact
+    // is no longer referenced by it (spec §12).
+    env.DB.prepare(`DELETE FROM item_references WHERE item_id = ? OR (from_kind = 'work-record' AND from_id = ?)`).bind(itemId, itemId),
+    env.DB.prepare(`DELETE FROM item_sources WHERE item_id = ?`).bind(itemId),
+    env.DB.prepare(`DELETE FROM work_records WHERE item_id = ?`).bind(itemId),
     env.DB.prepare(`DELETE FROM items WHERE id = ?`).bind(itemId),
     audit(env.DB, { workspaceId: item.workspace_id, actor, action: 'item.deleted', itemId, detail: { reason } }),
   ]);
+  await itemChanged(env, itemId, item.workspace_id, 'deleted');
   return deleteOrphanBlobs(env, files.map((f) => f.sha256));
 }
 

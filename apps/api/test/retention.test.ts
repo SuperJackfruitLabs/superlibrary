@@ -1,8 +1,9 @@
 import { createMessageBatch, createScheduledController, env, getQueueResult, createExecutionContext } from 'cloudflare:test';
 import { describe, expect, it, vi } from 'vitest';
 import worker from '../src/index';
+import wranglerRaw from '../wrangler.jsonc?raw';
 import type { RetentionMessage } from '../src/env';
-import { deleteItem, sweep } from '../src/lifecycle/retention';
+import { deleteItem, sweep, RETENTION_CRON } from '../src/lifecycle/retention';
 import { sha256Hex, upload } from './helpers/upload';
 
 const DAY = 86_400_000;
@@ -129,6 +130,20 @@ describe('retention sweep (spec §12, plan D14)', () => {
     expect(audited?.actor).toBe('retention');
   });
 
+  it('an unknown cron expression does not sweep', async () => {
+    const send = vi.fn();
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const ctl = createScheduledController({ scheduledTime: Date.UTC(2026, 9, 9, 4), cron: '0 4 * * *' });
+    await worker.scheduled!(ctl, { ...env, RETENTION: { send } as unknown as Queue<RetentionMessage> }, createExecutionContext());
+    expect(send).not.toHaveBeenCalled();
+    expect(err).toHaveBeenCalledWith('no handler for cron', '0 4 * * *');
+    err.mockRestore();
+  });
+
+  it('the retention cron constant is the one wrangler.jsonc declares', () => {
+    expect(wranglerRaw).toContain(`"crons": ["${RETENTION_CRON}"]`);
+  });
+
   it('the cron enqueues one sweep; the consumer runs it and acks', async () => {
     const send = vi.fn();
     const ctl = createScheduledController({ scheduledTime: Date.UTC(2026, 9, 9, 3), cron: '0 3 * * *' });
@@ -192,5 +207,12 @@ describe('quarantine is emptied for every session that is over (rulings T7/T8, T
     expect(report.clearedQuarantines).toContain('upl_00000000000000ff');
     expect(await env.BLOBS.head(key)).toBeNull();
     expect(await env.BLOBS.head(`blobs/${'0'.repeat(64)}`)).toBeNull();
+  });
+});
+
+describe('worker entry exports guard', () => {
+  it('the worker entry exports only its default handler', async () => {
+    const entry = await import('../src/index');
+    expect(Object.keys(entry)).toEqual(['default']);
   });
 });

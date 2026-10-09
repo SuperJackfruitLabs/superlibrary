@@ -4,6 +4,7 @@ import type { Env } from '../env';
 import { error, json, type Handler } from '../http';
 import { audit } from '../audit';
 import { resolvePerson, type Person } from '../auth/caller';
+import { itemChanged } from '../events';
 import { VISIBLE_SQL, canManage, canSee, isExpired, loadItem, type ItemRow } from './visibility';
 import { deleteManifest, writeManifest } from '../storage/blobs';
 import { contentOrigin, signContent } from './sign';
@@ -145,6 +146,8 @@ async function revokeItem(request: Request, env: Env, p: Person, id: string): Pr
   // And again after: an expiry change or an n+1 commit that read the item before this batch may
   // have rewritten a manifest in between. From here on every writer sees revoked_at and deletes.
   for (const v of versions) await deleteManifest(env, id, v.version);
+  // The index consumer reads the new state; a revoked item is un-indexed (Task B3).
+  await itemChanged(env, id, item.workspace_id, 'upserted');
   const now = await loadItem(env, id);
   return json({ revoked: true, revokedAt: isoUtc(now!.revoked_at) });
 }
@@ -163,6 +166,7 @@ async function revokeVersion(env: Env, p: Person, id: string, version: number): 
     // Again after the batch, for a manifest rewritten in between (see revokeItem).
     await deleteManifest(env, id, version);
   }
+  await itemChanged(env, id, item.workspace_id, 'upserted');
   const now = await env.DB.prepare(`SELECT revoked_at FROM versions WHERE item_id = ? AND version = ?`).bind(id, version).first<{ revoked_at: string }>();
   return json({ revoked: true, version, revokedAt: isoUtc(now!.revoked_at) });
 }
@@ -202,6 +206,7 @@ async function widenScope(request: Request, env: Env, p: Person, id: string): Pr
       env.DB.prepare(`UPDATE items SET scope = 'workspace' WHERE id = ?`).bind(id),
       audit(env.DB, { workspaceId: p.workspaceId, actor: p.principalId, act: p.act, action: 'item.scope_changed', itemId: id, detail: { from: item.scope, to: 'workspace' } }),
     ]);
+    await itemChanged(env, id, item.workspace_id, 'upserted');
   }
   return json({ item: summary((await loadItem(env, id))!) });
 }

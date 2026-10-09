@@ -28,7 +28,15 @@
     // content Worker's FRAME_ANCESTORS minus APP_URL; a test added with the content Worker holds the two together.
     "EMBED_HOSTS": "https://app.superpipeline.dev https://console.agentpod.dev",
     // Plan decision D14: "report" until phase 2 brings references; then "enforce".
-    "RETENTION_MODE": "report"
+    "RETENTION_MODE": "report",
+    // Plan Stage 0. Names whom to call; grant nothing. Secrets (HUB_SERVICE_PRINCIPAL, SERVICE_CREDENTIALS,
+    // PUSH_SIGNING_KEY, OPERATORS) are set with `wrangler secret put`, never here.
+    "ORG_PLANE_URL": "https://accounts.superjackfruit.com",
+    "HUB_URL": "https://hub.agentpod.dev",
+    "HUB_AUDIENCE": "https://hub.agentpod.dev",
+    "SUPERPIPELINE_URL": "https://app.superpipeline.dev",
+    "SUPERPIPELINE_AUDIENCE": "https://app.superpipeline.dev",
+    "ROSTER_TTL_SECONDS": "300"
   },
   // URL_SIGNING_PRIVATE_KEY is a secret: `wrangler secret put URL_SIGNING_PRIVATE_KEY` (Task 21 Step 4).
   "d1_databases": [
@@ -36,7 +44,11 @@
   ],
   "r2_buckets": [{ "binding": "BLOBS", "bucket_name": "superlibrary-blobs" }],
   "queues": {
-    "producers": [{ "binding": "RETENTION", "queue": "superlibrary-retention" }],
+    "producers": [
+      { "binding": "RETENTION", "queue": "superlibrary-retention" },
+      { "binding": "INGEST", "queue": "superlibrary-ingest" },
+      { "binding": "INDEX", "queue": "superlibrary-index" }
+    ],
     "consumers": [{ "queue": "superlibrary-retention", "max_batch_size": 1, "max_retries": 5 }]
   },
   // The daily sweep enqueues one message; the consumer does the work (spec §6 `retention` queue).
