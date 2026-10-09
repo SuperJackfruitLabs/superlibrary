@@ -26,14 +26,14 @@ describe('the suite shell (operator direction A)', () => {
     open();
     const header = document.querySelector('header')!;
     const parts = [...header.children].map((e) => e.className.split(' ')[0]);
-    expect(parts).toEqual(['shell-brand', 'shell-nav', 'shell-end']);
-    expect(header.querySelector('.shell-brand')!.textContent).toContain('Superlibrary');
+    expect(parts).toEqual(['suite-shell-brand', 'suite-shell-nav', 'suite-shell-end']);
+    expect(header.querySelector('.suite-shell-brand')!.textContent).toContain('Superlibrary');
     expect(header.querySelector('[data-testid="mark"]')).not.toBeNull();
     expect(header.querySelector('nav[aria-label="Superlibrary"] [aria-current="page"]')!.textContent).toBe('Library');
   });
   it('the account menu holds the theme and Sign out, and Escape closes it back to its button', () => {
     const { onsignout, ontheme } = open();
-    const btn = document.querySelector<HTMLButtonElement>('.shell-account')!;
+    const btn = document.querySelector<HTMLButtonElement>('.suite-shell-account')!;
     expect(btn.getAttribute('aria-expanded')).toBe('false');
     btn.click(); flushSync();
     const menu = document.getElementById(btn.getAttribute('aria-controls')!)!;
@@ -42,7 +42,7 @@ describe('the suite shell (operator direction A)', () => {
     const dark = [...menu.querySelectorAll<HTMLInputElement>('input[type=radio]')].find((r) => r.value === 'dark')!;
     dark.click(); flushSync();
     expect(ontheme).toHaveBeenCalledWith('dark');
-    menu.querySelector<HTMLButtonElement>('button.shell-signout')!.click();
+    menu.querySelector<HTMLButtonElement>('button.suite-shell-signout')!.click();
     expect(onsignout).toHaveBeenCalled();
     btn.click(); flushSync();
     menu.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
@@ -55,6 +55,6 @@ describe('the suite shell (operator direction A)', () => {
     expect(document.querySelector('[data-slot="suite-switcher"]')).toBeNull();
     unmount(c!); c = null; document.body.innerHTML = '';
     open({ suite });
-    expect(document.querySelector('.shell-end [data-slot="suite-switcher"] button')!.textContent).toBe('Products');
+    expect(document.querySelector('.suite-shell-end [data-slot="suite-switcher"] button')!.textContent).toBe('Products');
   });
 });

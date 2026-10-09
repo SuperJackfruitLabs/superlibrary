@@ -34,11 +34,25 @@ describe('the app header', () => {
     expect([...document.querySelectorAll('nav[aria-label="Superlibrary"] a')].map((a) => a.textContent)).toEqual(['Library', 'Outcomes', 'Collections', 'Upload']);
   });
 
+  it('opening the account menu closes the suite switcher, and Escape on the trigger closes it', () => {
+    open();
+    const sw = document.querySelector<HTMLButtonElement>('button.suite-switcher')!;
+    const acct = document.querySelector<HTMLButtonElement>('button.suite-shell-account')!;
+    sw.click(); flushSync();
+    expect(sw.getAttribute('aria-expanded')).toBe('true');
+    acct.click(); flushSync();
+    expect(sw.getAttribute('aria-expanded')).toBe('false');
+    expect(acct.getAttribute('aria-expanded')).toBe('true');
+    acct.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); flushSync();
+    expect(acct.getAttribute('aria-expanded')).toBe('false');
+    expect(document.activeElement).toBe(acct);
+  });
+
   it('Sign out is inside the account menu, not in the bar, and calls back', () => {
     const onsignout = vi.fn();
     open(onsignout);
     const signout = [...document.querySelectorAll<HTMLButtonElement>('header button')].find((b) => b.textContent!.trim() === 'Sign out')!;
-    expect(signout.closest('.shell-menu')).not.toBeNull();
+    expect(signout.closest('.suite-shell-menu')).not.toBeNull();
     signout.click();
     expect(onsignout).toHaveBeenCalledOnce();
   });

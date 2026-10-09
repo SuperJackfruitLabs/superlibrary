@@ -6,4 +6,4 @@
   let { parentHref = 'https://superjackfruit.com' }: { parentHref?: string } = $props();
 </script>
 
-<footer class="shell-footer"><a href={parentHref}><ParentMark size={20} /><span>{PARENT.name}</span></a></footer>
+<footer class="suite-shell-footer"><a href={parentHref}><ParentMark size={20} /><span>{PARENT.name}</span></a></footer>
