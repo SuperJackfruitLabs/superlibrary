@@ -8,6 +8,7 @@ import { extractText } from './extract';
 import { embedderFor } from './embedder';
 import { indexFor, readSlots, type SlotRow } from './vector-index';
 import { estimateTokens } from '@superlibrary/contract';
+import { reindexPage } from './reindex';
 
 /** The daily repair (plan P10). A constant here, not in the Worker entry, which may export only default. */
 export const RECONCILE_CRON = '30 3 * * *';
@@ -130,9 +131,4 @@ export async function reconcile(env: Env): Promise<{ queued: number; orphans: nu
   ];
   for (let i = 0; i < msgs.length; i += 100) await env.INDEX.sendBatch(msgs.slice(i, i + 100));
   return { queued: missing.length + stale.length, orphans: orphans.length };
-}
-
-/** Task B8 fills this in; until then a stray page is retried, never acked. */
-export async function reindexPage(_env: Env, _slot: 'a' | 'b', _after: string | null): Promise<void> {
-  throw new Error('re-index arrives in Task B8');
 }

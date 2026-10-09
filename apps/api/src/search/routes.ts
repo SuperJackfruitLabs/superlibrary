@@ -7,6 +7,7 @@ import { searchAudited } from './search';
 import { getForViewer, related } from './related';
 import { invalidateRoster } from '../clients/roster';
 import { reconcile } from '../indexing/consumer';
+import { startReindex } from '../indexing/reindex';
 
 const isOperator = (env: { OPERATORS?: string }, prn: string) => (env.OPERATORS ?? '').split(/\s+/).includes(prn);
 
@@ -16,6 +17,22 @@ export const searchRoutes: Handler = async (request, env, _ctx, url) => {
     if (p instanceof Response) return p;
     if (!isOperator(env, p.principalId)) return error(403, 'not_permitted');
     return json(await reconcile(env), 202);
+  }
+  if (url.pathname === '/api/v1/admin/index/reindex' && request.method === 'POST') {
+    const p = await resolvePerson(request, env);
+    if (p instanceof Response) return p;
+    if (!isOperator(env, p.principalId)) return error(403, 'not_permitted');
+    const body = (await request.json().catch(() => null)) as { embedder?: string } | null;
+    if (!body || typeof body.embedder !== 'string' || !body.embedder) return error(400, 'invalid');
+    try {
+      return json(await startReindex(env, body.embedder), 202);
+    } catch (e) {
+      const m = e instanceof Error ? e.message : '';
+      if (m === 'reindex_running') return error(409, 'reindex_running');
+      if (m === 'dimension_mismatch') return error(400, 'dimension_mismatch');
+      if (m.startsWith('unknown embedder')) return error(400, 'unknown_embedder');
+      throw e;
+    }
   }
   if (url.pathname === '/api/v1/roster/invalidate' && request.method === 'POST') {
     const claims = await serviceCaller(request, env);
