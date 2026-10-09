@@ -130,7 +130,7 @@ export function versionRows(v: VersionSummary): Row[] {
 }
 
 const WORDS: Record<string, string> = {
-  revoked: 'This was revoked.', expired: 'This has expired.', not_found: 'Nothing here, or you cannot see it.',
+  revoked: 'This was revoked.', expired: 'This has expired.', not_found: 'Nothing here, or you cannot see it.', name_taken: 'A collection with that name already exists.',
   not_permitted: 'Only the person who uploaded it, or an owner of the workspace, may do that.',
   sign_in_required: 'Sign in again to do that.',
 };
@@ -157,9 +157,9 @@ export const askRevokeItem = (title: string): Ask => ({
 });
 
 /** A change to the item (revoke, expiry): null when it was done, else the sentence to show. */
-export async function change(api: Api, path: string, method: 'POST' | 'PATCH', body: unknown): Promise<string | null> {
+export async function change(api: Api, path: string, method: 'POST' | 'PATCH' | 'DELETE', body?: unknown): Promise<string | null> {
   try {
-    const res = await api(path, { method, headers: JSON_HEADERS, body: JSON.stringify(body) });
+    const res = await api(path, body === undefined ? { method } : { method, headers: JSON_HEADERS, body: JSON.stringify(body) });
     if (res.ok) return null;
     const b = (await res.json().catch(() => ({}))) as { error?: string; detail?: string };
     return explain(b.error ?? `http_${res.status}`, b.detail);

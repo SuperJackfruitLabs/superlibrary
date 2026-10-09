@@ -12,6 +12,7 @@
   import ItemHeader from '$lib/ItemHeader.svelte';
   import WorkRecordView from '$lib/WorkRecordView.svelte';
   import RelatedList from '$lib/RelatedList.svelte';
+  import AddToCollection from '$lib/AddToCollection.svelte';
   import ModerationPanel from '$lib/ModerationPanel.svelte';
   import { themeState } from '$kit/theme.svelte';
   import {
@@ -300,6 +301,7 @@
   </section>
 
   <RelatedList {itemId} />
+  <AddToCollection {itemId} />
 
   {#if manage}
     <section class="manage" aria-labelledby="manage-h">
