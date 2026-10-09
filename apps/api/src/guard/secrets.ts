@@ -63,3 +63,24 @@ export function scanUndecodedText(bytes: Uint8Array): Finding[] {
   for (const f of [...scanText(text), ...scanText(text.replace(/\0/g, ''))]) seen.set(`${f.line}:${f.rule}`, f);
   return [...seen.values()].sort((a, b) => a.line - b.line || a.rule.localeCompare(b.rule));
 }
+
+export const REDACTED = '[redacted secret]';
+
+/**
+ * Spec §8: a work record is stored with each match replaced. The same rules as scanText, matched
+ * globally; for an assignment only the value goes. Returns which rules fired, never what matched.
+ */
+export function redactSecrets(text: string): { text: string; rules: SecretRule[] } {
+  const fired = new Set<SecretRule>();
+  let out = text;
+  for (const [rule, re] of RULES) {
+    const g = new RegExp(re.source, re.flags.includes('g') ? re.flags : re.flags + 'g');
+    out = out.replace(g, () => { fired.add(rule); return REDACTED; });
+  }
+  out = out.replace(ASSIGNMENT, (whole, value: string) => {
+    if (/^[a-z-]+$/i.test(value) || entropy(value) < 3.5) return whole;
+    fired.add('high-entropy-assignment');
+    return whole.slice(0, whole.length - value.length) + REDACTED;
+  });
+  return { text: out, rules: [...fired] };
+}
