@@ -7,6 +7,7 @@ import { canSee, isExpired, loadItem, viewerScopes, type ItemRow } from '../item
 import { extractText, TEXT_VIEWS } from '../indexing/extract';
 import type { Stage, Timer } from '../timing';
 import { search, sourcesOf, supersededByMap, visibleSupersededBy } from './search';
+import { indexFor, readSlots } from '../indexing/vector-index';
 
 const GET_CAP = 100_000;
 
@@ -52,6 +53,19 @@ export async function related(env: Env, v: Viewer, q: RelatedQuery, timer?: Time
   return items;
 }
 
+/** The item's first chunk's stored vector in the active slot, or undefined (not indexed yet, or the index unreachable). */
+async function storedVector(env: Env, itemId: string): Promise<number[] | undefined> {
+  const first = await env.DB.prepare(`SELECT id FROM chunks WHERE item_id = ? ORDER BY position LIMIT 1`).bind(itemId).first<{ id: string }>();
+  if (!first) return undefined;
+  try {
+    const { active } = await readSlots(env);
+    return (await indexFor(env, active).get([first.id]))[0]?.values;
+  } catch (e) {
+    console.error('stored vector unavailable; embedding the basis', e instanceof Error ? e.message : String(e));
+    return undefined;
+  }
+}
+
 /** What related searched by (audited): the card's record, the item, the caller's text for a card with no record yet, or nothing. */
 export type RelatedBasis = 'record' | 'item' | 'text' | 'none';
 
@@ -76,14 +90,18 @@ async function relatedItems(env: Env, v: Viewer, q: RelatedQuery, timer?: Timer)
   });
   if (!found) return { items: [], basis: 'none' };
   const { selfId, basis } = found;
+  // Gap S4: the basis item's own first-chunk vector, already in the active slot; embed only if it is missing.
+  const vector = selfId ? await timed('basis', () => storedVector(env, selfId)) : undefined;
   // Gap S2: the item itself is no candidate, so its self-match never sets the floor's bar; the filter stays as a second guard.
-  const hits = (await search(env, v, { query: basis.slice(0, 2000), limit: Math.min(25, q.limit * 3) }, scopes, { timer, exclude: selfId })).filter((r) => r.itemId !== selfId);
+  const hits = (await search(env, v, { query: basis.slice(0, 2000), limit: Math.min(25, q.limit * 3) }, scopes, { timer, exclude: selfId, vector })).filter((r) => r.itemId !== selfId);
   const out: RelatedItem[] = [];
   await timed('fit', async () => {
+    // Gap S4: every hit's first chunk in one round trip.
+    const firsts = new Map((await env.DB.prepare(`SELECT item_id, text FROM chunks WHERE item_id IN (SELECT value FROM json_each(?)) AND position = 0`).bind(JSON.stringify(hits.map((h) => h.itemId))).all<{ item_id: string; text: string }>()).results.map((r) => [r.item_id, r.text]));
     let used = 0;
     for (const r of hits) {
       if (out.length === q.limit) break;
-      const chunk = (await env.DB.prepare(`SELECT text FROM chunks WHERE item_id = ? ORDER BY position LIMIT 1`).bind(r.itemId).first<{ text: string }>())?.text ?? r.snippet;
+      const chunk = firsts.get(r.itemId) ?? r.snippet;
       const room = q.maxTokens - used;
       if (room < 60) break;
       // Fit the block to the room left: trim the body until the wrapped block's estimate fits.

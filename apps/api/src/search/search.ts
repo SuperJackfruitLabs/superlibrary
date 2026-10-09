@@ -106,7 +106,7 @@ export interface ExplainRow { itemId: string; fts: number | null; vector: number
  * `timer` records each stage's wait (gap S4). `exclude`: an item that is never a candidate, in either list,
  * so it never sets the floor's bar (related's basis item). `explain`: filled with one row per candidate.
  */
-export interface SearchOptions { timer?: Timer; exclude?: string; explain?: ExplainRow[] }
+export interface SearchOptions { timer?: Timer; exclude?: string; explain?: ExplainRow[]; /** Gap S4: the query's vector when the caller already has it (related's basis item); otherwise the query is embedded. */ vector?: number[] }
 
 export async function search(env: Env, v: Viewer, q: SearchQuery, precomputedScopes?: string[], opts: SearchOptions = {}): Promise<SearchResult[]> {
   const t = opts.timer;
@@ -147,7 +147,7 @@ export async function search(env: Env, v: Viewer, q: SearchQuery, precomputedSco
   try {
     if (vectorScopes.length === 0) throw new Error('no visible scope for the vector query');
     const { active } = await timed('slots', () => readSlots(env));
-    const [values] = await timed('embed', () => embedderFor(env, active.embedder_id!).embed([q.query]));
+    const values = opts.vector && opts.vector.length === active.dims ? opts.vector : (await timed('embed', () => embedderFor(env, active.embedder_id!).embed([q.query])))[0];
     const matches = await timed('vector', () => indexFor(env, active).query(values!, {
       namespace: v.workspaceId, topK: 50,
       filter: { scope: { $in: vectorScopes }, ...(q.kinds ? { kind: { $in: q.kinds } } : {}), ...(q.outcomes ? { outcome: { $in: q.outcomes } } : {}) },
