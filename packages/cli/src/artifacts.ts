@@ -3,7 +3,7 @@ import { basename, join, relative, resolve, sep } from 'node:path';
 import { createHash } from 'node:crypto';
 import { ITEM_ID, LIMITS, NOTHING_ADDED, checkPath, sendFiles, isTransient, describeRefusal, pathRefusalSentence, refusalSentence, sizeRefusal, type UploadRefusal, type CommitResult, type EmbedGrant } from '@superlibrary/contract';
 import { baseUrl, tokenSource, type TokenSource } from './credential.ts';
-
+import { oneLine } from './args.ts';
 export interface LocalFile { path: string; bytes: Uint8Array }
 export type Client = (method: string, path: string, body?: unknown) => Promise<Response>;
 /** Files accounted for so far, of the total. */
@@ -73,7 +73,7 @@ function reasonOf(b: { issues?: unknown; detail?: unknown; message?: unknown }):
   const v = b.issues ?? b.detail ?? b.message;
   if (v === undefined || v === null) return '';
   const s = typeof v === 'string' ? v : JSON.stringify(v);
-  return s.replace(/[\u0000-\u001f\u007f-\u009f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 300);
+  return oneLine(s).slice(0, 300);
 }
 
 /**

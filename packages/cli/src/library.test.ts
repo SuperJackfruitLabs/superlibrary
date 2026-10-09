@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Client } from './artifacts.ts';
-import { collectAddWith, collectionLines, createdLine, detailLines, printable, resolveCollection, resultLines, scopeWith, searchBody } from './library.ts';
+import { collectAddWith, collectionLines, createdLine, quoteHint, detailLines, printable, resolveCollection, resultLines, scopeWith, searchBody } from './library.ts';
 
 const NONE = { kind: null, outcome: null, board: null, agent: null, station: null, since: null, until: null, limit: null };
 function fake(answers: Record<string, unknown>): { c: Client; calls: Array<[string, string, unknown]> } {
@@ -85,5 +85,19 @@ describe('refusal wording', () => {
     await expect(import('./library.ts').then((m) => m.searchWith(bad, 'x', NONE))).rejects.toThrow('bad id');
     const { c } = fake({ 'GET /api/v1/collections': COLS });
     await expect(collectAddWith(c, 'Week 41', 'itm_0123456789abcdef', null)).rejects.toThrow('does not exist or you cannot see it');
+  });
+});
+
+describe('final fix wave', () => {
+  it('refuses a date that is not on the calendar', () => {
+    expect(() => searchBody('x', { ...NONE, since: '2026-02-30' })).toThrow('YYYY-MM-DD');
+    expect(() => searchBody('x', { ...NONE, until: '2026-04-31' })).toThrow('YYYY-MM-DD');
+    expect(searchBody('x', { ...NONE, since: '2028-02-29' }).since).toBe('2028-02-29T00:00:00.000Z');
+  });
+  it('hints to quote a multi-word collection name only when words were left over', () => {
+    const e = new Error('no collection called Week. Run suli collect list.');
+    expect(quoteHint(e, 1).message).toContain('in quotes');
+    expect(quoteHint(e, 0).message).not.toContain('quotes');
+    expect(quoteHint(new Error('other'), 2).message).toBe('other');
   });
 });

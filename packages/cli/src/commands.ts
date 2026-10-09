@@ -126,7 +126,7 @@ export function renderUsage(): string {
     for (const c of COMMANDS.filter((x) => x.group === g.id)) lines.push(`  ${commandName(c).padEnd(22)} ${plain(c.summary)}`);
     lines.push('');
   }
-  lines.push('  --json              machine-stable output, on any command', '  suli help <verb>    one command in full (or: suli <verb> --help)', '', `Credential, first found wins: $SUPERLIBRARY_TOKEN, then suli login's cached token, then its device credential.`, 'Exit status: 0 on success, 1 otherwise.');
+  lines.push(`  ${'--json'.padEnd(22)} machine-stable output, on any command`, `  ${'suli help <verb>'.padEnd(22)} one command in full (or: suli <verb> --help)`, '', `Credential, first found wins: $SUPERLIBRARY_TOKEN, then suli login's cached token, then its device credential.`, 'Exit status: 0 on success, 1 otherwise.');
   return lines.join('\n');
 }
 

@@ -1,10 +1,11 @@
 /** suli search, collect and scope (spec §11). A client: it adds no authority and renders the server's refusals. */
 import { COLLECTION_ID, OUTCOMES, type CollectionDetail, type CollectionSummary, type SearchResult } from '@superlibrary/contract';
+import { oneLine } from './args.ts';
 import { client, itemId, refused, type Client } from './artifacts.ts';
 
 /** Server text is written by agents and people: no control character (ESC, CSI, OSC, newline) reaches the terminal. */
 export function printable(s: unknown): string {
-  return String(s ?? '').replace(/[\u0000-\u001f\u007f-\u009f]+/g, ' ').replace(/\s+/g, ' ').trim();
+  return oneLine(String(s ?? ''));
 }
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -12,7 +13,7 @@ const DAY = /^\d{4}-\d{2}-\d{2}$/;
 function dayStart(d: string, plus = 0): string {
   if (!DAY.test(d)) throw new Error(`a date is YYYY-MM-DD: ${d}`);
   const t = new Date(`${d}T00:00:00.000Z`);
-  if (Number.isNaN(t.getTime())) throw new Error(`a date is YYYY-MM-DD: ${d}`);
+  if (Number.isNaN(t.getTime()) || t.toISOString().slice(0, 10) !== d) throw new Error(`a date is YYYY-MM-DD: ${d}`);
   t.setUTCDate(t.getUTCDate() + plus);
   return t.toISOString();
 }
@@ -127,7 +128,17 @@ export const detailLines = (d: CollectionDetail): string =>
 
 const out = (json: boolean, value: unknown, text: string): void => { process.stdout.write(json ? JSON.stringify(value) + '\n' : text + '\n'); };
 
+/** A name that did not match, when more words followed it than the verb takes: say to quote it. */
+export function quoteHint(e: unknown, extra: number): Error {
+  const err = e instanceof Error ? e : new Error(String(e));
+  return extra > 0 && err.message.startsWith('no collection called') ? new Error(`${err.message} A name of several words goes in quotes: suli collect <verb> "Week 41" …`) : err;
+}
+
 export async function collect(sub: string | undefined, args: string[], o: { description: string | null; note: string | null; json: boolean }): Promise<void> {
+  try { return await collectRun(sub, args, o); } catch (e) { throw quoteHint(e, sub === 'show' ? args.length - 1 : sub === 'add' || sub === 'remove' ? args.length - 2 : 0); }
+}
+
+async function collectRun(sub: string | undefined, args: string[], o: { description: string | null; note: string | null; json: boolean }): Promise<void> {
   const c = client();
   if (sub === 'list') {
     const list = await collectListWith(c);
