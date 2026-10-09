@@ -19,10 +19,13 @@ export class PipelineError extends Error {
   constructor(readonly status: number, message: string) { super(message); }
 }
 
+export type SnapshotCache = Map<string, Promise<{ cards: PipelineCard[]; references: PipelineReference[] }>>;
+
 export interface SuperpipelineClient {
   boards(): Promise<Array<{ id: string; name: string }>>;
   snapshot(boardId: string): Promise<{ cards: PipelineCard[]; references: PipelineReference[] }>;
-  cardBundle(boardId: string, cardId: string): Promise<CardBundle | null>;
+  /** `snapshots`: a per-batch cache of board snapshots, so many cards of one board read it once. */
+  cardBundle(boardId: string, cardId: string, snapshots?: SnapshotCache): Promise<CardBundle | null>;
   registerPush(boardId: string, url: string, token: string, events: string[]): Promise<string>;
 }
 
@@ -41,13 +44,19 @@ export function pipelineFor(env: Env, org: string): SuperpipelineClient {
     return { status: res.status, json: (await res.json()) as T };
   }
   const b = (id: string) => `/v1/boards/${encodeURIComponent(id)}`;
+  function snapshotOf(boardId: string, cache?: SnapshotCache) {
+    if (!cache) return client.snapshot(boardId);
+    let p = cache.get(boardId);
+    if (!p) { p = client.snapshot(boardId); cache.set(boardId, p); p.catch(() => cache.delete(boardId)); }
+    return p;
+  }
   const client: SuperpipelineClient = {
     async boards() { return (await call<{ boards: Array<{ id: string; name: string }> }>('GET', '/v1/boards')).json?.boards ?? []; },
     async snapshot(boardId) {
       const s = (await call<{ cards: PipelineCard[]; references: PipelineReference[] }>('GET', b(boardId))).json;
       return { cards: s?.cards ?? [], references: s?.references ?? [] };
     },
-    async cardBundle(boardId, cardId) {
+    async cardBundle(boardId, cardId, snapshots) {
       const c = `${b(boardId)}/cards/${encodeURIComponent(cardId)}`;
       const card = (await call<{ card: PipelineCard }>('GET', c)).json?.card;
       if (!card) return null;
@@ -56,7 +65,7 @@ export function pipelineFor(env: Env, org: string): SuperpipelineClient {
         call<{ comments: PipelineComment[] }>('GET', `${c}/comments`),
         call<{ links: PipelineLink[] }>('GET', `${c}/links`),
         call<{ gates: PipelineGate[] }>('GET', `${c}/activities`),
-        client.snapshot(boardId),
+        snapshotOf(boardId, snapshots),
       ]);
       return {
         card,
