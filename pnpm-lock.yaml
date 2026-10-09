@@ -129,6 +129,16 @@ importers:
         specifier: ^8.0.16
         version: 8.3.3(@types/node@22.20.5)(esbuild@0.28.1)(yaml@2.9.1)
 
+  packages/cli:
+    dependencies:
+      '@superlibrary/contract':
+        specifier: workspace:*
+        version: link:../contract
+    devDependencies:
+      '@types/node':
+        specifier: ^22.20.2
+        version: 22.20.5
+
   packages/contract:
     dependencies:
       zod:

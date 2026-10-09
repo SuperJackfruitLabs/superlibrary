@@ -1,0 +1,15 @@
+{
+  "name": "@superlibrary/cli",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "bin": { "suli": "./src/index.ts", "superlibrary": "./src/index.ts" },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "reference": "UPDATE_REFERENCE=1 vitest run src/reference.test.ts",
+    "build": "bun build --compile src/index.ts --outfile dist/suli"
+  },
+  "dependencies": { "@superlibrary/contract": "workspace:*" },
+  "devDependencies": { "@types/node": "^22.20.2" }
+}

@@ -18,6 +18,8 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
+      # The CLI runs under bun.
+      - uses: oven-sh/setup-bun@v2
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
       - run: pnpm test

@@ -11,3 +11,15 @@ export const LIMITS = {
   uploadTtlHours: 24,
   csvRows: 5000,
 } as const;
+
+const mb = (bytes: number) => bytes / MB;
+
+/** The sentences every client shows for a size refusal, with the numbers taken from LIMITS. */
+export const sizeRefusal = {
+  file: (path: string) => `${path} is larger than ${mb(LIMITS.fileBytes)} MB, the limit for one file.`,
+  folder: () => `Together these are more than ${mb(LIMITS.folderBytes)} MB, the limit for a folder.`,
+  files: (count?: number) => `A folder may have at most ${LIMITS.folderFiles} files${count === undefined ? '' : `; this has ${count}`}.`,
+};
+
+/** Ends every refusal that happens before anything is stored. */
+export const NOTHING_ADDED = 'Nothing was added to the library.';
