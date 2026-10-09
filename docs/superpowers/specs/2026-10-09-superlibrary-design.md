@@ -318,6 +318,8 @@ open it in a new window.
   - `{ type: "superlibrary:open", url }`: a link clicked in a rendered file (Markdown, notebook
     Markdown, Graphviz node URLs). The sandbox stays exactly as above, without `allow-popups`, so
     the host opens it with `noopener,noreferrer`, and only for `http:` and `https:` URLs.
+    Any page in the frame, an HTML artifact's included, may post it, and the host opens the URL
+    subject to the browser's popup blocker.
 - **Host SDK** `@superlibrary/embed`: `mountArtifact(el, { itemId, version?, getEmbedUrl, … })`
   renders the sandboxed frame and, outside the sandbox, a toolbar. Amended 2026-10-09 (operator):
   1. **Version** label (from the grant, never the item's latest number), with a menu of the live
