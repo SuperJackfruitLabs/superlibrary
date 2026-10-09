@@ -46,6 +46,8 @@ export interface Env {
   CONTENT_ORIGIN_TEMPLATE: string;
   /** Space-separated origins, besides APP_URL, that may mint embed URLs from a browser. */
   EMBED_HOSTS: string;
+  /** Space-separated browser origins (the AgentPod console) that may call the upload and station routes with a person's own token (ruling RA3). */
+  CONSOLE_ORIGINS?: string;
   RETENTION_MODE: 'report' | 'enforce';
   /** Ed25519 private JWK as JSON (secret). */
   URL_SIGNING_PRIVATE_KEY?: string;

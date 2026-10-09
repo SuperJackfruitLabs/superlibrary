@@ -8,13 +8,19 @@ import { protectedResourceMetadata } from './auth/org-plane';
 import { error, json, type Handler } from './http';
 import { uploadRoutes } from './uploads/routes';
 import { itemRoutes } from './items/routes';
+import { sourceRoutes } from './sources/routes';
 import { queueHandlers } from './queues';
 import { counted, withCost } from './cost';
 import { RETENTION_CRON } from './lifecycle/retention';
 import { RECONCILE_CRON, reconcile } from './indexing/consumer';
 import { searchRoutes } from './search/routes';
 
-const handlers: Handler[] = [uploadRoutes, itemRoutes, searchRoutes];
+const handlers: Handler[] = [
+  uploadRoutes,
+  itemRoutes,
+  searchRoutes,
+  sourceRoutes,
+];
 
 async function route(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
   const url = new URL(request.url);

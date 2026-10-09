@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { LIMITS, SCOPE_RE, encodePath, orderFiles, type EmbedGrant, type FileEntry, type ItemSummary, type VersionSummary, type View } from '@superlibrary/contract';
 import type { Env } from '../env';
-import { error, json, type Handler } from '../http';
+import { corsFor as corsForOrigins, error, json, preflight, type Handler } from '../http';
 import { audit } from '../audit';
 import { resolvePerson, type Person } from '../auth/caller';
 import { itemChanged } from '../events';
@@ -71,10 +71,7 @@ async function detail(env: Env, p: Person, id: string): Promise<Response> {
   return json({ item: summary(item), versions: out });
 }
 
-function corsFor(request: Request, env: Env): Record<string, string> {
-  const origin = request.headers.get('Origin');
-  return origin && hostsOf(env.EMBED_HOSTS).includes(origin) ? { 'Access-Control-Allow-Origin': origin, Vary: 'Origin' } : {};
-}
+const corsFor = (request: Request, env: Env) => corsForOrigins(request, env.EMBED_HOSTS);
 
 async function embed(request: Request, env: Env, p: Person, id: string): Promise<Response> {
   const item = await readable(env, p, id);
@@ -221,11 +218,7 @@ export const itemRoutes: Handler = async (request, env, _ctx, url) => {
   const m = ITEM.exec(url.pathname);
   if (!m) return null;
   const [, id, sub] = m as unknown as [string, string, string | undefined];
-  if (sub === '/embed' && request.method === 'OPTIONS') {
-    const cors = corsFor(request, env);
-    if (!cors['Access-Control-Allow-Origin']) return new Response(null, { status: 204 });
-    return new Response(null, { status: 204, headers: { ...cors, 'Access-Control-Allow-Methods': 'POST', 'Access-Control-Allow-Headers': 'authorization, content-type', 'Access-Control-Max-Age': '600' } });
-  }
+  if (sub === '/embed' && request.method === 'OPTIONS') return preflight(request, env.EMBED_HOSTS, 'POST');
   const p = await resolvePerson(request, env);
   if (p instanceof Response) {
     for (const [k, v] of Object.entries(corsFor(request, env))) p.headers.set(k, v);

@@ -27,6 +27,9 @@
     // Other products that may mint embed URLs from the browser (spec §9, Embedding). Must equal the
     // content Worker's FRAME_ANCESTORS minus APP_URL; a test added with the content Worker holds the two together.
     "EMBED_HOSTS": "https://app.superpipeline.dev https://console.agentpod.dev",
+    // Browser origins that call the upload routes and the station list with the person's own token
+    // (ruling RA3: the AgentPod console links a file as the signed-in person, never through the hub).
+    "CONSOLE_ORIGINS": "https://console.agentpod.dev",
     // Plan decision D14: "report" until phase 2 brings references; then "enforce".
     "RETENTION_MODE": "report",
     // Plan Stage 0. Names whom to call; grant nothing. Secrets (HUB_SERVICE_PRINCIPAL, SERVICE_CREDENTIALS,

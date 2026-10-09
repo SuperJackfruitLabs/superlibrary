@@ -41,6 +41,7 @@ export default defineConfig(async () => {
             APP_URL: 'https://api.test',
             CONTENT_ORIGIN_TEMPLATE: 'https://{label}.content.test',
             EMBED_HOSTS: 'https://host.test',
+            CONSOLE_ORIGINS: 'https://console.test',
             RETENTION_MODE: 'report',
             ORG_PLANE_ISSUER: '',
             ORG_PLANE_JWKS_URL: '',
