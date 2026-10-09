@@ -9,6 +9,7 @@ import { error, json, type Handler } from './http';
 import { uploadRoutes } from './uploads/routes';
 import { itemRoutes } from './items/routes';
 import { sweep } from './lifecycle/retention';
+import { counted, withCost } from './cost';
 
 const handlers: Handler[] = [uploadRoutes, itemRoutes];
 
@@ -30,11 +31,13 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
 
 export default {
   async fetch(request, env, ctx) {
+    const startedAt = Date.now();
+    const c = counted(env);
     try {
-      return await route(request, env, ctx);
+      return withCost(await route(request, c.env, ctx), c.cost, startedAt);
     } catch (e) {
       console.error('unexpected', e instanceof Error ? e.message : String(e));
-      return error(500, 'unexpected');
+      return withCost(error(500, 'unexpected'), c.cost, startedAt);
     }
   },
   async queue(batch: MessageBatch<RetentionMessage>, env: Env, _ctx: ExecutionContext) {

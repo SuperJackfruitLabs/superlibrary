@@ -1,5 +1,5 @@
 import { unzipSync } from 'fflate';
-import { LIMITS, checkPath, describeRefusal, listWords, pathRefusalSentence, secretRefusal, sizeRefusal, type CommitResult, type Finding, type RefusalDetail, type UploadRefusal } from '@superlibrary/contract';
+import { LIMITS, checkPath, describeRefusal, sendFiles, listWords, pathRefusalSentence, secretRefusal, sizeRefusal, type CommitResult, type Finding, type RefusalDetail, type UploadRefusal } from '@superlibrary/contract';
 
 export { describeRefusal, secretRefusal };
 
@@ -202,15 +202,13 @@ async function refusal(res: Response, uploadId?: string): Promise<Refusal> {
   };
 }
 
-/** One request per file, each through `api`, so each carries a token fetched for it (plan Review Focus). */
-async function send(api: Api, uploadId: string, files: LocalFile[], onProgress?: Progress): Promise<Refusal | null> {
-  onProgress?.(0, files.length);
-  for (const [i, f] of files.entries()) {
-    const res = await api(`/api/v1/uploads/${uploadId}/files?path=${encodeURIComponent(f.path)}`, { method: 'PUT', body: f.bytes as Uint8Array<ArrayBuffer> });
-    if (!res.ok) return refusal(res, uploadId);
-    onProgress?.(i + 1, files.length);
-  }
-  return null;
+/**
+ * The contract's sender (the same as suli's): small files in batches, a big one alone, several
+ * requests at a time, each through `api` so each carries a token fetched for it (plan Review Focus).
+ */
+async function send(api: Api, uploadId: string, files: LocalFile[], onProgress?: Progress, held: string[] = []): Promise<Refusal | null> {
+  const failed = await sendFiles((path, init) => api(path, { method: init.method, body: init.body as BodyInit }), uploadId, files, { held, onProgress });
+  return failed ? refusal(failed, uploadId) : null;
 }
 
 const normalised = (path: string) => { const c = checkPath(path); return c.ok ? c.path : path; };
@@ -234,15 +232,15 @@ async function commit(api: Api, uploadId: string, files: LocalFile[] = []): Prom
   }
 }
 
-/** `onProgress(sent, total)`: files sent so far, called before the first and after each one. */
+/** `onProgress(sent, total)`: files sent so far, called before the first request and after each. */
 export async function uploadFiles(
   api: Api, files: LocalFile[], meta: { title: string; item?: string; expiresAt?: string }, opts: { onProgress?: Progress } = {},
 ): Promise<UploadOutcome> {
   const declared = await Promise.all(files.map(async (f) => ({ path: f.path, bytes: f.bytes.length, sha256: await sha256Hex(f.bytes) })));
   const created = await api('/api/v1/uploads', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...meta, files: declared }) });
   if (created.status !== 201) return refusal(created);
-  const { uploadId } = (await created.json()) as { uploadId: string };
-  const failed = await send(api, uploadId, files, opts.onProgress);
+  const { uploadId, held = [] } = (await created.json()) as { uploadId: string; held?: string[] };
+  const failed = await send(api, uploadId, files, opts.onProgress, held);
   if (failed) return failed;
   return commit(api, uploadId, files);
 }

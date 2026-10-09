@@ -68,7 +68,10 @@ export interface TokenDeps {
   exchange?: (t: PlaneTarget, credential: string) => Promise<{ token: string; expiresIn: number }>;
 }
 
-export function tokenSource(deps: TokenDeps = {}): { kind: 'env' | 'device' | 'none'; token(): Promise<string | null> } {
+/** `fresh`: the server refused the token in hand (revoked, or a clock ahead of ours), so exchange anew. */
+export interface TokenSource { kind: 'env' | 'device' | 'none'; token(o?: { fresh?: boolean }): Promise<string | null> }
+
+export function tokenSource(deps: TokenDeps = {}): TokenSource {
   const env = deps.env ?? process.env;
   const fixed = env[ENV_TOKEN];
   if (fixed) return { kind: 'env', token: async () => fixed };
@@ -77,16 +80,26 @@ export function tokenSource(deps: TokenDeps = {}): { kind: 'env' | 'device' | 'n
   if (!device) return { kind: 'none', token: async () => null };
   const now = deps.now ?? Date.now;
   const exchange = deps.exchange ?? ((t, c) => exchangeDevice(t, c));
-  return {
-    kind: 'device',
-    async token() {
-      const base = deps.base ?? baseUrl(env);
-      if (new URL(base).origin !== new URL(device.audience).origin) throw new Error(`You are signed in for ${device.audience}, not ${base}. Run suli login.`);
-      const cached = readJson<{ token: string; expiresAt: number }>(join(dir, 'token.json'));
-      if (cached && cached.expiresAt - now() > 30_000) return cached.token;
+  // Requests run several at a time: the ones that find the token stale share one exchange.
+  let exchanging: Promise<string> | null = null;
+  const renew = () => (exchanging ??= (async () => {
+    try {
       const { token, expiresIn } = await exchange({ plane: device.plane, audience: device.audience }, device.credential);
       writePrivate(dir, 'token.json', { token, expiresAt: now() + expiresIn * 1000 });
       return token;
+    } finally {
+      exchanging = null;
+    }
+  })());
+  return {
+    kind: 'device',
+    async token(o = {}) {
+      const base = deps.base ?? baseUrl(env);
+      if (new URL(base).origin !== new URL(device.audience).origin) throw new Error(`You are signed in for ${device.audience}, not ${base}. Run suli login.`);
+      if (exchanging) return exchanging;
+      const cached = o.fresh ? null : readJson<{ token: string; expiresAt: number }>(join(dir, 'token.json'));
+      if (cached && cached.expiresAt - now() > 30_000) return cached.token;
+      return renew();
     },
   };
 }
