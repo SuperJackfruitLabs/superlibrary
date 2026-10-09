@@ -21,3 +21,28 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
       - run: pnpm test
+
+  e2e:
+    runs-on: ubuntu-latest
+    env:
+      WRANGLER_SEND_METRICS: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # The Chromium and WebKit builds this Playwright version pins (Chromium's headless shell
+      # included), and their system libraries. WebKit runs the containment and phone-width specs.
+      - run: pnpm --filter @superlibrary/web exec playwright install --with-deps chromium webkit
+      # Writes a fresh dev signing pair (no .dev.vars in CI), then boots the API (:8787), the content
+      # Worker (:8788) and the web dev server (:5173), headless.
+      - run: pnpm --filter @superlibrary/web e2e
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-results
+          path: apps/web/test-results/
+          retention-days: 7

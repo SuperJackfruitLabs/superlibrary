@@ -96,6 +96,20 @@ export interface VersionSummary {
   files: FileEntry[];
 }
 
+/**
+ * Where an item came from beyond who and when (spec §3, Provenance). A person's upload has none
+ * (phase 1); an agent's link (phase 2) carries its station and source path, and the card and run
+ * it was made for. Every field is optional: a reader shows what is there.
+ */
+export interface ItemSource {
+  /** The creator is an agent, not a person. */
+  agent?: boolean;
+  station?: string;
+  path?: string;
+  card?: string;
+  run?: string;
+}
+
 export interface ItemSummary {
   id: string;
   kind: 'artifact' | 'work-record';
@@ -107,4 +121,6 @@ export interface ItemSummary {
   latestVersion: number;
   expiresAt: string | null;
   revokedAt: string | null;
+  /** Absent for a person's upload (phase 1). */
+  source?: ItemSource;
 }

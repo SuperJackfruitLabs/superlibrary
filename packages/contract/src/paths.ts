@@ -52,3 +52,19 @@ export function checkPath(raw: string): PathCheck {
   if (hit) return { ok: false, path: raw, reason: 'denied', rule: hit.rule };
   return { ok: true, path: segments.join('/') };
 }
+
+/** Why a path is refused, for every refusal but `denied` (which names its rule). */
+export const PATH_REFUSAL_REASONS: Readonly<Record<Exclude<PathRefusal, 'denied'>, string>> = {
+  parent: 'it leaves the folder',
+  absolute: 'it is an absolute path',
+  backslash: 'it contains a backslash',
+  empty: 'it has no name',
+  control_character: 'it contains a control character',
+  too_long: 'its path is too long',
+};
+
+/** The one sentence every client shows for a refused path, so the web app and `suli` say the same. */
+export function pathRefusalSentence(c: { path: string; reason: PathRefusal; rule?: string }): string {
+  const why = c.reason === 'denied' ? `it matches the ${c.rule} rule` : PATH_REFUSAL_REASONS[c.reason];
+  return `${c.path} is not uploaded: ${why}.`;
+}
