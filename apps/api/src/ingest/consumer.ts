@@ -7,6 +7,7 @@ import { deleteItem } from '../lifecycle/retention';
 import { sha256Hex } from '../storage/blobs';
 import { pipelineFor, PipelineError, type SnapshotCache } from '../sources/superpipeline';
 import { buildWorkRecord } from './work-record';
+import { boardReadState, sweepRefused } from '../sources/subscribe';
 
 const ACTOR = 'source:superpipeline';
 
@@ -17,6 +18,43 @@ async function orgOf(env: Env, workspaceId: string): Promise<string> {
   const w = await env.DB.prepare(`SELECT external_id FROM workspaces WHERE id = ?`).bind(workspaceId).first<{ external_id: string }>();
   if (!w) throw new UnknownWorkspace(`unknown workspace ${workspaceId}`);
   return w.external_id;
+}
+
+export const BOARD_DELETE_PAGE = 25;
+
+/**
+ * Gap S5: a confirmed-deleted board's records go, everything with them (deleteItem). The evidence is
+ * read again here, every page: the board must still be marked, still be absent from a list that
+ * answered (and not refused by the breaker), and its own read must still answer exactly 404. A board
+ * that is listed or reads again keeps everything; any other answer retries the message.
+ * `removed`: records deleted by earlier pages, for the audit.
+ */
+export async function removeDeletedBoard(env: Env, workspaceId: string, boardId: string, removed = 0): Promise<void> {
+  const row = await env.DB.prepare(`SELECT missing_since FROM source_boards WHERE workspace_id = ? AND board_id = ?`).bind(workspaceId, boardId).first<{ missing_since: string | null }>();
+  if (!row?.missing_since) return;   // listed again since, already removed, or never confirmed
+  const clear = () => env.DB.prepare(`UPDATE source_boards SET missing_since = NULL WHERE workspace_id = ? AND board_id = ?`).bind(workspaceId, boardId).run();
+  const sp = pipelineFor(env, await orgOf(env, workspaceId));
+  const listed = await sp.boards();   // throws on any error: the message retries
+  if (listed.some((b) => b.id === boardId)) { await clear(); return; }
+  const known = (await env.DB.prepare(`SELECT board_id FROM source_boards WHERE workspace_id = ?`).bind(workspaceId).all<{ board_id: string }>()).results;
+  const on = new Set(listed.map((b) => b.id));
+  if (sweepRefused(listed.length, known.filter((k) => !on.has(k.board_id)).length, known.length)) {
+    console.error('board removal refused: no list, or too many boards missing at once', JSON.stringify({ workspaceId, boardId }));
+    return;   // the mark stays; the next hourly run sends it again once the list is sound
+  }
+  const state = await boardReadState(sp, boardId);
+  if (state === 'readable') { await clear(); return; }
+  if (state !== 'gone') throw new PipelineError(0, `board ${boardId} read gave no evidence; retrying`);
+  const page = (await env.DB.prepare(`SELECT item_id FROM work_records WHERE workspace_id = ? AND board_id = ? LIMIT ?`).bind(workspaceId, boardId, BOARD_DELETE_PAGE).all<{ item_id: string }>()).results;
+  for (const r of page) await deleteItem(env, r.item_id, ACTOR, 'board deleted');
+  if (page.length === BOARD_DELETE_PAGE) {
+    await env.INGEST.send({ type: 'board.deleted', workspaceId, boardId, removed: removed + page.length });
+    return;
+  }
+  await env.DB.batch([
+    env.DB.prepare(`DELETE FROM source_boards WHERE workspace_id = ? AND board_id = ?`).bind(workspaceId, boardId),
+    audit(env.DB, { workspaceId, actor: ACTOR, action: 'board.removed', detail: { boardId, records: removed + page.length } }),
+  ]);
 }
 
 export async function deleteCardRecord(env: Env, workspaceId: string, cardId: string): Promise<boolean> {
@@ -120,13 +158,15 @@ export async function ingestBatch(batch: MessageBatch<IngestMessage>, env: Env):
   const snapshots: SnapshotCache = new Map();
   for (const msg of batch.messages) {
     const m = msg.body;
-    const key = m.type === 'board.backfill' ? null : `${m.workspaceId} ${m.cardId}`;
+    const key = m.type === 'board.backfill' || m.type === 'board.deleted' ? null : `${m.workspaceId} ${m.cardId}`;
     try {
       if (m.type === 'card.sync' || m.type === 'card.deleted') {
         if (!done.has(key!)) done.set(key!, syncCard(env, m, snapshots));
         await done.get(key!);
       } else if (m.type === 'board.backfill') {
         await backfillBoard(env, m.workspaceId, m.boardId, m.after ?? null);
+      } else if (m.type === 'board.deleted') {
+        await removeDeletedBoard(env, m.workspaceId, m.boardId, m.removed ?? 0);
       }
       msg.ack();
     } catch (e) {
