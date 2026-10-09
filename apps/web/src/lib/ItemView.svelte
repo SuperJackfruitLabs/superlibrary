@@ -26,6 +26,7 @@
   let mountKey = $state(0);
   let notice = $state<string | null>(null);
   let noticeEl = $state<HTMLElement | null>(null);
+  let refusalEl = $state<HTMLElement | null>(null);
   let copied = $state<string | null>(null);
   let expires = $state('');
   let expiryError = $state<string | null>(null);
@@ -139,8 +140,9 @@
     if (err) { dialogError = err; return; }
     pending = null;
     await tick();
-    // The control that opened it may be gone (a revoked version has no Revoke button): say what happened there.
-    if (document.activeElement === document.body) noticeEl?.focus();
+    // The control that opened it may be gone (a revoked version has no Revoke button, a revoked item
+    // has no page): say what happened there.
+    if (document.activeElement === document.body) (noticeEl ?? refusalEl)?.focus();
   }
 
   async function saveExpiry(clear: boolean) {
@@ -182,7 +184,7 @@
   <div class="panel">{@render expiryForm('Keep it')}</div>
   <p><a href="/">Back to the library</a></p>
 {:else if phase === 'refused'}
-  <p class="error" role="alert">{refusal}</p>
+  <p class="error" role="alert" tabindex="-1" bind:this={refusalEl}>{refusal}</p>
   <div class="actions"><a class="button" href="/">Back to the library</a>{#if refusal.startsWith('The library could not')}<button type="button" onclick={load}>Try again</button>{/if}</div>
 {:else if item}
   <header class="item-head">
