@@ -3,7 +3,7 @@ import { SELF, createMessageBatch, env } from 'cloudflare:test';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { IndexMessage } from '@superlibrary/contract';
 import { indexBatch, indexItem, reconcile } from '../src/indexing/consumer';
-import { reindexPage, startReindex } from '../src/indexing/reindex';
+import { cancelReindex, reindexPage, resumeReindex, startReindex } from '../src/indexing/reindex';
 import { readSlots, setIndexingForTests } from '../src/indexing/vector-index';
 import { search } from '../src/search/search';
 import { fakeEmbedder, fakeVectorize } from './helpers/fake-vectors';
@@ -75,6 +75,50 @@ describe('re-index (spec §7, §15)', () => {
     expect(await startReindex(env, 'workers-ai/bge-m3')).toEqual({ slot: 'a' });
     send.mockRestore();
   });
+  it('a page with a stale cursor neither advances nor swaps; a duplicate starts no second chain', async () => {
+    await seedRecord({ id: 'itm_00000000000000c1', ws: WS, text: 'alpha' });
+    const sent: IndexMessage[] = [];
+    const send = vi.spyOn(env.INDEX, 'send').mockImplementation((async (m: IndexMessage) => { sent.push(m); }) as never);
+    await startReindex(env, 'test/next');
+    await reindexPage(env, 'b', 'itm_zzz');                       // stale 'after'
+    expect((await readSlots(env)).active.slot).toBe('a');
+    expect((await readSlots(env)).building!.cursor).toBeNull();
+    sent.length = 0;
+    await env.DB.prepare(`UPDATE items SET id = id`).run();
+    await reindexPage(env, 'b', null);                            // the real (last) page swaps
+    expect((await readSlots(env)).active.slot).toBe('b');
+    await reindexPage(env, 'b', null);                            // a duplicate after the swap
+    expect((await readSlots(env)).active.slot).toBe('b');
+    expect(sent).toHaveLength(0);
+    send.mockRestore();
+  });
+  it('startReindex is atomic: a lost race throws reindex_running and sends one page', async () => {
+    const send = vi.spyOn(env.INDEX, 'send').mockResolvedValue(undefined as never);
+    const rs = await Promise.allSettled([startReindex(env, 'test/next'), startReindex(env, 'test/next')]);
+    expect(rs.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+    expect(send).toHaveBeenCalledTimes(1);
+    send.mockRestore();
+  });
+  it('treats NULL idle dims as 1024 (B-R14)', async () => {
+    setIndexingForTests({ embedders: { 'workers-ai/bge-m3': fakeEmbedder(), 'test/wide': fakeEmbedder('test/wide', 768) }, bindings: { a, b } });
+    await expect(startReindex(env, 'test/wide')).rejects.toThrow(/dimension_mismatch/);
+  });
+  it('cancel moves building to idle, then drains; resume re-enqueues from the cursor', async () => {
+    const send = vi.spyOn(env.INDEX, 'send').mockResolvedValue(undefined as never);
+    await expect(cancelReindex(env)).rejects.toThrow(/no_reindex/);
+    await expect(resumeReindex(env)).rejects.toThrow(/no_reindex/);
+    await startReindex(env, 'test/next');
+    await env.DB.prepare(`UPDATE vector_slots SET cursor = 'itm_00000000000000c9' WHERE slot = 'b'`).run();
+    send.mockClear();
+    expect(await resumeReindex(env)).toEqual({ slot: 'b', after: 'itm_00000000000000c9' });
+    expect(send).toHaveBeenCalledWith({ type: 'reindex', slot: 'b', after: 'itm_00000000000000c9' });
+    expect(await cancelReindex(env)).toEqual({ slot: 'b' });
+    expect((await readSlots(env)).building).toBeNull();
+    expect((await readSlots(env)).active.slot).toBe('a');
+    await reindexPage(env, 'b', 'itm_00000000000000c9');          // a stale page after the cancel
+    expect((await readSlots(env)).active.slot).toBe('a');
+    send.mockRestore();
+  });
   it('refuses a second re-index while one is building', async () => {
     const send = vi.spyOn(env.INDEX, 'send').mockResolvedValue(undefined as never);
     await startReindex(env, 'test/next');
@@ -124,6 +168,22 @@ describe('POST /api/v1/admin/index/reindex', () => {
     const again = await call({ embedder: 'test/next' });
     expect(again.status).toBe(409);
     expect(await again.json()).toMatchObject({ error: 'reindex_running' });
+  });
+  it('cancel and resume are operators only and answer 404 with nothing building', async () => {
+    const post = (path: string) => SELF.fetch(`https://api.test/api/v1/admin/index/reindex/${path}`, { method: 'POST', headers: { 'X-Dev-Principal': HUMAN, 'X-Dev-Org': person.org } });
+    expect((await post('cancel')).status).toBe(403);
+    (env as unknown as Record<string, unknown>).OPERATORS = HUMAN;
+    expect((await post('cancel')).status).toBe(404);
+    expect((await post('resume')).status).toBe(404);
+    expect((await call({ embedder: 'test/next' })).status).toBe(202);
+    expect((await post('cancel')).status).toBe(202);
+    expect((await readSlots(env)).building).toBeNull();
+  });
+  it('resume answers 202 while building', async () => {
+    (env as unknown as Record<string, unknown>).OPERATORS = HUMAN;
+    expect((await call({ embedder: 'test/next' })).status).toBe(202);
+    const r = await SELF.fetch('https://api.test/api/v1/admin/index/reindex/resume', { method: 'POST', headers: { 'X-Dev-Principal': HUMAN, 'X-Dev-Org': person.org } });
+    expect(r.status).toBe(202);
   });
   it('answers 409 slot_not_drained while an item still records the idle slot', async () => {
     (env as unknown as Record<string, unknown>).OPERATORS = HUMAN;

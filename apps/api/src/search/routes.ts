@@ -7,7 +7,7 @@ import { searchAudited } from './search';
 import { getForViewer, related } from './related';
 import { invalidateRoster } from '../clients/roster';
 import { reconcile } from '../indexing/consumer';
-import { startReindex } from '../indexing/reindex';
+import { cancelReindex, resumeReindex, startReindex } from '../indexing/reindex';
 
 const isOperator = (env: { OPERATORS?: string }, prn: string) => (env.OPERATORS ?? '').split(/\s+/).includes(prn);
 
@@ -32,6 +32,17 @@ export const searchRoutes: Handler = async (request, env, _ctx, url) => {
       if (m === 'slot_not_drained') return error(409, 'slot_not_drained');
       if (m === 'dimension_mismatch') return error(400, 'dimension_mismatch');
       if (m.startsWith('unknown embedder')) return error(400, 'unknown_embedder');
+      throw e;
+    }
+  }
+  if ((url.pathname === '/api/v1/admin/index/reindex/cancel' || url.pathname === '/api/v1/admin/index/reindex/resume') && request.method === 'POST') {
+    const p = await resolvePerson(request, env);
+    if (p instanceof Response) return p;
+    if (!isOperator(env, p.principalId)) return error(403, 'not_permitted');
+    try {
+      return json(url.pathname.endsWith('/cancel') ? await cancelReindex(env) : await resumeReindex(env), 202);
+    } catch (e) {
+      if (e instanceof Error && e.message === 'no_reindex') return error(404, 'no_reindex');
       throw e;
     }
   }
