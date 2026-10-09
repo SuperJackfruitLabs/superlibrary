@@ -4,8 +4,7 @@ import { error, json, preflight, withCors } from '../http';
 import { Timer } from '../timing';
 import { resolvePerson, resolveViewer, serviceCaller } from '../auth/caller';
 import { RelatedQuery, SearchQuery } from '@superlibrary/contract';
-import { search, searchAudited, type ExplainRow } from './search';
-import { audit } from '../audit';
+import { searchAudited, type ExplainRow } from './search';
 import { getForViewer, related } from './related';
 import { invalidateRoster } from '../clients/roster';
 import { reconcile } from '../indexing/consumer';
@@ -62,10 +61,9 @@ export const searchRoutes: Handler = async (request, env, _ctx, url) => {
     if (p instanceof Response) return p;
     if (!isOperator(env, p.principalId)) return error(403, 'not_permitted');
     const q = SearchQuery.safeParse(await request.json().catch(() => null));
-    if (!q.success) return error(400, 'invalid');
+    if (!q.success) return error(400, 'invalid', { issues: q.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message })) });
     const explain: ExplainRow[] = [];
-    const results = await search(env, p, q.data, undefined, { explain });
-    await audit(env.DB, { workspaceId: p.workspaceId, actor: p.principalId, act: p.act, action: 'items.searched', detail: { count: results.length, queryLength: q.data.query.length, explain: true } }).run();
+    const results = await searchAudited(env, p, q.data, undefined, { explain, detail: { explain: true } });
     return json({ results: results.map((r) => ({ itemId: r.itemId, title: r.title, outcome: r.outcome, score: r.score })), candidates: explain });
   }
   if (url.pathname === '/api/v1/search' && request.method === 'POST') {

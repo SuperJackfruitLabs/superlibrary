@@ -66,6 +66,12 @@ describe('the relevance floor (gap S2)', () => {
     expect(items.map((x) => x.itemId)).toContain(e);
     expect(items.map((x) => x.itemId)).not.toContain(a);
   });
+  it('related on a basis of only common words still finds work that shares them', async () => {
+    const a = await art('the', 'the of and to in');
+    const e = await art('of', 'the of and to in gamma');
+    const items = await related(env, me, RelatedQuery.parse({ itemId: a }));
+    expect(items.map((x) => x.itemId)).toContain(e);
+  });
 });
 
 describe('the explain route (gap S2, operators only)', () => {
@@ -78,6 +84,9 @@ describe('the explain route (gap S2, operators only)', () => {
     const b = await art('Garden', big('garden tomato soil water compost', 400));
     expect((await explain()).status).toBe(403);   // a person not listed in OPERATORS
     bag.OPERATORS = HUMAN;
+    const bad = await call('/api/v1/admin/search/explain', { method: 'POST', body: { query: '' } });
+    expect(bad.status).toBe(400);
+    expect(await bad.json()).toMatchObject({ error: 'invalid', issues: [{ path: 'query' }] });
     const r = await explain();
     expect(r.status).toBe(200);
     const body = await r.json<{ results: Array<{ itemId: string; title: string; outcome: string; score: number }>; candidates: ExplainRow[] }>();

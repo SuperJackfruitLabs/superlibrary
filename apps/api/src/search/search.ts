@@ -96,7 +96,11 @@ export function fuse(ranks: Ranks, outcome: Outcome): number {
 
 const live = `AND i.revoked_at IS NULL AND (i.expires_at IS NULL OR i.expires_at > ?4)`;
 
-/** How the floor treated one candidate (gap S2): its 1-based rank in each list before the floor, its best chunk's cosine. */
+/**
+ * How the floor treated one candidate (gap S2). `fts` and `vector` are its 1-based ranks in each list
+ * before the floor (so `vector` is not the rank fusion used once others were dropped); `vectorScore`
+ * is its best chunk's cosine; `kept` whether it reached ranking.
+ */
 export interface ExplainRow { itemId: string; fts: number | null; vector: number | null; vectorScore: number | null; kept: boolean }
 /**
  * `timer` records each stage's wait (gap S4). `exclude`: an item that is never a candidate, in either list,
@@ -192,9 +196,9 @@ export async function search(env: Env, v: Viewer, q: SearchQuery, precomputedSco
 }
 
 /** The audited entry for every caller (REST, MCP): one `items.searched` row, never the query text. */
-export async function searchAudited(env: Env, v: Viewer, q: SearchQuery, timer?: Timer): Promise<SearchResult[]> {
-  const results = await search(env, v, q, undefined, { timer });
-  const write = () => audit(env.DB, { workspaceId: v.workspaceId, actor: v.principalId, act: v.act, action: 'items.searched', detail: { count: results.length, queryLength: q.query.length } }).run();
+export async function searchAudited(env: Env, v: Viewer, q: SearchQuery, timer?: Timer, opts: { explain?: ExplainRow[]; detail?: Record<string, unknown> } = {}): Promise<SearchResult[]> {
+  const results = await search(env, v, q, undefined, { timer, explain: opts.explain });
+  const write = () => audit(env.DB, { workspaceId: v.workspaceId, actor: v.principalId, act: v.act, action: 'items.searched', detail: { count: results.length, queryLength: q.query.length, ...opts.detail } }).run();
   await (timer ? timer.time('audit', write) : write());
   return results;
 }
