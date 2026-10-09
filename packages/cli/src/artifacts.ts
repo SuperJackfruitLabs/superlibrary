@@ -1,11 +1,13 @@
 import { lstatSync, readFileSync, readdirSync, realpathSync, statSync } from 'node:fs';
 import { basename, join, relative, resolve, sep } from 'node:path';
 import { createHash } from 'node:crypto';
-import { ITEM_ID, LIMITS, NOTHING_ADDED, checkPath, describeRefusal, pathRefusalSentence, refusalSentence, sizeRefusal, type UploadRefusal, type CommitResult, type EmbedGrant } from '@superlibrary/contract';
-import { baseUrl, tokenSource } from './credential.ts';
+import { ITEM_ID, LIMITS, NOTHING_ADDED, checkPath, sendFiles, isTransient, describeRefusal, pathRefusalSentence, refusalSentence, sizeRefusal, type UploadRefusal, type CommitResult, type EmbedGrant } from '@superlibrary/contract';
+import { baseUrl, tokenSource, type TokenSource } from './credential.ts';
 
 export interface LocalFile { path: string; bytes: Uint8Array }
 export type Client = (method: string, path: string, body?: unknown) => Promise<Response>;
+/** Files accounted for so far, of the total. */
+export type Progress = (sent: number, total: number) => void;
 
 /** A file or a folder as upload paths. Symlinks are followed only while they stay inside (spec §8). */
 export function walk(root: string): LocalFile[] {
@@ -42,16 +44,25 @@ export function walk(root: string): LocalFile[] {
   return found.map((f) => ({ path: f.path, bytes: readFileSync(f.target) }));
 }
 
-/** A token per request, never one per upload: a long upload outlives a five-minute token. */
-export function makeClient(base: string, token: () => Promise<string | null>, fetchImpl: typeof fetch = fetch, source: 'env' | 'device' | 'none' = 'device'): Client {
+/**
+ * A token per request, never one per upload: a long upload outlives a five-minute token. A device
+ * token the server refuses (revoked, or the server's clock ahead of ours) is exchanged once more
+ * and the request sent again; only a second refusal is "sign in again".
+ */
+export function makeClient(base: string, token: TokenSource['token'], fetchImpl: typeof fetch = fetch, source: 'env' | 'device' | 'none' = 'device'): Client {
   return async (method, path, body) => {
-    const t = await token();
-    if (!t) throw new Error('not signed in. Run suli login.');
-    const headers: Record<string, string> = { Authorization: `Bearer ${t}` };
     let payload: RequestInit['body'];
-    if (body instanceof Uint8Array) payload = body as RequestInit['body'];
-    else if (body !== undefined) { headers['content-type'] = 'application/json'; payload = JSON.stringify(body); }
-    const res = await fetchImpl(`${base}${path}`, { method, headers, body: payload, redirect: 'error' });
+    const json = body !== undefined && !(body instanceof Uint8Array) && !(body instanceof FormData);
+    if (body instanceof Uint8Array || body instanceof FormData) payload = body as RequestInit['body'];
+    else if (body !== undefined) payload = JSON.stringify(body);
+    const send = async (fresh: boolean) => {
+      const t = await token(fresh ? { fresh } : undefined);
+      if (!t) throw new Error('not signed in. Run suli login.');
+      const headers: Record<string, string> = { Authorization: `Bearer ${t}`, ...(json ? { 'content-type': 'application/json' } : {}) };
+      return fetchImpl(`${base}${path}`, { method, headers, body: payload, redirect: 'error' });
+    };
+    let res = await send(false);
+    if (res.status === 401 && source === 'device') { await res.body?.cancel(); res = await send(true); }
     if (res.status === 401) throw new Error(source === 'env' ? 'the token in SUPERLIBRARY_TOKEN was refused by the server.' : 'the server did not accept your sign-in. Run suli login.');
     return res;
   };
@@ -86,7 +97,21 @@ const versionNumber = (v: string | null): string | null => {
   return v;
 };
 
-export async function uploadWith(client: Client, root: string, o: { title?: string; item?: string; board?: string; entry?: string; expires?: string; override?: string }): Promise<CommitResult> {
+/** A request that failed in transit is sent again (every upload request but the first is idempotent). */
+async function retried(fn: () => Promise<Response>): Promise<Response> {
+  for (let n = 0; ; n++) {
+    try {
+      const res = await fn();
+      if ((res.status === 429 || res.status >= 500) && n < 3) { await res.body?.cancel(); await new Promise((r) => setTimeout(r, 500 * 2 ** n)); continue; }
+      return res;
+    } catch (e) {
+      if (!isTransient(e) || n >= 3) throw e;
+      await new Promise((r) => setTimeout(r, 500 * 2 ** n));
+    }
+  }
+}
+
+export async function uploadWith(client: Client, root: string, o: { title?: string; item?: string; board?: string; entry?: string; expires?: string; override?: string; onProgress?: Progress; concurrency?: number }): Promise<CommitResult> {
   const expiresAt = o.expires ? expiryIso(o.expires) : undefined;
   const files = walk(root);
   const declared = files.map((f) => ({ path: f.path, bytes: f.bytes.length, sha256: createHash('sha256').update(f.bytes).digest('hex') }));
@@ -96,32 +121,59 @@ export async function uploadWith(client: Client, root: string, o: { title?: stri
     ...(expiresAt ? { expiresAt } : {}),
   });
   if (created.status !== 201) return refused(created, 'the upload', true);
-  const { uploadId } = (await created.json()) as { uploadId: string };
-  for (const f of files) {
-    const res = await client('PUT', `/api/v1/uploads/${uploadId}/files?path=${encodeURIComponent(f.path)}`, f.bytes);
-    if (!res.ok) return refused(res, f.path, true);
+  const { uploadId, held = [] } = (await created.json()) as { uploadId: string; held?: string[] };
+  const send = (only: LocalFile[], progress?: Progress) => sendFiles((path, init) => client(init.method, path, init.body), uploadId, only, { held, onProgress: progress, concurrency: o.concurrency });
+  const failed = await send(files, o.onProgress);
+  if (failed) return refused(failed, 'a file', true);
+  const commit = () => retried(() => client('POST', `/api/v1/uploads/${uploadId}/commit`));
+  let committed = await commit();
+  // Bytes the server lost since they were sent (it names them) are sent once more.
+  if (committed.status === 409) {
+    const body = (await committed.clone().json().catch(() => ({}))) as { error?: string; missing?: string[] };
+    const want = new Set(body.missing ?? []);
+    const again = files.filter((f) => want.has(f.path));
+    if (body.error === 'incomplete' && again.length === want.size && again.length > 0) {
+      const lost = await sendFiles((path, init) => client(init.method, path, init.body), uploadId, again, { concurrency: o.concurrency });
+      if (lost) return refused(lost, 'a file', true);
+      committed = await commit();
+    }
   }
-  let committed = await client('POST', `/api/v1/uploads/${uploadId}/commit`);
   if (committed.status === 422) {
     const { findings = [] } = (await committed.json()) as { findings?: { path: string; line: number; rule: string }[] };
     const where = findings.map((f) => `${f.path} line ${f.line}: ${f.rule}`).join('; ');
     if (!o.override) throw new Error(`this looks like it contains a secret — ${where}. ${NOTHING_ADDED} Remove it, or pass --override "<why>" to upload anyway (recorded).`);
     const ov = await client('POST', `/api/v1/uploads/${uploadId}/override`, { reason: o.override });
     if (!ov.ok) return refused(ov, 'the override', true);
-    committed = await client('POST', `/api/v1/uploads/${uploadId}/commit`);
+    committed = await commit();
   }
   if (!committed.ok) return refused(committed, 'the commit', true);
   return (await committed.json()) as CommitResult;
 }
 
+/**
+ * One progress line on stderr (stdout stays the result alone, so `--json` pipes cleanly): rewritten
+ * in place on a terminal, else a line at each tenth and at the end.
+ */
+export function progressLine(write: (s: string) => void, tty: boolean): Progress {
+  let lastTenth = -1;
+  return (sent, total) => {
+    if (total < 2) return;
+    const line = `suli: sent ${sent}/${total} files`;
+    if (tty) { write(`\r${line}${sent === total ? '\n' : ''}`); return; }
+    const tenth = Math.floor((sent * 10) / total);
+    if (tenth !== lastTenth || sent === total) { lastTenth = tenth; write(`${line}\n`); }
+  };
+}
+
 const client = () => {
   const src = tokenSource();
-  return makeClient(baseUrl(), () => src.token(), fetch, src.kind);
+  return makeClient(baseUrl(), (o) => src.token(o), fetch, src.kind);
 };
 
 export async function upload(path: string | undefined, o: { title: string | null; item: string | null; board: string | null; entry: string | null; expires: string | null; override: string | null; json: boolean }): Promise<void> {
   if (!path) throw new Error('name a file or a folder: suli upload <path>');
-  const r = await uploadWith(client(), path, { title: o.title ?? undefined, item: o.item ?? undefined, board: o.board ?? undefined, entry: o.entry ?? undefined, expires: o.expires ?? undefined, override: o.override ?? undefined });
+  const onProgress = progressLine((s) => process.stderr.write(s), process.stderr.isTTY === true);
+  const r = await uploadWith(client(), path, { title: o.title ?? undefined, item: o.item ?? undefined, board: o.board ?? undefined, entry: o.entry ?? undefined, expires: o.expires ?? undefined, override: o.override ?? undefined, onProgress });
   process.stdout.write(o.json ? JSON.stringify(r) + '\n' : `${r.url} (v${r.version})\n`);
 }
 

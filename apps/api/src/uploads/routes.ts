@@ -1,6 +1,8 @@
 /**
- * Upload sessions (plan D16): declare the files, send each one, commit (Task 8). Every declared
- * and every sent path goes through `checkPath`, and rows are keyed on its normalised form.
+ * Upload sessions (plan D16): declare the files, send them (one per PUT, or many per batch), commit
+ * (Task 8). Every declared and every sent path goes through `checkPath`, and rows are keyed on its
+ * normalised form. Each D1 round trip crosses to the database's region, so per-request work is a
+ * fixed number of statements, never one per file.
  */
 import { z } from 'zod';
 import { LIMITS, UploadCreate, checkPath, type CommitResult } from '@superlibrary/contract';
@@ -91,13 +93,156 @@ async function create(request: Request, env: Env, p: Person): Promise<Response> 
 
   const id = newId('upl');
   const expiresAt = new Date(Date.now() + LIMITS.uploadTtlHours * 3600_000).toISOString();
+  // Read before the session exists, so its own declarations cannot count as held.
+  const heldShas = await heldBy(env, p, files.map((f) => f.sha256));
   await env.DB.batch([
     env.DB.prepare(`INSERT INTO upload_sessions (id, workspace_id, created_by, item_id, title, scope, entry, item_expires_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
       .bind(id, p.workspaceId, p.principalId, body.item ?? null, body.title, body.scope, entry, itemExpiresAt, expiresAt),
-    ...files.map((f) => env.DB.prepare(`INSERT INTO upload_files (session_id, path, sha256, bytes) VALUES (?, ?, ?, ?)`).bind(id, f.path, f.sha256, f.bytes)),
+    // One statement for every declared file: D1 counts each statement of a batch against its
+    // per-invocation cap, and a 500-file folder must not spend 500 of them.
+    env.DB.prepare(`INSERT INTO upload_files (session_id, path, sha256, bytes) SELECT ?1, json_extract(value, '$.path'), json_extract(value, '$.sha256'), json_extract(value, '$.bytes') FROM json_each(?2)`)
+      .bind(id, JSON.stringify(files.map((f) => ({ path: f.path, sha256: f.sha256, bytes: f.bytes })))),
     audit(env.DB, { workspaceId: p.workspaceId, actor: p.principalId, act: p.act, action: 'upload.created', detail: { uploadId: id, files: files.length } }),
   ]);
-  return json({ uploadId: id, expiresAt, entry }, 201);
+  // Resume (content addressing): the paths whose bytes this person has already sent. A client may
+  // send them as `held` entries in a batch instead of sending the bytes again.
+  return json({ uploadId: id, expiresAt, entry, held: files.filter((f) => heldShas.has(f.sha256)).map((f) => f.path) }, 201);
+}
+
+/**
+ * Of these SHA-256s, the ones this person has sent themself: in a version they committed in this
+ * workspace, or received clean in one of their own sessions. Never someone else's bytes: knowing a
+ * hash is not having the file, so a hash alone must not let anyone claim bytes they never sent.
+ */
+async function heldBy(env: Env, p: Person, shas: string[]): Promise<Set<string>> {
+  if (shas.length === 0) return new Set();
+  const rows = await env.DB.prepare(
+    `SELECT vf.sha256 FROM version_files vf JOIN versions v ON v.item_id = vf.item_id AND v.version = vf.version JOIN items i ON i.id = vf.item_id
+       WHERE i.workspace_id = ?1 AND v.created_by = ?2 AND vf.sha256 IN (SELECT value FROM json_each(?3))
+     UNION
+     SELECT uf.sha256 FROM upload_files uf JOIN upload_sessions s ON s.id = uf.session_id
+       WHERE s.workspace_id = ?1 AND s.created_by = ?2 AND uf.received = 1 AND uf.quarantined = 0 AND uf.sha256 IN (SELECT value FROM json_each(?3))`,
+  ).bind(p.workspaceId, p.principalId, JSON.stringify([...new Set(shas)])).all<{ sha256: string }>();
+  return new Set(rows.results.map((r) => r.sha256));
+}
+
+/** Runs `fn` over `items`, at most `limit` at a time, keeping their order. */
+export async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const out = new Array<R>(items.length);
+  let next = 0;
+  const worker = async () => { while (next < items.length) { const i = next++; out[i] = await fn(items[i]!); } };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return out;
+}
+
+/** R2 calls in flight at once within one request. */
+const R2_PARALLEL = 16;
+
+/** A file as it arrives: its bytes, or `held` (resume) when this person sent the same bytes before. */
+type Arrival = { path: string; bytes: Uint8Array } | { path: string; held: true };
+type Received = { path: string; mediaType: string; view: string; findings: { line: number; rule: string }[] } | { path: string; missing: true };
+
+const sqlTime = (t: string) => Date.parse(/[zZ]|[+-]\d{2}:\d{2}$/.test(t) ? t : `${t.replace(' ', 'T')}Z`);
+
+/**
+ * Files arriving renew their session by uploadTtlHours (a long upload must not expire while it is
+ * still sending), never past uploadMaxHours after it was declared.
+ */
+function renewedExpiry(s: SessionRow): string {
+  const cap = sqlTime(s.created_at) + LIMITS.uploadMaxHours * 3600_000;
+  return new Date(Math.max(Date.parse(s.expires_at), Math.min(Date.now() + LIMITS.uploadTtlHours * 3600_000, cap))).toISOString();
+}
+
+/**
+ * The one receiving path, for a single PUT and for a batch: every check a file gets (path rules,
+ * declared, size, SHA-256, sniff, secret scan before storing) runs on every file before anything is
+ * written, so a refused request records nothing. The D1 writes are one batch of a fixed number of
+ * statements, whatever the file count.
+ */
+async function receive(env: Env, p: Person, s: SessionRow, arrivals: Arrival[]): Promise<Received[] | Response> {
+  const id = s.id;
+  const items: Array<Arrival & { path: string }> = [];
+  const seen = new Set<string>();
+  for (const a of arrivals) {
+    const c = checkPath(a.path);
+    if (!c.ok) return refusePath(c);
+    if (seen.has(c.path)) return error(400, 'duplicate_path', { path: c.path });
+    seen.add(c.path);
+    items.push({ ...a, path: c.path });
+  }
+  const declared = new Map((await env.DB.prepare(`SELECT path, sha256, bytes FROM upload_files WHERE session_id = ?1 AND path IN (SELECT value FROM json_each(?2))`)
+    .bind(id, JSON.stringify([...seen])).all<{ path: string; sha256: string; bytes: number }>()).results.map((r) => [r.path, r]));
+  for (const a of items) {
+    const f = declared.get(a.path);
+    if (!f) return error(404, 'not_declared', { path: a.path });
+    if ('bytes' in a) {
+      if (a.bytes.length !== f.bytes) return error(400, 'size_mismatch', { path: a.path });
+      if ((await sha256Hex(a.bytes)) !== f.sha256) return error(400, 'sha256_mismatch', { path: a.path });
+    }
+  }
+  // Held entries are read back from storage, and only bytes this person sent count as held.
+  const wantHeld = items.filter((a) => 'held' in a);
+  const held = await heldBy(env, p, wantHeld.map((a) => declared.get(a.path)!.sha256));
+  const fromStore = await mapLimit(wantHeld, R2_PARALLEL, async (a) => {
+    const f = declared.get(a.path)!;
+    if (!held.has(f.sha256)) return null;
+    const o = await env.BLOBS.get(blobKey(f.sha256));
+    if (!o) return null;
+    const bytes = new Uint8Array(await o.arrayBuffer());
+    // Content addressed (and stored with its checksum), but checked like any arrival all the same.
+    return bytes.length === f.bytes && (await sha256Hex(bytes)) === f.sha256 ? bytes : null;
+  });
+  const stored = new Map(wantHeld.map((a, i) => [a.path, fromStore[i]]));
+
+  const out: Received[] = [];
+  const rows: { path: string; mediaType: string; view: string; q: number }[] = [];
+  const findings: { path: string; line: number; rule: string }[] = [];
+  const writes: { key: string; bytes: Uint8Array; sha256: string }[] = [];
+  for (const a of items) {
+    const f = declared.get(a.path)!;
+    const bytes = 'bytes' in a ? a.bytes : stored.get(a.path);
+    if (!bytes) { out.push({ path: a.path, missing: true }); continue; }
+    const sniffed = sniff(bytes, a.path);
+    // Recognised binaries (images, audio, video, PDF, fonts, zip/Office) are not scanned; anything
+    // else that is not valid text may still be text in another encoding, so it is read byte-wise.
+    const hits = sniffed.text && sniffed.encoding
+      ? scanText(decodeText(bytes, sniffed.encoding))
+      : sniffed.mediaType === 'application/octet-stream' ? scanUndecodedText(bytes) : [];
+    // Spec §8: scanned before storing. A hit never reaches blobs/ (ruling T7/T8): it waits in this
+    // session's quarantine for an override at commit, or is deleted with the session. Held bytes
+    // are scanned again, so an override given to an earlier upload does not carry over.
+    const quarantined = hits.length > 0;
+    if (quarantined) writes.push({ key: quarantineKey(id, f.sha256), bytes, sha256: f.sha256 });
+    else if ('bytes' in a) writes.push({ key: blobKey(f.sha256), bytes, sha256: f.sha256 });
+    rows.push({ path: a.path, mediaType: sniffed.mediaType, view: sniffed.view, q: quarantined ? 1 : 0 });
+    for (const h of hits) findings.push({ path: a.path, line: h.line, rule: h.rule });
+    out.push({ path: a.path, mediaType: sniffed.mediaType, view: sniffed.view, findings: hits });
+  }
+  // Content addressed: writing the same bytes to the same key again changes nothing, and costs one
+  // call where a head first would cost one or two.
+  const unique = [...new Map(writes.map((w) => [w.key, w])).values()];
+  await mapLimit(unique, R2_PARALLEL, (w) => env.BLOBS.put(w.key, w.bytes, { sha256: w.sha256 }));
+  if (rows.length === 0) return out;
+
+  const paths = JSON.stringify(rows.map((r) => r.path));
+  try {
+    await env.DB.batch([
+      env.DB.prepare(`UPDATE upload_files SET received = 1, media_type = json_extract(j.value, '$.mediaType'), view = json_extract(j.value, '$.view'), quarantined = json_extract(j.value, '$.q')
+        FROM json_each(?2) AS j WHERE upload_files.session_id = ?1 AND upload_files.path = json_extract(j.value, '$.path')`).bind(id, JSON.stringify(rows)),
+      env.DB.prepare(`DELETE FROM secret_findings WHERE session_id = ?1 AND path IN (SELECT value FROM json_each(?2))`).bind(id, paths),
+      ...(findings.length > 0 ? [
+        env.DB.prepare(`INSERT OR IGNORE INTO secret_findings (session_id, path, line, rule) SELECT ?1, json_extract(value, '$.path'), json_extract(value, '$.line'), json_extract(value, '$.rule') FROM json_each(?2)`).bind(id, JSON.stringify(findings)),
+        // An override covers the findings it was shown (and recorded); a new hit needs a new one.
+        env.DB.prepare(`UPDATE upload_sessions SET override_reason = NULL, override_by = NULL, override_at = NULL WHERE id = ?`).bind(id),
+      ] : []),
+      env.DB.prepare(`UPDATE upload_sessions SET expires_at = ? WHERE id = ? AND state = 'open'`).bind(renewedExpiry(s), id),
+    ]);
+  } catch (e) {
+    // Committed between our read and this write (migration 0003 refuses the session update).
+    if (/upload already committed/.test(e instanceof Error ? e.message : '')) return error(409, 'already_committed');
+    throw e;
+  }
+  return out;
 }
 
 async function put(request: Request, env: Env, p: Person, id: string, url: URL): Promise<Response> {
@@ -105,40 +250,86 @@ async function put(request: Request, env: Env, p: Person, id: string, url: URL):
   if (s instanceof Response) return s;
   if (s.state !== 'open') return error(409, 'already_committed');
   // URLSearchParams has decoded `?path=` once; it is never decoded again, only normalised.
-  const c = checkPath(url.searchParams.get('path') ?? '');
+  const raw = url.searchParams.get('path') ?? '';
+  const c = checkPath(raw);
   if (!c.ok) return refusePath(c);
-  const path = c.path;
-  const f = await env.DB.prepare(`SELECT sha256, bytes FROM upload_files WHERE session_id = ? AND path = ?`).bind(id, path).first<{ sha256: string; bytes: number }>();
-  if (!f) return error(404, 'not_declared', { path });
   const announced = Number(request.headers.get('content-length') ?? NaN);
-  if (Number.isFinite(announced) && announced !== f.bytes) return error(400, 'size_mismatch', { path });
-  const bytes = new Uint8Array(await request.arrayBuffer());
-  if (bytes.length !== f.bytes) return error(400, 'size_mismatch', { path });
-  if ((await sha256Hex(bytes)) !== f.sha256) return error(400, 'sha256_mismatch', { path });
-
-  const sniffed = sniff(bytes, path);
-  // Recognised binaries (images, audio, video, PDF, fonts, zip/Office) are not scanned; anything
-  // else that is not valid text may still be text in another encoding, so it is read byte-wise.
-  const findings = sniffed.text && sniffed.encoding
-    ? scanText(decodeText(bytes, sniffed.encoding))
-    : sniffed.mediaType === 'application/octet-stream' ? scanUndecodedText(bytes) : [];
-  // Spec §8: scanned before storing. A hit never reaches blobs/ (ruling T7/T8): it waits in this
-  // session's quarantine for an override at commit, or is deleted with the session.
-  const quarantined = findings.length > 0;
-  if (quarantined) await env.BLOBS.put(quarantineKey(id, f.sha256), bytes, { sha256: f.sha256 });
-  else if (!(await env.BLOBS.head(blobKey(f.sha256)))) await env.BLOBS.put(blobKey(f.sha256), bytes, { sha256: f.sha256 });
-  await env.DB.batch([
-    env.DB.prepare(`UPDATE upload_files SET received = 1, media_type = ?, view = ?, quarantined = ? WHERE session_id = ? AND path = ?`)
-      .bind(sniffed.mediaType, sniffed.view, quarantined ? 1 : 0, id, path),
-    env.DB.prepare(`DELETE FROM secret_findings WHERE session_id = ? AND path = ?`).bind(id, path),
-    ...findings.map((x) => env.DB.prepare(`INSERT OR IGNORE INTO secret_findings (session_id, path, line, rule) VALUES (?, ?, ?, ?)`).bind(id, path, x.line, x.rule)),
-    // An override covers the findings it was shown (and recorded); a new hit needs a new one.
-    ...(quarantined ? [env.DB.prepare(`UPDATE upload_sessions SET override_reason = NULL, override_by = NULL, override_at = NULL WHERE id = ?`).bind(id)] : []),
-  ]);
-  return json({ path, mediaType: sniffed.mediaType, view: sniffed.view, findings });
+  if (Number.isFinite(announced)) {
+    const f = await env.DB.prepare(`SELECT bytes FROM upload_files WHERE session_id = ? AND path = ?`).bind(id, c.path).first<{ bytes: number }>();
+    if (!f) return error(404, 'not_declared', { path: c.path });
+    if (announced !== f.bytes) return error(400, 'size_mismatch', { path: c.path });
+  }
+  const r = await receive(env, p, s, [{ path: raw, bytes: new Uint8Array(await request.arrayBuffer()) }]);
+  return r instanceof Response ? r : json(r[0]);
 }
 
-const UPLOAD = /^\/api\/v1\/uploads\/(upl_[0-9a-f]{16})(\/files|\/override|\/commit)?$/;
+const BatchManifest = z.object({ files: z.array(z.object({ path: z.string(), held: z.literal(true).optional() }).strict()).min(1) }).strict();
+/** Multipart framing around LIMITS.batchBytes of files: part headers and the manifest. */
+const BATCH_OVERHEAD = 256 * 1024;
+
+/** The body, or null as soon as it passes `cap` bytes (never buffered past it). */
+async function readCapped(body: ReadableStream<Uint8Array> | null, cap: number): Promise<Uint8Array | null> {
+  if (!body) return new Uint8Array();
+  const reader = body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.length;
+    if (total > cap) { await reader.cancel(); return null; }
+    chunks.push(value);
+  }
+  const out = new Uint8Array(total);
+  let at = 0;
+  for (const c of chunks) { out.set(c, at); at += c.length; }
+  return out;
+}
+
+/**
+ * Many files in one request (multipart/form-data): a `manifest` part `{ files: [{ path, held? }] }`
+ * and one `file` part per entry without `held`, in manifest order. At most LIMITS.batchFiles files
+ * and LIMITS.batchBytes of them; a file over that goes alone through PUT.
+ */
+async function batch(request: Request, env: Env, p: Person, id: string): Promise<Response> {
+  const tooLarge = () => error(413, 'batch_too_large', { limit: LIMITS.batchFiles, bytesLimit: LIMITS.batchBytes });
+  const announced = Number(request.headers.get('content-length') ?? NaN);
+  if (Number.isFinite(announced) && announced > LIMITS.batchBytes + BATCH_OVERHEAD) return tooLarge();
+  const s = await ownSession(env, p, id);
+  if (s instanceof Response) return s;
+  if (s.state !== 'open') return error(409, 'already_committed');
+  const type = request.headers.get('content-type') ?? '';
+  if (!/^multipart\/form-data/i.test(type)) return error(415, 'unsupported_media_type', { detail: 'send multipart/form-data' });
+  const raw = await readCapped(request.body, LIMITS.batchBytes + BATCH_OVERHEAD);
+  if (!raw) return tooLarge();
+  let form: FormData;
+  try {
+    form = await new Response(raw, { headers: { 'content-type': type } }).formData();
+  } catch {
+    return error(400, 'invalid', { detail: 'the body is not multipart/form-data' });
+  }
+  const manifestPart = form.get('manifest');
+  let manifest: z.infer<typeof BatchManifest>;
+  try {
+    const parsed = BatchManifest.safeParse(JSON.parse(typeof manifestPart === 'string' ? manifestPart : await (manifestPart as Blob | null)?.text() ?? ''));
+    if (!parsed.success) return error(400, 'invalid', { detail: 'manifest must be { files: [{ path, held? }] }' });
+    manifest = parsed.data;
+  } catch {
+    return error(400, 'invalid', { detail: 'manifest must be JSON' });
+  }
+  if (manifest.files.length > LIMITS.batchFiles) return error(413, 'batch_too_large', { limit: LIMITS.batchFiles });
+  const parts = form.getAll('file');
+  const carried = manifest.files.filter((f) => !f.held);
+  if (parts.length !== carried.length || (parts as unknown[]).some((x) => typeof x === 'string')) return error(400, 'invalid', { detail: 'one file part per entry without held, in manifest order' });
+  const bodies = await Promise.all((parts as unknown as Blob[]).map(async (b) => new Uint8Array(await b.arrayBuffer())));
+  if (bodies.reduce((n, b) => n + b.length, 0) > LIMITS.batchBytes) return tooLarge();
+  let k = 0;
+  const arrivals: Arrival[] = manifest.files.map((f) => (f.held ? { path: f.path, held: true as const } : { path: f.path, bytes: bodies[k++]! }));
+  const r = await receive(env, p, s, arrivals);
+  return r instanceof Response ? r : json({ files: r });
+}
+
+const UPLOAD = /^\/api\/v1\/uploads\/(upl_[0-9a-f]{16})(\/files|\/batch|\/override|\/commit)?$/;
 
 export const uploadRoutes: Handler = async (request, env, _ctx, url) => {
   if (url.pathname === '/api/v1/uploads' && request.method === 'POST') {
@@ -151,6 +342,7 @@ export const uploadRoutes: Handler = async (request, env, _ctx, url) => {
   if (p instanceof Response) return p;
   const [, id, action] = m as unknown as [string, string, string | undefined];
   if (action === '/files' && request.method === 'PUT') return put(request, env, p, id, url);
+  if (action === '/batch' && request.method === 'POST') return batch(request, env, p, id);
   if (action === '/override' && request.method === 'POST') return overrideScan(request, env, p, id);
   if (action === '/commit' && request.method === 'POST') return commit(env, p, id);
   return error(405, 'method_not_allowed');
@@ -217,13 +409,12 @@ async function commit(env: Env, p: Person, id: string): Promise<Response> {
   if (missing.length > 0) return error(409, 'incomplete', { missing });
   // A PUT that found its bytes already in blobs/ stored nothing; those bytes may have been deleted
   // since (PR 2 review). Every clean file's blob must exist now, or the client sends it again.
-  const absent = new Set<string>();
-  for (const sha of new Set(files.filter((f) => !f.quarantined).map((f) => f.sha256))) {
-    if (!(await env.BLOBS.head(blobKey(sha)))) absent.add(sha);
-  }
+  const clean = [...new Set(files.filter((f) => !f.quarantined).map((f) => f.sha256))];
+  const present = await mapLimit(clean, R2_PARALLEL, async (sha) => (await env.BLOBS.head(blobKey(sha))) !== null);
+  const absent = new Set(clean.filter((_, i) => !present[i]));
   if (absent.size > 0) {
     const gone = files.filter((f) => !f.quarantined && absent.has(f.sha256)).map((f) => f.path);
-    await env.DB.batch(gone.map((path) => env.DB.prepare(`UPDATE upload_files SET received = 0 WHERE session_id = ? AND path = ?`).bind(id, path)));
+    await env.DB.prepare(`UPDATE upload_files SET received = 0 WHERE session_id = ?1 AND path IN (SELECT value FROM json_each(?2))`).bind(id, JSON.stringify(gone)).run();
     return error(409, 'incomplete', { missing: gone });
   }
   // Refused: nothing is written. The flagged bytes stay in this session's private quarantine,
@@ -272,7 +463,9 @@ async function commit(env: Env, p: Person, id: string): Promise<Response> {
   statements.push(
     env.DB.prepare(`INSERT INTO versions (item_id, version, entry, view, media_type, total_bytes, file_count, sha256, created_by, scan_override) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
       .bind(itemId, version, entry.path, entry.view, entry.media_type, totalBytes, files.length, sha256, p.principalId, override),
-    ...files.map((f) => env.DB.prepare(`INSERT INTO version_files (item_id, version, path, sha256, bytes, media_type, view) VALUES (?, ?, ?, ?, ?, ?, ?)`).bind(itemId, version, f.path, f.sha256, f.bytes, f.media_type, f.view)),
+    // One statement for every file (D1 counts each statement of a batch against its per-invocation
+    // cap): the rows are copied from the declarations just read, inside the same transaction.
+    env.DB.prepare(`INSERT INTO version_files (item_id, version, path, sha256, bytes, media_type, view) SELECT ?1, ?2, path, sha256, bytes, media_type, view FROM upload_files WHERE session_id = ?3`).bind(itemId, version, id),
     env.DB.prepare(`DELETE FROM upload_files WHERE session_id = ?`).bind(id),
     audit(env.DB, { workspaceId: p.workspaceId, actor: p.principalId, act: p.act, action: 'version.created', itemId, version, detail: { uploadId: id, files: files.length, bytes: totalBytes, scanOverride: override === 1 } }),
   );

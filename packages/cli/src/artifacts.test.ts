@@ -69,7 +69,7 @@ describe('uploadWith', () => {
       auth.push(new Headers(init.headers).get('authorization')!);
       clock += 200_000; // each file takes 200 s on this link
       if (url.endsWith('/api/v1/uploads')) return ok({ uploadId: 'upl_0000000000000001' }, 201);
-      if (url.includes('/files?')) return ok({ findings: [] });
+      if (url.includes('/batch')) return ok({ files: [] });
       return ok({ itemId: 'itm_0000000000000001', version: 1, url: 'https://app.test/a/itm_0000000000000001', sha256: 'x', mediaType: 'text/plain', bytes: 2 }, 201);
     }) as never;
     const d = tmp();
@@ -77,7 +77,8 @@ describe('uploadWith', () => {
     writeFileSync(join(d, 'b.txt'), 'b');
     const result = await uploadWith(makeClient('https://app.test', () => src.token(), fetchImpl), d, { title: 'T' });
     expect(result.itemId).toBe('itm_0000000000000001');
-    expect(auth).toEqual(['Bearer tok1', 'Bearer tok1', 'Bearer tok2', 'Bearer tok2']);
+    // create at 0 s, the batch at 200 s (tok1 has 100 s left), the commit at 400 s.
+    expect(auth).toEqual(['Bearer tok1', 'Bearer tok1', 'Bearer tok2']);
   });
 
   it('a secret finding stops the upload with file and line, unless --override is given', async () => {
@@ -85,7 +86,7 @@ describe('uploadWith', () => {
     const fetchImpl = (async (url: string, init: RequestInit) => {
       calls.push(`${init.method} ${new URL(url).pathname}`);
       if (url.endsWith('/api/v1/uploads')) return ok({ uploadId: 'upl_0000000000000002' }, 201);
-      if (url.includes('/files?')) return ok({ findings: [{ line: 3, rule: 'github-token' }] });
+      if (url.includes('/batch')) return ok({ files: [{ path: 'c.ts', findings: [{ line: 3, rule: 'github-token' }] }] });
       if (url.endsWith('/override')) return ok({ overridden: true });
       return calls.includes('POST /api/v1/uploads/upl_0000000000000002/override')
         ? ok({ itemId: 'itm_0000000000000002', version: 1 }, 201)
@@ -114,26 +115,39 @@ describe('a single file gets the same checks as a folder', () => {
   });
 });
 
-type Seen = { method: string; url: string; body: string };
+type Seen = { method: string; url: string; body: string; form?: FormData; auth: string };
 function stack(handler: (s: Seen) => Response | undefined = () => undefined) {
   const seen: Seen[] = [];
   const impl = (async (url: string, init: RequestInit) => {
-    const s = { method: String(init.method), url, body: init.body instanceof Uint8Array ? '' : String(init.body ?? '') };
+    const form = init.body instanceof FormData ? init.body : undefined;
+    const s = { method: String(init.method), url, body: init.body instanceof Uint8Array || form ? '' : String(init.body ?? ''), form, auth: new Headers(init.headers).get('authorization') ?? '' };
     seen.push(s);
     const custom = handler(s);
     if (custom) return custom;
     if (url.endsWith('/api/v1/uploads')) return Response.json({ uploadId: 'upl_0000000000000001' }, { status: 201 });
     if (url.includes('/files?')) return Response.json({});
+    if (url.endsWith('/batch')) return Response.json({ files: manifest(s).files.map((f) => ({ path: f.path, findings: [] })) });
     return Response.json({ itemId: 'itm_0000000000000001', version: 1, url: 'https://app.test/a/itm_0000000000000001' }, { status: 201 });
   }) as never;
   return { seen, impl, client: makeClient('https://app.test', async () => 't', impl) };
 }
 
+const manifest = (s: Seen) => JSON.parse(String(s.form!.get('manifest'))) as { files: Array<{ path: string; held?: true }> };
+
 describe('uploadWith details', () => {
-  it('encodes a path with #, ? and % and a non-ASCII letter into the PUT query', async () => {
+  it('names a path with #, ? and % and a non-ASCII letter as itself in the batch manifest', async () => {
     const d = tmp();
     const name = 'a#b?c%d é.txt';
     writeFileSync(join(d, name), 'x');
+    const { seen, client } = stack();
+    await uploadWith(client, d, { title: 'T' });
+    expect(manifest(seen.find((s) => s.url.endsWith('/batch'))!).files).toEqual([{ path: name }]);
+  });
+  it('encodes such a path into the PUT query of a file too big for a batch', async () => {
+    const d = tmp();
+    const name = 'a#b?c%d é.bin';
+    writeFileSync(join(d, name), '');
+    truncateSync(join(d, name), LIMITS.batchBytes + 1);
     const { seen, client } = stack();
     await uploadWith(client, d, { title: 'T' });
     const put = seen.find((s) => s.method === 'PUT')!;
@@ -158,7 +172,7 @@ describe('uploadWith details', () => {
     await uploadWith(client, d, { override: 'rotated already' });
     expect(JSON.parse(seen.find((s) => s.url.endsWith('/override'))!.body)).toEqual({ reason: 'rotated already' });
 
-    const { client: c2 } = stack((s) => (s.method === 'PUT' ? Response.json({ error: 'quota_exceeded' }, { status: 413 }) : undefined));
+    const { client: c2 } = stack((s) => (s.url.endsWith('/batch') ? Response.json({ error: 'quota_exceeded' }, { status: 413 }) : undefined));
     await expect(uploadWith(c2, d, {})).rejects.toThrow(describeRefusal({ ok: false, status: 413, error: 'quota_exceeded' }));
   });
   it('rejects an --expires date that is not a real day, before any request', async () => {
@@ -223,5 +237,75 @@ describe('upload, get and revoke', () => {
       await expect(revoke(ID, { version: '1/../..', reason: null, json: false })).rejects.toThrow('--version takes a whole number');
     });
     expect(r.seen).toEqual([]);
+  });
+});
+
+describe('fast folder uploads', () => {
+  const folder = (n: number) => {
+    const d = tmp();
+    for (let i = 0; i < n; i++) writeFileSync(join(d, `f${String(i).padStart(3, '0')}.txt`), `file ${i}`);
+    return d;
+  };
+
+  it('a 500-file folder takes 12 requests: create, 10 batches, commit', async () => {
+    const { seen, client } = stack();
+    await uploadWith(client, folder(LIMITS.folderFiles), { title: 'T' });
+    expect(seen.map((s) => `${s.method} ${new URL(s.url).pathname.split('/').pop()}`)).toEqual([
+      'POST uploads', ...Array(LIMITS.folderFiles / LIMITS.batchFiles).fill('POST batch'), 'POST commit',
+    ]);
+  });
+
+  it('an access token the server stops accepting mid-upload is renewed, and the upload completes', async () => {
+    let n = 0;
+    const exchange = vi.fn(async () => ({ token: `tok${++n}`, expiresIn: 300 }));
+    // The cache says tok1 is good for minutes; the server (its clock ahead) refuses it after two batches.
+    const src = tokenSource({ env: {}, base: 'https://app.test', dir: tmp(), exchange, now: () => 0, device: { credential: 'dev_00000000000000000000:' + 'a'.repeat(43), plane: 'https://accounts.test', audience: 'https://app.test' } });
+    let batches = 0;
+    const { seen, impl } = stack((s) => {
+      if (!s.url.endsWith('/batch')) return undefined;
+      if (s.auth === 'Bearer tok1' && ++batches > 2) return new Response(JSON.stringify({ error: 'sign_in_required' }), { status: 401 });
+      return undefined;
+    });
+    const client = makeClient('https://app.test', (o) => src.token(o), impl, 'device');
+    const result = await uploadWith(client, folder(200), { title: 'T', concurrency: 1 });
+    expect(result.itemId).toBe('itm_0000000000000001');
+    expect(exchange).toHaveBeenCalledTimes(2);
+    expect(seen.filter((s) => s.url.endsWith('/batch') && s.auth === 'Bearer tok2')).toHaveLength(2);
+    expect(seen.at(-1)!.auth).toBe('Bearer tok2');
+  });
+
+  it('a renewed token is exchanged once for all the requests in flight', async () => {
+    let n = 0;
+    const exchange = vi.fn(async () => { await new Promise((r) => setTimeout(r, 10)); return { token: `tok${++n}`, expiresIn: 300 }; });
+    const src = tokenSource({ env: {}, base: 'https://app.test', dir: tmp(), exchange, now: () => 0, device: { credential: 'dev_00000000000000000000:' + 'a'.repeat(43), plane: 'https://accounts.test', audience: 'https://app.test' } });
+    await Promise.all(Array.from({ length: 6 }, () => src.token()));
+    expect(exchange).toHaveBeenCalledTimes(1);
+  });
+
+  it('resume: files the server already holds for this person are named, not sent', async () => {
+    const d = folder(3);
+    const { seen, client } = stack((s) => (s.url.endsWith('/api/v1/uploads') ? Response.json({ uploadId: 'upl_0000000000000001', held: ['f000.txt', 'f002.txt'] }, { status: 201 }) : undefined));
+    await uploadWith(client, d, { title: 'T' });
+    const b = seen.find((s) => s.url.endsWith('/batch'))!;
+    expect(manifest(b).files).toEqual([{ path: 'f000.txt', held: true }, { path: 'f001.txt' }, { path: 'f002.txt', held: true }]);
+    expect(b.form!.getAll('file')).toHaveLength(1);
+  });
+
+  it('progress goes to stderr; stdout carries only the result', async () => {
+    vi.stubEnv('SUPERLIBRARY_TOKEN', 'tok');
+    vi.stubEnv('SUPERLIBRARY_URL', 'https://app.test');
+    const st = stack();
+    vi.stubGlobal('fetch', st.impl);
+    let out = '';
+    let err = '';
+    const w1 = vi.spyOn(process.stdout, 'write').mockImplementation(((c: string) => { out += c; return true; }) as never);
+    const w2 = vi.spyOn(process.stderr, 'write').mockImplementation(((c: string) => { err += c; return true; }) as never);
+    try {
+      await upload(folder(120), { title: null, item: null, board: null, entry: null, expires: null, override: null, json: true });
+    } finally { w1.mockRestore(); w2.mockRestore(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); }
+    expect(out.trim().split('\n')).toHaveLength(1);
+    expect(JSON.parse(out)).toMatchObject({ itemId: 'itm_0000000000000001' });
+    expect(err).toContain('suli: sent 120/120 files');
+    expect(out).not.toContain('sent');
   });
 });

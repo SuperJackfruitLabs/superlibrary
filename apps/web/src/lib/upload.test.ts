@@ -6,6 +6,13 @@ import { deleteOnToIso, describeRefusal, expandZip, leftOutSentence, overrideAnd
 const enc = (s: string) => new TextEncoder().encode(s);
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status });
 
+function manifestOf(init: RequestInit) {
+  return JSON.parse(String((init.body as FormData).get('manifest'))) as { files: Array<{ path: string; held?: true }> };
+}
+function batchAnswer(init: RequestInit, findings: unknown[] = []) {
+  return json(200, { files: manifestOf(init).files.map((f) => ({ path: f.path, findings })) });
+}
+
 function fakeApi(handlers: Record<string, (init: RequestInit) => Response>) {
   const calls: string[] = [];
   const api = async (path: string, init: RequestInit = {}) => {
@@ -150,21 +157,21 @@ describe('selectFiles: what a pick becomes, checked before any file is read', ()
 });
 
 describe('uploadFiles', () => {
-  it('declares, sends each file, commits — in that order', async () => {
+  it('declares, sends the files in one batch, commits — in that order', async () => {
     const { api, calls } = fakeApi({
       'POST /api/v1/uploads': () => json(201, { uploadId: 'upl_0000000000000001', expiresAt: 'x', entry: 'a.md' }),
-      'PUT /api/v1/uploads/:id/files?path': () => json(200, { findings: [] }),
+      'POST /api/v1/uploads/:id/batch': (init) => batchAnswer(init),
       'POST /api/v1/uploads/:id/commit': () => json(201, { itemId: 'itm_0000000000000001', version: 1 }),
     });
     const out = await uploadFiles(api, [{ path: 'a.md', bytes: enc('# a') }, { path: 'b.md', bytes: enc('# b') }], { title: 'T' });
     expect(out).toMatchObject({ ok: true, result: { itemId: 'itm_0000000000000001' } });
-    expect(calls).toEqual(['POST /api/v1/uploads', 'PUT /api/v1/uploads/:id/files?path', 'PUT /api/v1/uploads/:id/files?path', 'POST /api/v1/uploads/:id/commit']);
+    expect(calls).toEqual(['POST /api/v1/uploads', 'POST /api/v1/uploads/:id/batch', 'POST /api/v1/uploads/:id/commit']);
   });
 
   it('a secret finding comes back with the upload id, and an override with a reason then commits', async () => {
     const { api, calls } = fakeApi({
       'POST /api/v1/uploads': () => json(201, { uploadId: 'upl_0000000000000002' }),
-      'PUT /api/v1/uploads/:id/files?path': () => json(200, { findings: [{ line: 2, rule: 'github-token' }] }),
+      'POST /api/v1/uploads/:id/batch': (init) => batchAnswer(init, [{ line: 2, rule: 'github-token' }]),
       'POST /api/v1/uploads/:id/commit': () => json(422, { error: 'secret_found', findings: [{ path: 'c.ts', line: 2, rule: 'github-token' }] }),
       'POST /api/v1/uploads/:id/override': (init) => (JSON.parse(String(init.body)).reason === 'rotated already' ? json(200, { overridden: true }) : json(400, { error: 'invalid' })),
     });
@@ -176,14 +183,16 @@ describe('uploadFiles', () => {
 
   it('declares each file by size and SHA-256, and sends its exact bytes', async () => {
     let declared: unknown;
-    let sent: unknown;
+    let sent: Uint8Array | undefined;
     const { api } = fakeApi({
       'POST /api/v1/uploads': (init) => { declared = JSON.parse(String(init.body)); return json(201, { uploadId: 'upl_0000000000000003' }); },
-      'PUT /api/v1/uploads/:id/files?path': (init) => { sent = init.body; return json(200, { findings: [] }); },
+      'POST /api/v1/uploads/:id/batch': (init) => { parts.push((init.body as FormData).get('file') as Blob); return batchAnswer(init); },
       'POST /api/v1/uploads/:id/commit': () => json(201, { itemId: 'itm_0000000000000003', version: 2 }),
     });
+    const parts: Blob[] = [];
     await uploadFiles(api, [{ path: 'a.md', bytes: enc('abc') }], { title: 'T', item: 'itm_0000000000000003' });
     expect(declared).toEqual({ title: 'T', item: 'itm_0000000000000003', files: [{ path: 'a.md', bytes: 3, sha256: 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad' }] });
+    sent = new Uint8Array(await parts[0]!.arrayBuffer());
     expect(sent).toEqual(enc('abc'));
   });
 
@@ -191,8 +200,8 @@ describe('uploadFiles', () => {
     const names = ['my report #1.md', 'img/a b?.png', '100%.txt', 'résumé/日本.txt', 'a+b&c=d.md'];
     const seen: string[] = [];
     const api = async (path: string, init: RequestInit = {}) => {
-      if (init.method === 'PUT') seen.push(new URL(path, 'https://app.test').searchParams.get('path')!);
-      return path.endsWith('/uploads') ? json(201, { uploadId: 'upl_0000000000000004' }) : path.endsWith('/commit') ? json(201, { itemId: 'itm_0000000000000004', version: 1 }) : json(200, { findings: [] });
+      if (path.endsWith('/batch')) { seen.push(...manifestOf(init).files.map((f) => f.path)); return batchAnswer(init); }
+      return path.endsWith('/uploads') ? json(201, { uploadId: 'upl_0000000000000004' }) : json(201, { itemId: 'itm_0000000000000004', version: 1 });
     };
     await uploadFiles(api, names.map((path) => ({ path, bytes: enc(path) })), { title: 'T' });
     expect(seen).toEqual(names);
@@ -200,27 +209,44 @@ describe('uploadFiles', () => {
 
   it('a commit answered 409 incomplete resends exactly the missing files, then commits again', async () => {
     let commits = 0;
-    const puts: string[] = [];
+    const sent: string[] = [];
     const api = async (path: string, init: RequestInit = {}) => {
-      if (init.method === 'PUT') { puts.push(new URL(path, 'https://app.test').searchParams.get('path')!); return json(200, { findings: [] }); }
+      if (path.endsWith('/batch')) { sent.push(...manifestOf(init).files.map((f) => f.path)); return batchAnswer(init); }
       if (path.endsWith('/uploads')) return json(201, { uploadId: 'upl_0000000000000005' });
       return ++commits === 1 ? json(409, { error: 'incomplete', missing: ['b.md'] }) : json(201, { itemId: 'itm_0000000000000005', version: 1 });
     };
     const out = await uploadFiles(api, [{ path: 'a.md', bytes: enc('a') }, { path: 'b.md', bytes: enc('b') }], { title: 'T' });
     expect(out).toMatchObject({ ok: true });
-    expect(puts).toEqual(['a.md', 'b.md', 'b.md']);
+    expect(sent).toEqual(['a.md', 'b.md', 'b.md']);
     expect(commits).toBe(2);
   });
 
-  it('reports progress after each file it sends', async () => {
+  it('names the files the server already holds instead of sending them (resume)', async () => {
+    let manifest: { files: Array<{ path: string; held?: true }> } | undefined;
+    let parts = 0;
+    const { api } = fakeApi({
+      'POST /api/v1/uploads': () => json(201, { uploadId: 'upl_0000000000000007', held: ['a.md'] }),
+      'POST /api/v1/uploads/:id/batch': (init) => { manifest = manifestOf(init); parts = (init.body as FormData).getAll('file').length; return batchAnswer(init); },
+      'POST /api/v1/uploads/:id/commit': () => json(201, { itemId: 'itm_0000000000000007', version: 1 }),
+    });
+    await uploadFiles(api, [{ path: 'a.md', bytes: enc('a') }, { path: 'b.md', bytes: enc('b') }], { title: 'T' });
+    expect(manifest!.files).toEqual([{ path: 'a.md', held: true }, { path: 'b.md' }]);
+    expect(parts).toBe(1);
+  });
+
+  it('reports progress as files are sent', async () => {
     const { api } = fakeApi({
       'POST /api/v1/uploads': () => json(201, { uploadId: 'upl_0000000000000006' }),
+      'POST /api/v1/uploads/:id/batch': (init) => batchAnswer(init),
       'PUT /api/v1/uploads/:id/files?path': () => json(200, { findings: [] }),
       'POST /api/v1/uploads/:id/commit': () => json(201, { itemId: 'itm_0000000000000006', version: 1 }),
     });
     const seen: [number, number][] = [];
-    await uploadFiles(api, [{ path: 'a', bytes: enc('a') }, { path: 'b', bytes: enc('b') }], { title: 'T' }, { onProgress: (n, of) => seen.push([n, of]) });
-    expect(seen).toEqual([[0, 2], [1, 2], [2, 2]]);
+    const big = new Uint8Array(LIMITS.batchBytes + 1);
+    await uploadFiles(api, [{ path: 'a', bytes: enc('a') }, { path: 'big.bin', bytes: big }, { path: 'b', bytes: enc('b') }], { title: 'T' }, { onProgress: (n, of) => seen.push([n, of]) });
+    expect(seen[0]).toEqual([0, 3]);
+    expect(seen.at(-1)).toEqual([3, 3]);
+    expect(seen).toHaveLength(3);
   });
 
   it('a refused declaration keeps what the server said about it', async () => {

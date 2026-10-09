@@ -31,27 +31,32 @@ function signInRequired(env: Env): Response {
   return res;
 }
 
-export async function ensureWorkspace(db: D1Database, org: string): Promise<string> {
-  await db
-    .prepare(`INSERT OR IGNORE INTO workspaces (id, external_source, external_id) VALUES (?, ?, ?)`)
-    .bind(newId('wsp'), ORG_PLANE_SOURCE, org)
-    .run();
-  const row = await db.prepare(`SELECT id FROM workspaces WHERE external_source = ? AND external_id = ?`).bind(ORG_PLANE_SOURCE, org).first<{ id: string }>();
-  if (!row) throw new Error('first sight could not create the workspace');
-  return row.id;
-}
+/**
+ * The workspace and the caller's role in it: one read when both exist (every request after the
+ * first), else one batch that creates whichever is missing and reads the result. Each D1 round trip
+ * crosses to the database's region, so a request pays one, not four.
+ */
+const MEMBERSHIP = `SELECT w.id AS workspace_id, m.role FROM workspaces w JOIN members m ON m.workspace_id = w.id AND m.principal_id = ?3
+  WHERE w.external_source = ?1 AND w.external_id = ?2`;
 
-export async function ensureMember(db: D1Database, workspaceId: string, principalId: string): Promise<'owner' | 'member'> {
-  await db
-    .prepare(
+export async function ensureMembership(db: D1Database, org: string, principalId: string): Promise<{ workspaceId: string; role: 'owner' | 'member' }> {
+  type Row = { workspace_id: string; role: 'owner' | 'member' };
+  const known = await db.prepare(MEMBERSHIP).bind(ORG_PLANE_SOURCE, org, principalId).first<Row>();
+  if (known) return { workspaceId: known.workspace_id, role: known.role };
+  const [, , read] = await db.batch<Row>([
+    db.prepare(`INSERT OR IGNORE INTO workspaces (id, external_source, external_id) VALUES (?, ?, ?)`).bind(newId('wsp'), ORG_PLANE_SOURCE, org),
+    // First member is the owner, everyone after a member: decided inside the statement, so two
+    // concurrent first requests cannot make two owners.
+    db.prepare(
       `INSERT OR IGNORE INTO members (workspace_id, principal_id, role)
-       SELECT ?1, ?2, CASE WHEN EXISTS (SELECT 1 FROM members WHERE workspace_id = ?1) THEN 'member' ELSE 'owner' END`,
-    )
-    .bind(workspaceId, principalId)
-    .run();
-  const row = await db.prepare(`SELECT role FROM members WHERE workspace_id = ? AND principal_id = ?`).bind(workspaceId, principalId).first<{ role: 'owner' | 'member' }>();
-  if (!row) throw new Error('could not record the membership');
-  return row.role;
+       SELECT w.id, ?3, CASE WHEN EXISTS (SELECT 1 FROM members WHERE workspace_id = w.id) THEN 'member' ELSE 'owner' END
+       FROM workspaces w WHERE w.external_source = ?1 AND w.external_id = ?2`,
+    ).bind(ORG_PLANE_SOURCE, org, principalId),
+    db.prepare(MEMBERSHIP).bind(ORG_PLANE_SOURCE, org, principalId),
+  ]);
+  const row = read?.results[0];
+  if (!row) throw new Error('first sight could not record the workspace membership');
+  return { workspaceId: row.workspace_id, role: row.role };
 }
 
 async function claimsOf(request: Request, env: Env): Promise<OrgPlaneClaims | Response> {
@@ -76,7 +81,6 @@ export async function resolvePerson(request: Request, env: Env): Promise<Person 
   if (claims.principalKind !== 'human') {
     return error(403, 'principal_not_supported', { detail: 'only a person may use Superlibrary in this release' });
   }
-  const workspaceId = await ensureWorkspace(env.DB, claims.org);
-  const role = await ensureMember(env.DB, workspaceId, claims.sub);
+  const { workspaceId, role } = await ensureMembership(env.DB, claims.org, claims.sub);
   return { principalId: claims.sub, org: claims.org, workspaceId, role, act: typeof claims.act?.sub === 'string' ? claims.act.sub : null };
 }

@@ -9,6 +9,11 @@ export const LIMITS = {
   retentionDays: 30,
   /** An upload session not committed within this many hours is swept. */
   uploadTtlHours: 24,
+  /** Files arriving renew a session by uploadTtlHours, never past this many hours after it was declared. */
+  uploadMaxHours: 72,
+  /** One batch request carries at most this many files and this many bytes of them; a bigger file goes alone. */
+  batchFiles: 50,
+  batchBytes: 8 * MB,
   csvRows: 5000,
 } as const;
 
