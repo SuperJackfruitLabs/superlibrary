@@ -257,7 +257,7 @@ describe('a person is never served through a service (operator ruling R-H1)', ()
 
   it("a person's token minted by a service (act) is refused and audited", async () => {
     await withOrgPlane(async () => {
-      const minted = await planeToken({ sub: HUMAN, principalKind: 'human', act: { sub: HUB_SVC }, amr: ['assertion'] });
+      const minted = await planeToken({ sub: HUMAN, principalKind: 'human', act: { sub: HUB_SVC }, amr: ['pwd'] });
       const rows = await refusalsDuring(HUMAN, async () => {
         const read = await call('/api/v1/items', minted);
         expect(read.status).toBe(403);
