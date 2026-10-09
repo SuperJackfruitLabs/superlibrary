@@ -29,6 +29,7 @@ export const searchRoutes: Handler = async (request, env, _ctx, url) => {
     } catch (e) {
       const m = e instanceof Error ? e.message : '';
       if (m === 'reindex_running') return error(409, 'reindex_running');
+      if (m === 'slot_not_drained') return error(409, 'slot_not_drained');
       if (m === 'dimension_mismatch') return error(400, 'dimension_mismatch');
       if (m.startsWith('unknown embedder')) return error(400, 'unknown_embedder');
       throw e;

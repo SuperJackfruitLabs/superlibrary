@@ -2,7 +2,7 @@
 import { SELF, createMessageBatch, env } from 'cloudflare:test';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { IndexMessage } from '@superlibrary/contract';
-import { indexBatch, indexItem } from '../src/indexing/consumer';
+import { indexBatch, indexItem, reconcile } from '../src/indexing/consumer';
 import { reindexPage, startReindex } from '../src/indexing/reindex';
 import { readSlots, setIndexingForTests } from '../src/indexing/vector-index';
 import { search } from '../src/search/search';
@@ -23,6 +23,12 @@ beforeEach(async () => {
 afterEach(async () => {
   setIndexingForTests(null);
   await env.DB.batch([
+    env.DB.prepare(`DELETE FROM index_state`),
+    env.DB.prepare(`DELETE FROM chunks_fts`),
+    env.DB.prepare(`DELETE FROM chunks`),
+    env.DB.prepare(`DELETE FROM item_sources`),
+    env.DB.prepare(`DELETE FROM work_records`),
+    env.DB.prepare(`DELETE FROM items`),
     env.DB.prepare(`UPDATE vector_slots SET state = 'idle' WHERE slot = 'b'`),
     env.DB.prepare(`UPDATE vector_slots SET state = 'active', embedder_id = 'workers-ai/bge-m3', dims = 1024 WHERE slot = 'a'`),
     env.DB.prepare(`UPDATE vector_slots SET embedder_id = NULL, dims = NULL, cursor = NULL WHERE slot = 'b'`),
@@ -50,6 +56,24 @@ describe('re-index (spec §7, §15)', () => {
     expect(await ids()).toEqual(['itm_00000000000000a1', 'itm_00000000000000a2', 'itm_00000000000000a3']);   // after
     expect([...b.store.values()].every((v) => v.metadata!.embedder === 'test/next')).toBe(true);
     expect(b.queries.length).toBeGreaterThan(0);
+  });
+  it('does not fill the old slot until its items are drained (two embedders never mix)', async () => {
+    for (let i = 1; i <= 2; i++) { await seedRecord({ id: `itm_00000000000000a${i}`, ws: WS, text: `quarterly roadmap item ${i}` }); await indexItem(env, `itm_00000000000000a${i}`); }
+    const pages: IndexMessage[] = [];
+    const send = vi.spyOn(env.INDEX, 'send').mockImplementation((async (m: IndexMessage) => { pages.push(m); }) as never);
+    await startReindex(env, 'test/next');
+    while (pages.length) { const m = pages.shift()! as Extract<IndexMessage, { type: 'reindex' }>; await reindexPage(env, m.slot, m.after); }
+    expect((await readSlots(env)).active.slot).toBe('b');
+    await expect(startReindex(env, 'workers-ai/bge-m3')).rejects.toThrow(/slot_not_drained/);
+    const sent: Array<{ body: { itemId: string } }> = [];
+    const r = await reconcile({ ...env, INDEX: { sendBatch: async (m: typeof sent) => { sent.push(...m); } } as unknown as Queue<IndexMessage> });
+    expect(r.queued).toBe(2);
+    expect(sent.map((x) => x.body.itemId).sort()).toEqual(['itm_00000000000000a1', 'itm_00000000000000a2']);
+    expect(a.store.size).toBeGreaterThan(0);
+    for (const x of sent) await indexItem(env, x.body.itemId);
+    expect(a.store.size).toBe(0);
+    expect(await startReindex(env, 'workers-ai/bge-m3')).toEqual({ slot: 'a' });
+    send.mockRestore();
   });
   it('refuses a second re-index while one is building', async () => {
     const send = vi.spyOn(env.INDEX, 'send').mockResolvedValue(undefined as never);
@@ -100,5 +124,14 @@ describe('POST /api/v1/admin/index/reindex', () => {
     const again = await call({ embedder: 'test/next' });
     expect(again.status).toBe(409);
     expect(await again.json()).toMatchObject({ error: 'reindex_running' });
+  });
+  it('answers 409 slot_not_drained while an item still records the idle slot', async () => {
+    (env as unknown as Record<string, unknown>).OPERATORS = HUMAN;
+    await env.DB.prepare(`INSERT INTO index_state (item_id, digest, chunk_ids, slots, indexed_at) VALUES ('itm_00000000000000e1', 'd', '[]', '{"b":"x"}', 't')`).run();
+    try {
+      const r = await call({ embedder: 'test/next' });
+      expect(r.status).toBe(409);
+      expect(await r.json()).toMatchObject({ error: 'slot_not_drained' });
+    } finally { await env.DB.prepare(`DELETE FROM index_state WHERE item_id = 'itm_00000000000000e1'`).run(); }
   });
 });

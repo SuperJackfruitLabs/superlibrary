@@ -20,6 +20,9 @@ export async function startReindex(env: Env, embedderId: string): Promise<{ slot
   if (s.building) throw new Error('reindex_running');
   const e = embedderFor(env, embedderId);
   const slot = s.active.slot === 'a' ? 'b' : 'a';
+  // B-R13: the idle slot must hold nothing of ours: no index_state may still record it.
+  const left = await env.DB.prepare(`SELECT 1 AS n FROM index_state WHERE json_extract(slots, ?) IS NOT NULL LIMIT 1`).bind(`$.${slot}`).first();
+  if (left) throw new Error('slot_not_drained');
   const idle = await env.DB.prepare(`SELECT dims FROM vector_slots WHERE slot = ?`).bind(slot).first<{ dims: number | null }>();
   if (idle?.dims != null && idle.dims !== e.dims) throw new Error('dimension_mismatch');
   await env.DB.prepare(`UPDATE vector_slots SET embedder_id = ?, dims = ?, state = 'building', cursor = NULL, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE slot = ?`).bind(e.id, e.dims, slot).run();
