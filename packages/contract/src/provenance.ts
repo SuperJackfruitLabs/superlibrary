@@ -19,6 +19,7 @@ export const RUN_ID = /^run_[0-9a-f]{16}$/;
 export const Provenance = z
   .object({
     source: z.enum(SOURCES),
+    /** The Accounts `org_` id (the workspace's external id), not Superlibrary's internal `wsp_` id used by `ItemChanged.workspaceId` and `work_records.workspace_id`. */
     workspace: z.string().regex(ORG_ID).optional(),
     board: z.string().regex(BOARD_ID).optional(),
     card: z.string().regex(CARD_ID).optional(),

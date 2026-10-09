@@ -40,17 +40,28 @@ describe('foundation schema', () => {
       env.DB.prepare(`INSERT INTO item_sources (item_id, source, agent_principal, via_service) VALUES (?, 'agentpod', ?, ?)`).bind(item, agent, via).run();
     it('refuses an agentpod row with the agent but no acting service', async () => {
       await seedItem('itm_00000000000000a4');
-      await expect(put('itm_00000000000000a4', 'agent:one', null)).rejects.toThrow(/CHECK/);
+      await expect(put('itm_00000000000000a4', 'prn_000000000000000000a2', null)).rejects.toThrow(/CHECK/);
     });
     it('refuses an agentpod row with the acting service but no agent', async () => {
       await seedItem('itm_00000000000000a5');
-      await expect(put('itm_00000000000000a5', null, 'svc:hub')).rejects.toThrow(/CHECK/);
+      await expect(put('itm_00000000000000a5', null, 'prn_0000000000000000c0b1')).rejects.toThrow(/CHECK/);
+    });
+    it('refuses a value that is not a prn', async () => {
+      await seedItem('itm_00000000000000a7');
+      await expect(put('itm_00000000000000a7', 'prn_000000000000000000a2', 'svc:hub')).rejects.toThrow(/CHECK/);
+      await expect(put('itm_00000000000000a7', 'agent:one', 'prn_0000000000000000c0b1')).rejects.toThrow(/CHECK/);
     });
     it('accepts an agentpod row naming both', async () => {
       await seedItem('itm_00000000000000a6');
-      await put('itm_00000000000000a6', 'agent:one', 'svc:hub');
+      await put('itm_00000000000000a6', 'prn_000000000000000000a2', 'prn_0000000000000000c0b1');
       const r = await env.DB.prepare(`SELECT agent_principal, via_service FROM item_sources WHERE item_id = 'itm_00000000000000a6'`).first();
-      expect(r).toEqual({ agent_principal: 'agent:one', via_service: 'svc:hub' });
+      expect(r).toEqual({ agent_principal: 'prn_000000000000000000a2', via_service: 'prn_0000000000000000c0b1' });
     });
+  });
+  it('stores the station name the hub gave', async () => {
+    await seedItem('itm_00000000000000a8');
+    await env.DB.prepare(`INSERT INTO item_sources (item_id, source, station, station_name) VALUES ('itm_00000000000000a8', 'upload', 'stn_1', 'readable-key')`).run();
+    const r = await env.DB.prepare(`SELECT station_name FROM item_sources WHERE item_id = 'itm_00000000000000a8'`).first();
+    expect(r).toEqual({ station_name: 'readable-key' });
   });
 });

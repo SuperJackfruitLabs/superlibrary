@@ -111,6 +111,8 @@ export interface ItemSource {
   sourceKind?: 'upload' | 'agentpod' | 'superpipeline';
   agentPrincipal?: string;
   station?: string;
+  /** The station's readable key as the hub named it. */
+  stationName?: string;
   /** The station was removed; the item stays (spec §12). */
   stationRemoved?: boolean;
   path?: string;

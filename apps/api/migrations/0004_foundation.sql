@@ -18,14 +18,16 @@ CREATE TABLE item_sources (
   -- token); provenance records both the hub and the agent.
   via_service TEXT,
   station TEXT,
+  -- The station's readable key as the hub named it.
+  station_name TEXT,
   source_path TEXT,
   source_id TEXT,
   source_url TEXT,
   -- Spec §12: removing a station keeps its artifacts, marked as from a removed station.
   station_removed_at TEXT,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-  -- An agentpod item must name both the agent and the hub that acted for it.
-  CHECK (source <> 'agentpod' OR (agent_principal IS NOT NULL AND via_service IS NOT NULL))
+  -- An agentpod item must name both the agent and the hub that acted for it, each a prn (a NULL passes a CHECK, so it is refused explicitly).
+  CHECK (source <> 'agentpod' OR (agent_principal IS NOT NULL AND agent_principal GLOB 'prn_[0-9a-f]*' AND length(agent_principal) = 24 AND via_service IS NOT NULL AND via_service GLOB 'prn_[0-9a-f]*' AND length(via_service) = 24))
 );
 -- Spec §3: an artifact is versioned by source path; this finds the item to add version n+1 to.
 CREATE INDEX item_sources_station_path ON item_sources(station, source_path);

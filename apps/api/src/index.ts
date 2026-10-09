@@ -11,6 +11,9 @@ import { itemRoutes } from './items/routes';
 import { queueHandlers } from './queues';
 import { counted, withCost } from './cost';
 
+/** Must equal `triggers.crons[0]` in wrangler.jsonc (a test holds them together). */
+export const RETENTION_CRON = '0 3 * * *';
+
 const handlers: Handler[] = [uploadRoutes, itemRoutes];
 
 async function route(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
@@ -56,6 +59,10 @@ export default {
   },
   /** The daily cron only enqueues; the consumer does the work (spec §6 `retention` queue). */
   async scheduled(c: ScheduledController, env: Env, _ctx: ExecutionContext) {
+    if (c.cron !== RETENTION_CRON) {
+      console.error('no handler for cron', c.cron);
+      return;
+    }
     await env.RETENTION.send({ type: 'sweep', at: new Date(c.scheduledTime).toISOString() });
   },
 } satisfies ExportedHandler<Env, unknown>;

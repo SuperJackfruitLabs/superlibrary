@@ -20,7 +20,7 @@ export const SearchQuery = z.object({
   outcomes: z.array(z.enum(OUTCOMES)).min(1).optional(),
   board: z.string().regex(BOARD_ID).optional(),
   limit: z.number().int().min(1).max(25).default(10),
-});
+}).strict();
 export type SearchQuery = z.infer<typeof SearchQuery>;
 
 const relatedCaps = { limit: z.number().int().min(1).max(10).default(PROMPT_CAPS.items), maxTokens: z.number().int().min(100).max(4000).default(PROMPT_CAPS.tokens) };

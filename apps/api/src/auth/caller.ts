@@ -16,7 +16,7 @@ export interface Person {
   org: string;
   workspaceId: string;
   role: 'owner' | 'member';
-  /** `act.sub` of the person's token, when present (recorded, never authority). */
+  /** `act.sub` of the person's token, when present. Recorded, never a trust signal: every hub-minted token carries the hub here. Trust keys on `via`. */
   act: string | null;
 }
 export interface AgentViewer {
@@ -24,12 +24,13 @@ export interface AgentViewer {
   principalId: string;
   org: string;
   workspaceId: string;
+  /** Recorded, never a trust signal: every hub-minted token carries the hub here. Trust keys on `via`. */
   act: string | null;
-  /** The hub's prn when the agent came through the hub (plan P1), else null. */
+  /** The hub's prn when the agent came through the hub (plan P1), else null. The only field a source-trust check may key on. */
   via: string | null;
 }
 export type Viewer = Person | AgentViewer;
-/** Who may open an upload session: a person, or an agent through the hub only (plan P1). */
+/** Who may open an upload session (`via` is the only field a source-trust check may key on): a person, or an agent through the hub only (plan P1). */
 export type Uploader = Person | (AgentViewer & { via: string; role: 'member' });
 
 const PRN = /^prn_[0-9a-f]{20}$/;

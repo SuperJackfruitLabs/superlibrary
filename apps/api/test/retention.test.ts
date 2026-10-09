@@ -1,6 +1,7 @@
 import { createMessageBatch, createScheduledController, env, getQueueResult, createExecutionContext } from 'cloudflare:test';
 import { describe, expect, it, vi } from 'vitest';
-import worker from '../src/index';
+import worker, { RETENTION_CRON } from '../src/index';
+import wranglerRaw from '../wrangler.jsonc?raw';
 import type { RetentionMessage } from '../src/env';
 import { deleteItem, sweep } from '../src/lifecycle/retention';
 import { sha256Hex, upload } from './helpers/upload';
@@ -127,6 +128,20 @@ describe('retention sweep (spec §12, plan D14)', () => {
     expect(again.abandonedUploads).toEqual([]);
     const audited = await env.DB.prepare(`SELECT actor FROM audit_events WHERE action = 'item.deleted' AND item_id = ?`).bind(r.body.itemId).first<{ actor: string }>();
     expect(audited?.actor).toBe('retention');
+  });
+
+  it('an unknown cron expression does not sweep', async () => {
+    const send = vi.fn();
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const ctl = createScheduledController({ scheduledTime: Date.UTC(2026, 9, 9, 4), cron: '0 4 * * *' });
+    await worker.scheduled!(ctl, { ...env, RETENTION: { send } as unknown as Queue<RetentionMessage> }, createExecutionContext());
+    expect(send).not.toHaveBeenCalled();
+    expect(err).toHaveBeenCalledWith('no handler for cron', '0 4 * * *');
+    err.mockRestore();
+  });
+
+  it('the retention cron constant is the one wrangler.jsonc declares', () => {
+    expect(wranglerRaw).toContain(`"crons": ["${RETENTION_CRON}"]`);
   });
 
   it('the cron enqueues one sweep; the consumer runs it and acks', async () => {

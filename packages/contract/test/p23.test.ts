@@ -4,6 +4,13 @@ import {
   type ItemChanged, type IngestMessage,
 } from '../src/index';
 
+describe('search query', () => {
+  it('refuses a key it does not model, rather than dropping it', () => {
+    expect(SearchQuery.safeParse({ query: 'x', boards: ['brd_00000000000000b1'] }).success).toBe(false);
+    expect(SearchQuery.safeParse({ query: 'x' }).success).toBe(true);
+  });
+});
+
 describe('provenance', () => {
   it('accepts an agent link and a work record, and refuses unknown keys', () => {
     expect(Provenance.safeParse({ source: 'agentpod', board: 'brd_00000000000000b1', card: 'card_00000000000000c1', run: 'run_00000000000000d1', agent: 'prn_000000000000000000a2', station: 'stn-1', path: 'out/report.md' }).success).toBe(true);
