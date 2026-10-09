@@ -64,7 +64,8 @@
     ]
   },
   // The daily sweep enqueues one message; the consumer does the work (spec §6 `retention` queue).
-  "triggers": { "crons": ["0 3 * * *", "30 3 * * *"] },
+  // The daily reconcile (spec §7) runs at 03:30; the hourly cron re-registers the Superpipeline push configs (Task A11).
+  "triggers": { "crons": ["0 3 * * *", "30 3 * * *", "0 * * * *"] },
   // Same hostname as the Pages app (plan decision D1). Declared here, not clicked in the dashboard.
   "routes": [
     { "pattern": "app.superlibrary.dev/api/*", "zone_name": "superlibrary.dev" },

@@ -14,6 +14,9 @@ import { counted, withCost } from './cost';
 import { RETENTION_CRON } from './lifecycle/retention';
 import { RECONCILE_CRON, reconcile } from './indexing/consumer';
 import { searchRoutes } from './search/routes';
+import { subscribeAll } from './sources/subscribe';
+
+const SUBSCRIBE_CRON = '0 * * * *';
 
 const handlers: Handler[] = [uploadRoutes, itemRoutes, searchRoutes, sourceRoutes];
 
@@ -60,14 +63,10 @@ export default {
   },
   /** The daily cron only enqueues; the consumer does the work (spec §6 `retention` queue). */
   async scheduled(c: ScheduledController, env: Env, ctx: ExecutionContext) {
-    if (c.cron === RECONCILE_CRON) {
+    if (c.cron === SUBSCRIBE_CRON) ctx.waitUntil(subscribeAll(env));
+    else if (c.cron === RECONCILE_CRON) {
       ctx.waitUntil(reconcile(env).catch((e) => console.error('reconcile failed', e instanceof Error ? e.message : String(e))));
-      return;
-    }
-    if (c.cron !== RETENTION_CRON) {
-      console.error('no handler for cron', c.cron);
-      return;
-    }
-    await env.RETENTION.send({ type: 'sweep', at: new Date(c.scheduledTime).toISOString() });
+    } else if (c.cron === RETENTION_CRON) await env.RETENTION.send({ type: 'sweep', at: new Date(c.scheduledTime).toISOString() });
+    else console.error('no handler for cron', c.cron);
   },
 } satisfies ExportedHandler<Env, unknown>;

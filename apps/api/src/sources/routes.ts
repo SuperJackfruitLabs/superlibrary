@@ -3,6 +3,7 @@ import { error, json, preflight, withCors, type Handler } from '../http';
 import { resolvePerson } from '../auth/caller';
 import { VISIBLE_SQL, type ItemRow } from '../items/visibility';
 import { summary } from '../items/routes';
+import { receivePush } from './webhook';
 
 const STATION_ITEMS = '/api/v1/sources/agentpod/items';
 
@@ -11,6 +12,8 @@ const VISIBLE_I = VISIBLE_SQL.replace(/\bworkspace_id\b/g, 'i.workspace_id').rep
 
 /** Source-side routes (lane A). Task A11 adds the Superpipeline webhook, Task A14 the backfill. */
 export const sourceRoutes: Handler = async (request, env, _ctx, url) => {
+  // Superpipeline's record push authenticates with its HMAC, not a person's token.
+  if (url.pathname === '/api/v1/sources/superpipeline/events' && request.method === 'POST') return receivePush(request, env, url);
   if (url.pathname !== STATION_ITEMS) return null;
   // The AgentPod console lists a station's links with the person's own token (ruling RA3).
   if (request.method === 'OPTIONS') return preflight(request, env.CONSOLE_ORIGINS, 'GET');
