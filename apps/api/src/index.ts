@@ -8,14 +8,16 @@ import { protectedResourceMetadata } from './auth/org-plane';
 import { error, json, type Handler } from './http';
 import { uploadRoutes } from './uploads/routes';
 import { itemRoutes } from './items/routes';
+import { sourceRoutes } from './sources/routes';
 import { queueHandlers } from './queues';
 import { counted, withCost } from './cost';
 import { RETENTION_CRON } from './lifecycle/retention';
 import { RECONCILE_CRON, reconcile } from './indexing/consumer';
 import { handleMcp } from './mcp/server';
 import { searchRoutes } from './search/routes';
+import { SUBSCRIBE_CRON, subscribeAll } from './sources/subscribe';
 
-const handlers: Handler[] = [uploadRoutes, itemRoutes, searchRoutes];
+const handlers: Handler[] = [uploadRoutes, itemRoutes, searchRoutes, sourceRoutes];
 
 async function route(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
   const url = new URL(request.url);
@@ -73,14 +75,10 @@ export default {
   },
   /** The daily cron only enqueues; the consumer does the work (spec §6 `retention` queue). */
   async scheduled(c: ScheduledController, env: Env, ctx: ExecutionContext) {
-    if (c.cron === RECONCILE_CRON) {
+    if (c.cron === SUBSCRIBE_CRON) ctx.waitUntil(subscribeAll(env).catch((e) => console.error('subscribeAll failed', e instanceof Error ? e.message : String(e))));
+    else if (c.cron === RECONCILE_CRON) {
       ctx.waitUntil(reconcile(env).catch((e) => console.error('reconcile failed', e instanceof Error ? e.message : String(e))));
-      return;
-    }
-    if (c.cron !== RETENTION_CRON) {
-      console.error('no handler for cron', c.cron);
-      return;
-    }
-    await env.RETENTION.send({ type: 'sweep', at: new Date(c.scheduledTime).toISOString() });
+    } else if (c.cron === RETENTION_CRON) await env.RETENTION.send({ type: 'sweep', at: new Date(c.scheduledTime).toISOString() });
+    else console.error('no handler for cron', c.cron);
   },
 } satisfies ExportedHandler<Env, unknown>;

@@ -27,6 +27,9 @@
     // Other products that may mint embed URLs from the browser (spec §9, Embedding). Must equal the
     // content Worker's FRAME_ANCESTORS minus APP_URL; a test added with the content Worker holds the two together.
     "EMBED_HOSTS": "https://app.superpipeline.dev https://console.agentpod.dev",
+    // Browser origins that call the upload routes and the station list with the person's own token
+    // (ruling RA3: the AgentPod console links a file as the signed-in person, never through the hub).
+    "CONSOLE_ORIGINS": "https://console.agentpod.dev",
     // Plan decision D14: "report" until phase 2 brings references; then "enforce".
     "RETENTION_MODE": "report",
     // Plan Stage 0. Names whom to call; grant nothing. Secrets (HUB_SERVICE_PRINCIPAL, SERVICE_CREDENTIALS,
@@ -57,11 +60,15 @@
     ],
     "consumers": [
       { "queue": "superlibrary-retention", "max_batch_size": 1, "max_retries": 5 },
-      { "queue": "superlibrary-index", "max_batch_size": 2, "max_batch_timeout": 5, "max_retries": 8, "max_concurrency": 2 }
+      { "queue": "superlibrary-index", "max_batch_size": 2, "max_batch_timeout": 5, "max_retries": 8, "max_concurrency": 2 },
+      // max_concurrency 1: two invocations could read a card at different times and write in the
+      // opposite order, leaving the older read as the record. One at a time keeps the order.
+      { "queue": "superlibrary-ingest", "max_batch_size": 10, "max_batch_timeout": 5, "max_retries": 8, "max_concurrency": 1 }
     ]
   },
   // The daily sweep enqueues one message; the consumer does the work (spec §6 `retention` queue).
-  "triggers": { "crons": ["0 3 * * *", "30 3 * * *"] },
+  // The daily reconcile (spec §7) runs at 03:30; the hourly cron re-registers the Superpipeline push configs (Task A11).
+  "triggers": { "crons": ["0 3 * * *", "30 3 * * *", "0 * * * *"] },
   // Same hostname as the Pages app (plan decision D1). Declared here, not clicked in the dashboard.
   "routes": [
     { "pattern": "app.superlibrary.dev/api/*", "zone_name": "superlibrary.dev" },

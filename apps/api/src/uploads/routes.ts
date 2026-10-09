@@ -5,12 +5,14 @@
  * fixed number of statements, never one per file.
  */
 import { z } from 'zod';
-import { LIMITS, UploadCreate, checkPath, type CommitResult } from '@superlibrary/contract';
+import { LIMITS, UploadCreate, checkPath, type CommitResult, type LinkSource } from '@superlibrary/contract';
 import type { Env } from '../env';
-import { error, json, type Handler } from '../http';
+import { error, json, preflight, withCors, type Handler } from '../http';
 import { newId } from '../ids';
 import { audit } from '../audit';
-import { resolvePerson, type Person } from '../auth/caller';
+import { resolveUploader, type Uploader } from '../auth/caller';
+import { itemChanged } from '../events';
+import { checkLinkSource, linkSessionItem } from '../sources/link';
 import { decodeText, sniff } from '../guard/sniff';
 import { scanText, scanUndecodedText } from '../guard/secrets';
 import { committedUsage, newBytes, newCommittedBytes, workspaceUsage } from '../guard/limits';
@@ -22,6 +24,8 @@ export interface SessionRow {
   entry: string; item_expires_at: string | null; expires_at: string; state: 'open' | 'committed';
   result_item_id: string | null; result_version: number | null;
   override_reason: string | null; override_by: string | null; override_at: string | null; created_at: string;
+  /** A station link's LinkSource as JSON (Task A10), or null for a person's own upload. */
+  source: string | null;
 }
 
 /** One declared file as Task 8's commit reads it. `quarantined` 1: its bytes are at `quarantineKey`. */
@@ -43,17 +47,23 @@ const refusePath = (c: { path: string; reason: string; rule?: string }) =>
   error(400, 'path_refused', { path: c.path, reason: c.reason, ...(c.rule ? { rule: c.rule } : {}) });
 
 /** The caller's own session, or a refusal. Someone else's session is 404, not 403. */
-export async function ownSession(env: Env, p: Person, id: string): Promise<SessionRow | Response> {
+export async function ownSession(env: Env, p: Uploader, id: string): Promise<SessionRow | Response> {
   const s = await env.DB.prepare(`SELECT * FROM upload_sessions WHERE id = ? AND workspace_id = ? AND created_by = ?`).bind(id, p.workspaceId, p.principalId).first<SessionRow>();
   if (!s) return error(404, 'not_found');
   if (s.state === 'open' && Date.parse(s.expires_at) <= Date.now()) return error(410, 'upload_expired');
   return s;
 }
 
-async function create(request: Request, env: Env, p: Person): Promise<Response> {
+async function create(request: Request, env: Env, p: Uploader): Promise<Response> {
   const parsed = UploadCreate.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return error(400, 'invalid', { issues: parsed.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message })) });
   const body = parsed.data;
+  const source = checkLinkSource(env, p, body);
+  if (source instanceof Response) return source;
+  // Spec §3: a link of a station path already linked is that item's next version. The hub vouches
+  // for the station and the item already belongs to that station path, so canManage does not apply.
+  let itemForSource: string | null = null;
+  if (source && !body.item) itemForSource = await linkSessionItem(env, p.workspaceId, source);
   // One stored form, and the same refusal PATCH gives (Task 10).
   const itemExpiresAt = body.expiresAt ? new Date(body.expiresAt).toISOString() : null;
   if (itemExpiresAt && Date.parse(itemExpiresAt) <= Date.now()) return error(400, 'invalid', { detail: 'expiresAt must be in the future' });
@@ -79,6 +89,8 @@ async function create(request: Request, env: Env, p: Person): Promise<Response> 
     entry = c.path;
   }
   if (body.item) {
+    // checkLinkSource has refused an agent's `item`; only a person names one.
+    if (p.kind !== 'human') return error(400, 'invalid', { detail: 'an agent cannot choose the item' });
     // The same rule as revoke, expiry and scope (plan D11/D12): an item the caller may not manage,
     // including another person's board item an owner cannot see, is not confirmed to exist.
     const item = await loadItem(env, body.item);
@@ -96,8 +108,8 @@ async function create(request: Request, env: Env, p: Person): Promise<Response> 
   // Read before the session exists, so its own declarations cannot count as held.
   const heldShas = await heldBy(env, p, files.map((f) => f.sha256));
   await env.DB.batch([
-    env.DB.prepare(`INSERT INTO upload_sessions (id, workspace_id, created_by, item_id, title, scope, entry, item_expires_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-      .bind(id, p.workspaceId, p.principalId, body.item ?? null, body.title, body.scope, entry, itemExpiresAt, expiresAt),
+    env.DB.prepare(`INSERT INTO upload_sessions (id, workspace_id, created_by, item_id, title, scope, entry, item_expires_at, expires_at, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .bind(id, p.workspaceId, p.principalId, body.item ?? itemForSource, body.title, body.scope, entry, itemExpiresAt, expiresAt, source ? JSON.stringify(source) : null),
     // One statement for every declared file: D1 counts each statement of a batch against its
     // per-invocation cap, and a 500-file folder must not spend 500 of them.
     env.DB.prepare(`INSERT INTO upload_files (session_id, path, sha256, bytes) SELECT ?1, json_extract(value, '$.path'), json_extract(value, '$.sha256'), json_extract(value, '$.bytes') FROM json_each(?2)`)
@@ -114,7 +126,7 @@ async function create(request: Request, env: Env, p: Person): Promise<Response> 
  * workspace, or received clean in one of their own sessions. Never someone else's bytes: knowing a
  * hash is not having the file, so a hash alone must not let anyone claim bytes they never sent.
  */
-async function heldBy(env: Env, p: Person, shas: string[]): Promise<Set<string>> {
+async function heldBy(env: Env, p: Uploader, shas: string[]): Promise<Set<string>> {
   if (shas.length === 0) return new Set();
   const rows = await env.DB.prepare(
     `SELECT vf.sha256 FROM version_files vf JOIN versions v ON v.item_id = vf.item_id AND v.version = vf.version JOIN items i ON i.id = vf.item_id
@@ -159,7 +171,7 @@ function renewedExpiry(s: SessionRow): string {
  * written, so a refused request records nothing. The D1 writes are one batch of a fixed number of
  * statements, whatever the file count.
  */
-async function receive(env: Env, p: Person, s: SessionRow, arrivals: Arrival[]): Promise<Received[] | Response> {
+async function receive(env: Env, p: Uploader, s: SessionRow, arrivals: Arrival[]): Promise<Received[] | Response> {
   const id = s.id;
   const items: Array<Arrival & { path: string }> = [];
   const seen = new Set<string>();
@@ -245,7 +257,7 @@ async function receive(env: Env, p: Person, s: SessionRow, arrivals: Arrival[]):
   return out;
 }
 
-async function put(request: Request, env: Env, p: Person, id: string, url: URL): Promise<Response> {
+async function put(request: Request, env: Env, p: Uploader, id: string, url: URL): Promise<Response> {
   const s = await ownSession(env, p, id);
   if (s instanceof Response) return s;
   if (s.state !== 'open') return error(409, 'already_committed');
@@ -291,7 +303,7 @@ async function readCapped(body: ReadableStream<Uint8Array> | null, cap: number):
  * and one `file` part per entry without `held`, in manifest order. At most LIMITS.batchFiles files
  * and LIMITS.batchBytes of them; a file over that goes alone through PUT.
  */
-async function batch(request: Request, env: Env, p: Person, id: string): Promise<Response> {
+async function batch(request: Request, env: Env, p: Uploader, id: string): Promise<Response> {
   const tooLarge = () => error(413, 'batch_too_large', { limit: LIMITS.batchFiles, bytesLimit: LIMITS.batchBytes });
   const announced = Number(request.headers.get('content-length') ?? NaN);
   if (Number.isFinite(announced) && announced > LIMITS.batchBytes + BATCH_OVERHEAD) return tooLarge();
@@ -331,14 +343,33 @@ async function batch(request: Request, env: Env, p: Person, id: string): Promise
 
 const UPLOAD = /^\/api\/v1\/uploads\/(upl_[0-9a-f]{16})(\/files|\/batch|\/override|\/commit)?$/;
 
+/** The routes the AgentPod console calls from the browser with the person's own token (ruling RA3), and their methods. */
+function consoleMethods(pathname: string): string | null {
+  if (pathname === '/api/v1/uploads') return 'POST';
+  const m = UPLOAD.exec(pathname);
+  if (!m) return null;
+  if (m[2] === '/files') return 'PUT';
+  if (m[2] === '/batch' || m[2] === '/commit') return 'POST';
+  return null;
+}
+
 export const uploadRoutes: Handler = async (request, env, _ctx, url) => {
+  const methods = consoleMethods(url.pathname);
+  if (methods && request.method === 'OPTIONS') return preflight(request, env.CONSOLE_ORIGINS, methods);
+  const res = await routeUpload(request, env, url);
+  // Every answer, refusals included, so the console reads a refusal rather than an opaque failure.
+  // An uncaught throw becomes index.ts's 500 outside this wrapper, so that answer carries no CORS headers.
+  return res && methods ? withCors(request, env.CONSOLE_ORIGINS, res) : res;
+};
+
+async function routeUpload(request: Request, env: Env, url: URL): Promise<Response | null> {
   if (url.pathname === '/api/v1/uploads' && request.method === 'POST') {
-    const p = await resolvePerson(request, env);
+    const p = await resolveUploader(request, env);
     return p instanceof Response ? p : create(request, env, p);
   }
   const m = UPLOAD.exec(url.pathname);
   if (!m) return null;
-  const p = await resolvePerson(request, env);
+  const p = await resolveUploader(request, env);
   if (p instanceof Response) return p;
   const [, id, action] = m as unknown as [string, string, string | undefined];
   if (action === '/files' && request.method === 'PUT') return put(request, env, p, id, url);
@@ -346,7 +377,7 @@ export const uploadRoutes: Handler = async (request, env, _ctx, url) => {
   if (action === '/override' && request.method === 'POST') return overrideScan(request, env, p, id);
   if (action === '/commit' && request.method === 'POST') return commit(env, p, id);
   return error(405, 'method_not_allowed');
-};
+}
 
 const OverrideBody = z.object({ reason: z.string().trim().min(1).max(500) });
 
@@ -354,7 +385,9 @@ async function findingsOf(env: Env, id: string) {
   return (await env.DB.prepare(`SELECT path, line, rule FROM secret_findings WHERE session_id = ? ORDER BY path, line, rule`).bind(id).all<{ path: string; line: number; rule: string }>()).results;
 }
 
-async function overrideScan(request: Request, env: Env, p: Person, id: string): Promise<Response> {
+async function overrideScan(request: Request, env: Env, p: Uploader, id: string): Promise<Response> {
+  // Spec §8: agents cannot override the secret scan.
+  if (p.kind !== 'human') return error(403, 'principal_not_supported', { detail: 'only a person may override the scan' });
   const s = await ownSession(env, p, id);
   if (s instanceof Response) return s;
   if (s.state !== 'open') return error(409, 'already_committed');
@@ -397,10 +430,12 @@ async function committed(env: Env, s: SessionRow): Promise<Response> {
   if (!v) return error(410, 'gone');
   // Idempotent: a retried commit answers the first one's result and repairs what it left undone.
   await publish(env, s, s.result_item_id!, s.result_version!);
+  // The first commit's message may have been lost with whatever this retry repaired (plan P10).
+  await itemChanged(env, s.result_item_id!, s.workspace_id, 'upserted');
   return json(await resultOf(env, s.result_item_id!, s.result_version!), 200);
 }
 
-async function commit(env: Env, p: Person, id: string): Promise<Response> {
+async function commit(env: Env, p: Uploader, id: string): Promise<Response> {
   const s = await ownSession(env, p, id);
   if (s instanceof Response) return s;
   if (s.state === 'committed') return committed(env, s);
@@ -427,6 +462,8 @@ async function commit(env: Env, p: Person, id: string): Promise<Response> {
   const used = await committedUsage(env.DB, p.workspaceId);
   if (used + (await newCommittedBytes(env.DB, p.workspaceId, files)) > quota) return error(413, 'quota_exceeded', { limit: quota, used });
 
+  // Only the hub acting for an agent can have stored one (checkLinkSource at declare).
+  const src = s.source ? (JSON.parse(s.source) as LinkSource) : null;
   let itemId: string;
   let version: number;
   const statements: D1PreparedStatement[] = [];
@@ -447,12 +484,22 @@ async function commit(env: Env, p: Person, id: string): Promise<Response> {
   statements.push(env.DB.prepare(`UPDATE upload_sessions SET state = 'committed', result_item_id = ?, result_version = ? WHERE id = ?`).bind(itemId, version, id));
   if (s.item_id) {
     statements.push(env.DB.prepare(`UPDATE items SET latest_version = ?, title = ?, expires_at = COALESCE(?, expires_at) WHERE id = ? AND latest_version = ?`).bind(version, s.title, s.item_expires_at, itemId, version - 1));
+    // A station path linked again on the same board: the provenance names the latest run and the agent that made it.
+    if (src && p.kind === 'agent') {
+      statements.push(env.DB.prepare(`UPDATE item_sources SET card_id = ?, run_id = ?, agent_principal = ?, via_service = ?, station_name = ? WHERE item_id = ? AND source = 'agentpod'`)
+        .bind(src.card ?? null, src.run ?? null, p.principalId, p.via, src.stationName ?? null, itemId));
+    }
   } else {
     statements.push(
       env.DB.prepare(`INSERT INTO items (id, workspace_id, kind, title, scope, created_by, latest_version, expires_at) VALUES (?, ?, 'artifact', ?, ?, ?, 1, ?)`)
         .bind(itemId, p.workspaceId, s.title, s.scope, p.principalId, s.item_expires_at),
       audit(env.DB, { workspaceId: p.workspaceId, actor: p.principalId, act: p.act, action: 'item.created', itemId }),
     );
+    // Spec §3 provenance: the agent and the hub that acted for it, the station and its path, the run.
+    if (src && p.kind === 'agent') {
+      statements.push(env.DB.prepare(`INSERT INTO item_sources (item_id, source, board_id, card_id, run_id, agent_principal, via_service, station, station_name, source_path) VALUES (?, 'agentpod', ?, ?, ?, ?, ?, ?, ?, ?)`)
+        .bind(itemId, src.board, src.card ?? null, src.run ?? null, p.principalId, p.via, src.station, src.stationName ?? null, src.path));
+    }
   }
   const entry = files.find((f) => f.path === s.entry)!;
   // Spec §3: a file is addressed by its SHA-256; a folder by the SHA-256 of its (path, sha256)
@@ -486,5 +533,7 @@ async function commit(env: Env, p: Person, id: string): Promise<Response> {
   // After D1, never before: a manifest written for a version that then failed to commit would
   // overwrite the winner's. A failure from here on is repaired by the idempotent retry above.
   await publish(env, s, itemId, version);
+  // Every commit, a person's included: indexing learns of the new version (plan P10).
+  await itemChanged(env, itemId, p.workspaceId, 'upserted');
   return json(await resultOf(env, itemId, version), 201);
 }

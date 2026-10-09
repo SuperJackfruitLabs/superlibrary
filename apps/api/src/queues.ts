@@ -1,5 +1,6 @@
 import type { Env, RetentionMessage } from './env';
 import { indexBatch } from './indexing/consumer';
+import { ingestBatch } from './ingest/consumer';
 import { sweep } from './lifecycle/retention';
 
 // `any`: each queue carries its own message type.
@@ -21,4 +22,5 @@ async function retentionBatch(batch: MessageBatch<RetentionMessage>, env: Env): 
 export const queueHandlers: Record<string, QueueHandler> = {
   'superlibrary-retention': retentionBatch,
   'superlibrary-index': indexBatch,
+  'superlibrary-ingest': ingestBatch,
 };

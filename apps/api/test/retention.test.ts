@@ -142,7 +142,8 @@ describe('retention sweep (spec §12, plan D14)', () => {
   });
 
   it('wrangler.jsonc declares the retention and reconcile crons (others may be added)', () => {
-    const crons = JSON.parse(/"crons":\s*(\[[^\]]*\])/.exec(wranglerRaw)![1]!) as string[];
+    const jsonc = wranglerRaw.replace(/("(?:\\.|[^"\\])*")|\/\/[^\n]*|\/\*[\s\S]*?\*\//g, (_, s: string | undefined) => s ?? '').replace(/,(\s*[}\]])/g, '$1');
+    const crons = (JSON.parse(jsonc) as { triggers: { crons: string[] } }).triggers.crons;
     expect(crons).toContain(RETENTION_CRON);
     expect(crons).toContain(RECONCILE_CRON);
   });

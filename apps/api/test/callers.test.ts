@@ -250,3 +250,53 @@ describe('who may call (plan P1, P13)', () => {
     });
   });
 });
+
+describe('a person is never served through a service (operator ruling R-H1)', () => {
+  const DETAIL = 'a token minted for a person by a service is refused; sign in as yourself';
+  const upload = (t: string) => call('/api/v1/uploads', t, { 'content-type': 'application/json' }, { method: 'POST', body: JSON.stringify({ title: 'x', files: [{ path: 'a.md', bytes: 1, sha256: 'a'.repeat(64) }] }) });
+
+  it("a person's token minted by a service (act) is refused and audited", async () => {
+    await withOrgPlane(async () => {
+      const minted = await planeToken({ sub: HUMAN, principalKind: 'human', act: { sub: HUB_SVC }, amr: ['pwd'] });
+      const rows = await refusalsDuring(HUMAN, async () => {
+        const read = await call('/api/v1/items', minted);
+        expect(read.status).toBe(403);
+        expect(await read.json()).toMatchObject({ error: 'principal_not_supported', detail: DETAIL });
+        const write = await upload(minted);
+        expect(write.status).toBe(403);
+        expect(await write.json()).toMatchObject({ error: 'principal_not_supported', detail: DETAIL });
+      });
+      expect(rows).toHaveLength(2);
+      for (const row of rows) {
+        expect(row.act).toBe(HUB_SVC);
+        expect(row.workspace_id).toBeNull();
+        expect(JSON.parse(row.detail)).toMatchObject({ reason: 'delegated_person' });
+      }
+    });
+  });
+
+  it('an assertion token (amr assertion, no act) is refused', async () => {
+    await withOrgPlane(async () => {
+      const minted = await planeToken({ sub: HUMAN, principalKind: 'human', amr: ['assertion'] });
+      const rows = await refusalsDuring(HUMAN, async () => {
+        const r = await call('/api/v1/items', minted);
+        expect(r.status).toBe(403);
+        expect(await r.json()).toMatchObject({ error: 'principal_not_supported', detail: DETAIL });
+      });
+      expect(rows).toHaveLength(1);
+      expect(rows[0]!.act).toBeNull();
+      expect(JSON.parse(rows[0]!.detail)).toMatchObject({ reason: 'delegated_person' });
+    });
+  });
+
+  it("the same person's own token still works on the same routes", async () => {
+    await withOrgPlane(async () => {
+      const own = await planeToken({ sub: HUMAN, principalKind: 'human', amr: ['pwd'] });
+      const rows = await refusalsDuring(HUMAN, async () => {
+        expect((await call('/api/v1/items', own)).status).toBe(200);
+        expect((await upload(own)).status).toBe(201);
+      });
+      expect(rows).toHaveLength(0);
+    });
+  });
+});
