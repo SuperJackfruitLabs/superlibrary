@@ -56,6 +56,11 @@ describe('mark superseded by another item (spec §11)', () => {
     const next = await art('Replacement');
     expect((await supersede('itm_00000000000003a1', next)).status).toBe(200);   // HUMAN is the owner
     expect((await loadItem(env, 'itm_00000000000003a1'))).toMatchObject({ outcome: 'superseded', superseded_by: next, superseded_prior: 'approved' });
+    // The displayed replacement is the person's, not the card's (COALESCE order).
+    await seedWorkRecord({ id: 'itm_00000000000003a4', ws });
+    await env.DB.prepare(`UPDATE work_records SET superseded_by_card = 'card_00000000000003a4' WHERE item_id = 'itm_00000000000003a1'`).run();
+    const shown = await (await call('/api/v1/items/itm_00000000000003a1')).json<{ item: ItemSummary }>();
+    expect(shown.item.supersededBy).toBe(next);
   });
   it('only the uploader or an owner; an agent never', async () => {
     const theirs = await art('Theirs', HUMAN_2);
@@ -69,6 +74,29 @@ describe('mark superseded by another item (spec §11)', () => {
       const res = await call(`/api/v1/items/${theirs}/supersede`, { method: 'POST', body: { by: null }, headers: { Authorization: `Bearer ${t}` } });
       expect(res.status).toBe(403);
     });
+  });
+});
+
+describe('replacement chains', () => {
+  it('a loop through a card link is refused, as is a three-link chain closed', async () => {
+    await seedWorkRecord({ id: 'itm_00000000000003c1', ws });
+    await seedWorkRecord({ id: 'itm_00000000000003c2', ws });
+    await env.DB.prepare(`UPDATE work_records SET superseded_by_card = 'card_00000000000003c2' WHERE item_id = 'itm_00000000000003c1'`).run();
+    const rev = await supersede('itm_00000000000003c2', 'itm_00000000000003c1');
+    expect(rev.status).toBe(400);
+    expect(await rev.json()).toMatchObject({ detail: 'that would make a loop of replacements' });
+    const a = await art('Chain A'); const b = await art('Chain B'); const c = await art('Chain C');
+    expect((await supersede(a, b)).status).toBe(200);
+    expect((await supersede(b, c)).status).toBe(200);
+    expect((await supersede(c, a)).status).toBe(400);
+  });
+  it('re-pointing then clearing restores the original outcome, not superseded', async () => {
+    const a = await art('Repoint A'); const b = await art('Repoint B'); const c = await art('Repoint C');
+    expect((await supersede(a, b)).status).toBe(200);
+    expect((await supersede(a, c)).status).toBe(200);
+    expect((await (await supersede(a, null)).json<{ item: ItemSummary }>()).item.outcome).toBe('completed');
+    const audited = await env.DB.prepare(`SELECT detail FROM audit_events WHERE item_id = ? AND action = 'item.supersede_cleared'`).bind(a).first<{ detail: string }>();
+    expect(JSON.parse(audited!.detail)).toEqual({ was: c, restored: 'completed' });
   });
 });
 

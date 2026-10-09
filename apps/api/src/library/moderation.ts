@@ -33,12 +33,18 @@ async function body<S extends z.ZodType>(request: Request, schema: S): Promise<z
   return b.success ? b.data : error(400, 'invalid', { issues: issues(b.error) });
 }
 
-/** Following replacements from `by` reaches `id`: setting it would make a loop. */
+/** Following the replacements people and cards name from `by` reaches `id`: setting it would make a loop. */
 async function wouldLoop(env: Env, id: string, by: string): Promise<boolean> {
   let at: string | null = by;
   for (let i = 0; i < 32 && at; i++) {
     if (at === id) return true;
-    at = (await env.DB.prepare(`SELECT superseded_by FROM items WHERE id = ?`).bind(at).first<{ superseded_by: string | null }>())?.superseded_by ?? null;
+    // The effective link, as shown: a person's replacement first, else the card's (same join as supersededByMap).
+    at = (await env.DB.prepare(
+      `SELECT COALESCE(i.superseded_by, n.item_id) AS next FROM items i
+         LEFT JOIN work_records w ON w.item_id = i.id
+         LEFT JOIN work_records n ON n.workspace_id = w.workspace_id AND n.card_id = w.superseded_by_card
+        WHERE i.id = ?`,
+    ).bind(at).first<{ next: string | null }>())?.next ?? null;
   }
   return at !== null;   // a chain longer than 32 is refused as a loop rather than followed further
 }
@@ -52,7 +58,7 @@ export async function supersede(request: Request, env: Env, p: Person, id: strin
     if (m.item.superseded_by) {
       await env.DB.batch([
         env.DB.prepare(`UPDATE items SET outcome = COALESCE(superseded_prior, outcome), superseded_by = NULL, superseded_prior = NULL WHERE id = ?`).bind(id),
-        audit(env.DB, { workspaceId: p.workspaceId, actor: p.principalId, act: p.act, action: 'item.supersede_cleared', itemId: id, detail: { was: m.item.superseded_by } }),
+        audit(env.DB, { workspaceId: p.workspaceId, actor: p.principalId, act: p.act, action: 'item.supersede_cleared', itemId: id, detail: { was: m.item.superseded_by, restored: m.item.superseded_prior ?? m.item.outcome } }),
       ]);
       await itemChanged(env, id, m.item.workspace_id, 'upserted');
     }
