@@ -2,13 +2,13 @@
  * superlibrary-api: REST at app.superlibrary.dev/api/* (plan decision D1). Routes are added by
  * later tasks to `route` below; each returns null when the path is not theirs.
  */
-import type { Env, RetentionMessage } from './env';
-import { resolvePerson } from './auth/caller';
+import type { Env } from './env';
+import { resolvePerson, resolveViewer } from './auth/caller';
 import { protectedResourceMetadata } from './auth/org-plane';
 import { error, json, type Handler } from './http';
 import { uploadRoutes } from './uploads/routes';
 import { itemRoutes } from './items/routes';
-import { sweep } from './lifecycle/retention';
+import { queueHandlers } from './queues';
 import { counted, withCost } from './cost';
 
 const handlers: Handler[] = [uploadRoutes, itemRoutes];
@@ -20,7 +20,12 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
   if (url.pathname === '/api/v1/me' && request.method === 'GET') {
     const p = await resolvePerson(request, env);
     if (p instanceof Response) return p;
-    return json({ principalId: p.principalId, org: p.org, workspaceId: p.workspaceId, role: p.role });
+    return json({ kind: p.kind, principalId: p.principalId, org: p.org, workspaceId: p.workspaceId, role: p.role });
+  }
+  // Read-only identity for people and agents (plan P13); an agent is never made a member.
+  if (url.pathname === '/api/v1/whoami' && request.method === 'GET') {
+    const v = await resolveViewer(request, env);
+    return v instanceof Response ? v : json({ kind: v.kind, principalId: v.principalId });
   }
   for (const h of handlers) {
     const res = await h(request, env, ctx, url);
@@ -40,16 +45,17 @@ export default {
       return withCost(error(500, 'unexpected'), c.cost, startedAt);
     }
   },
-  async queue(batch: MessageBatch<RetentionMessage>, env: Env, _ctx: ExecutionContext) {
-    for (const m of batch.messages) {
-      // Idempotent: a duplicate delivery finds nothing left to do (spec §6). A sweep that throws
-      // is not acked, so the queue retries it.
-      if (m.body?.type === 'sweep') await sweep(env, Date.now());
-      m.ack();
+  async queue(batch: MessageBatch<unknown>, env: Env, _ctx: ExecutionContext) {
+    const handle = queueHandlers[batch.queue];
+    if (!handle) {
+      console.error('no handler for queue', batch.queue);
+      batch.retryAll();
+      return;
     }
+    await handle(batch, env);
   },
   /** The daily cron only enqueues; the consumer does the work (spec §6 `retention` queue). */
   async scheduled(c: ScheduledController, env: Env, _ctx: ExecutionContext) {
     await env.RETENTION.send({ type: 'sweep', at: new Date(c.scheduledTime).toISOString() });
   },
-} satisfies ExportedHandler<Env, RetentionMessage>;
+} satisfies ExportedHandler<Env, unknown>;
