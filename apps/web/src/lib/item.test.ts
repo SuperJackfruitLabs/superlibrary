@@ -55,7 +55,7 @@ describe('the callbacks the item page gives the embed', () => {
   });
   it('share info says who can see it, and lets only a manager widen it', async () => {
     const mine = shareInfoGetter(async () => json({ item: ITEM, versions: [] }), () => ME);
-    expect(await mine({ itemId: ITEM.id })).toEqual({ scope: ITEM.scope, canWiden: true, title: 'Report' });
+    expect(await mine({ itemId: ITEM.id })).toEqual({ scope: ITEM.scope, canWiden: true, title: 'Report', boardVisible: false });
     const theirs = shareInfoGetter(async () => json({ item: { ...ITEM, scope: 'workspace', createdBy: OTHER }, versions: [] }), () => ME);
     expect(await theirs({ itemId: ITEM.id })).toMatchObject({ scope: 'workspace', canWiden: false });
     const signedOut = shareInfoGetter(async () => json({ item: ITEM, versions: [] }), () => null);
@@ -148,5 +148,17 @@ describe('what each confirmation asks', () => {
   it('names the exact act on its button', () => {
     expect(askRevokeVersion(3)).toEqual({ title: 'Revoke version 3?', message: 'Nobody will be able to view version 3 again. The other versions stay. This cannot be undone.', action: 'Revoke version 3' });
     expect(askRevokeItem('Report')).toEqual({ title: 'Revoke “Report”?', message: 'Nobody will be able to view it or any of its versions again. This cannot be undone.', action: 'Revoke this item', reason: true });
+  });
+});
+
+describe('a board item (plan P4)', () => {
+  const BOARD_ITEM: ItemSummary = { ...ITEM, audience: 'board' };
+  it('reads "This board" in the list line and in Visible to', () => {
+    expect(listLine(BOARD_ITEM)).toContain('This board');
+    expect(provenanceRows(BOARD_ITEM, ME).find((r) => r.label === 'Visible to')?.value).toBe('This board');
+  });
+  it('share info says it is board-visible', async () => {
+    const get = shareInfoGetter(async () => new Response(JSON.stringify({ item: BOARD_ITEM, versions: [v(1)] }), { status: 200 }), () => ME);
+    expect(await get({ itemId: BOARD_ITEM.id })).toMatchObject({ boardVisible: true });
   });
 });

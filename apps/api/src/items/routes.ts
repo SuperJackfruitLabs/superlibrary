@@ -1,28 +1,82 @@
 import { z } from 'zod';
-import { LIMITS, SCOPE_RE, encodePath, orderFiles, type EmbedGrant, type FileEntry, type ItemSummary, type VersionSummary, type View } from '@superlibrary/contract';
+import { LIMITS, SCOPE_RE, encodePath, orderFiles, type EmbedGrant, type FileEntry, type ItemSource, type ItemSummary, type VersionSummary, type View } from '@superlibrary/contract';
 import type { Env } from '../env';
 import { error, json, type Handler } from '../http';
 import { audit } from '../audit';
 import { resolvePerson, type Person } from '../auth/caller';
 import { itemChanged } from '../events';
-import { VISIBLE_SQL, canManage, canSee, isExpired, loadItem, type ItemRow } from './visibility';
+import { audienceOf, canManage, canSee, isExpired, loadItem, viewerScopes, visibleBinds, visibleSql, type ItemRow } from './visibility';
 import { deleteManifest, writeManifest } from '../storage/blobs';
 import { contentOrigin, signContent } from './sign';
 import { isoUtc } from '../time';
 
 const hostsOf = (s: string) => s.split(/\s+/).filter((x) => x !== '');
 
-export function summary(i: ItemRow): ItemSummary {
-  return {
+interface SourceRow {
+  source: 'upload' | 'agentpod' | 'superpipeline'; board_id: string | null; card_id: string | null; stage: string | null; run_id: string | null;
+  agent_principal: string | null; station: string | null; source_path: string | null; source_id: string | null; source_url: string | null; station_removed_at: string | null;
+}
+
+function sourceOf(r: SourceRow): ItemSource {
+  const s: ItemSource = { sourceKind: r.source, agent: r.agent_principal !== null, stationRemoved: r.station_removed_at !== null };
+  if (r.agent_principal) s.agentPrincipal = r.agent_principal;
+  if (r.station) s.station = r.station;
+  if (r.source_path) s.path = r.source_path;
+  if (r.board_id) s.board = r.board_id;
+  if (r.card_id) s.card = r.card_id;
+  if (r.stage) s.stage = r.stage;
+  if (r.run_id) s.run = r.run_id;
+  if (r.source_id) s.sourceId = r.source_id;
+  if (r.source_url) s.sourceUrl = r.source_url;
+  return s;
+}
+
+const SOURCE_COLS = `item_id, source, board_id, card_id, stage, run_id, agent_principal, station, source_path, source_id, source_url, station_removed_at`;
+
+/** What `summary` adds: each item's source, whether its board is known, and a work record's replacement. */
+interface Extras { source?: ItemSource; boardKnown?: boolean; supersededBy?: string | null }
+
+export function summary(i: ItemRow, extra: Extras = {}): ItemSummary {
+  const out: ItemSummary = {
     id: i.id, kind: i.kind, title: i.title, scope: i.scope as ItemSummary['scope'], outcome: i.outcome as ItemSummary['outcome'],
     createdBy: i.created_by, createdAt: isoUtc(i.created_at), latestVersion: i.latest_version, expiresAt: isoUtc(i.expires_at), revokedAt: isoUtc(i.revoked_at),
   };
+  if (extra.source) out.source = extra.source;
+  // 'uploader' when the board is not one Superlibrary knows: then only the uploader sees it.
+  const a = audienceOf(i);
+  out.audience = a === 'board' && extra.boardKnown === false ? 'uploader' : a;
+  if (extra.supersededBy !== undefined) out.supersededBy = extra.supersededBy;
+  return out;
+}
+
+/** Sources, known boards and replacements for these items, in one pass each (a list is never N+1). */
+async function extrasFor(env: Env, items: ItemRow[]): Promise<Map<string, Extras>> {
+  const out = new Map<string, Extras>(items.map((i) => [i.id, {}]));
+  if (items.length === 0) return out;
+  const ids = JSON.stringify(items.map((i) => i.id));
+  const srcs = await env.DB.prepare(`SELECT ${SOURCE_COLS} FROM item_sources WHERE item_id IN (SELECT value FROM json_each(?1))`).bind(ids).all<SourceRow & { item_id: string }>();
+  for (const r of srcs.results) out.get(r.item_id)!.source = sourceOf(r);
+  const boards = new Set<string>();
+  for (const i of items) if (i.scope.startsWith('board:')) boards.add(i.scope.slice(6));
+  const known = new Set<string>();
+  if (boards.size) {
+    const ws = items[0]!.workspace_id;
+    const rows = await env.DB.prepare(`SELECT board_id FROM source_boards WHERE workspace_id = ?1 AND board_id IN (SELECT value FROM json_each(?2))`).bind(ws, JSON.stringify([...boards])).all<{ board_id: string }>();
+    for (const r of rows.results) known.add(r.board_id);
+  }
+  for (const i of items) out.get(i.id)!.boardKnown = !i.scope.startsWith('board:') || known.has(i.scope.slice(6));
+  const wr = await env.DB.prepare(
+    `SELECT w.item_id AS item_id, n.item_id AS next FROM work_records w LEFT JOIN work_records n ON n.workspace_id = w.workspace_id AND n.card_id = w.superseded_by_card
+      WHERE w.item_id IN (SELECT value FROM json_each(?1))`,
+  ).bind(ids).all<{ item_id: string; next: string | null }>();
+  for (const r of wr.results) out.get(r.item_id)!.supersededBy = r.next;
+  return out;
 }
 
 /** The visible, live item, or the refusal a caller should see. Invisible is 404 (plan D11). */
 export async function readable(env: Env, p: Person, id: string): Promise<ItemRow | Response> {
   const item = await loadItem(env, id);
-  if (!item || !canSee(p, item)) return error(404, 'not_found');
+  if (!item || !canSee(p, item, await viewerScopes(env, p))) return error(404, 'not_found');
   if (item.revoked_at) return error(410, 'revoked');
   if (isExpired(item)) return error(410, 'expired');
   return item;
@@ -45,15 +99,17 @@ async function list(env: Env, p: Person, url: URL): Promise<Response> {
   const limit = Math.min(Math.max(Number(url.searchParams.get('limit') ?? 50) || 50, 1), 100);
   const before = url.searchParams.get('before');
   const [bAt, bId] = before ? (before.split('|') as [string, string]) : [null, null];
+  const scopes = await viewerScopes(env, p);
   const rows = await env.DB.prepare(
-    `SELECT * FROM items WHERE ${VISIBLE_SQL} AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at > ?3)
-       AND (?4 IS NULL OR created_at < ?4 OR (created_at = ?4 AND id < ?5))
-     ORDER BY created_at DESC, id DESC LIMIT ?6`,
-  ).bind(p.workspaceId, p.principalId, new Date().toISOString(), bAt, bId ?? null, limit + 1).all<ItemRow>();
+    `SELECT * FROM items WHERE ${visibleSql('items')} AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at > ?4)
+       AND (?5 IS NULL OR created_at < ?5 OR (created_at = ?5 AND id < ?6))
+     ORDER BY created_at DESC, id DESC LIMIT ?7`,
+  ).bind(...visibleBinds(p, scopes), new Date().toISOString(), bAt, bId ?? null, limit + 1).all<ItemRow>();
   const page = rows.results.slice(0, limit);
   const last = page.at(-1);
   await audit(env.DB, { workspaceId: p.workspaceId, actor: p.principalId, act: p.act, action: 'items.listed', detail: { count: page.length } }).run();
-  return json({ items: page.map(summary), next: rows.results.length > limit && last ? `${last.created_at}|${last.id}` : null });
+  const extras = await extrasFor(env, page);
+  return json({ items: page.map((i) => summary(i, extras.get(i.id))), next: rows.results.length > limit && last ? `${last.created_at}|${last.id}` : null });
 }
 
 async function detail(env: Env, p: Person, id: string): Promise<Response> {
@@ -68,7 +124,7 @@ async function detail(env: Env, p: Person, id: string): Promise<Response> {
     version: v.version, entry: v.entry, view: v.view, mediaType: v.media_type, totalBytes: v.total_bytes, fileCount: v.file_count,
     sha256: v.sha256, createdAt: isoUtc(v.created_at), revokedAt: isoUtc(v.revoked_at), scanOverride: v.scan_override === 1, files: files.get(v.version)!,
   }));
-  return json({ item: summary(item), versions: out });
+  return json({ item: summary(item, (await extrasFor(env, [item])).get(id)), versions: out });
 }
 
 function corsFor(request: Request, env: Env): Record<string, string> {
@@ -116,8 +172,9 @@ const ScopeBody = z.object({ scope: z.string().regex(SCOPE_RE) });
  */
 async function manageable(env: Env, p: Person, id: string): Promise<ItemRow | Response> {
   const item = await loadItem(env, id);
-  if (!item || !canSee(p, item)) return error(404, 'not_found');
-  if (!canManage(p, item)) return error(403, 'not_permitted');
+  const scopes = item ? await viewerScopes(env, p) : [];
+  if (!item || !canSee(p, item, scopes)) return error(404, 'not_found');
+  if (!canManage(p, item, scopes)) return error(403, 'not_permitted');
   if (item.revoked_at) return error(410, 'revoked');
   return item;
 }

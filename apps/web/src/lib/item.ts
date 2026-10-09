@@ -61,7 +61,7 @@ export function shareInfoGetter(api: Api, me: () => Me | null): NonNullable<Moun
     const r = await readItem(api, itemId);
     if (r.state !== 'ok') throw new ItemError(0, r.state === 'expired' ? 'expired' : r.code);
     const who = me();
-    return { scope: r.item.scope, canWiden: who !== null && mayManage(who, r.item), title: r.item.title } satisfies ShareInfo;
+    return { scope: r.item.scope, canWiden: who !== null && mayManage(who, r.item), title: r.item.title, boardVisible: r.item.audience === 'board' } satisfies ShareInfo;
   };
 }
 
@@ -91,7 +91,7 @@ export interface Row { label: string; value: string; note?: string; mono?: boole
 export const when = (iso: string) => new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 /** A library row's second line: version, who can see it (in words), when, and its delete date. */
 export function listLine(item: ItemSummary): string {
-  const seen = visibilityWords({ scope: item.scope, canWiden: false });
+  const seen = visibilityWords({ scope: item.scope, canWiden: false, boardVisible: item.audience === 'board' });
   return `v${item.latestVersion} · ${seen} · ${when(item.createdAt)}${item.expiresAt ? ` · to be deleted ${when(item.expiresAt)}` : ''}`;
 }
 export const day = (iso: string) => new Date(iso).toLocaleDateString(undefined, { dateStyle: 'medium' });
@@ -106,7 +106,7 @@ export function provenanceRows(item: ItemSummary, me: Me | null): Row[] {
   if (s.card) rows.push({ label: 'Card', value: s.card, mono: true });
   if (s.run) rows.push({ label: 'Run', value: s.run, mono: true });
   rows.push({ label: 'Created', value: when(item.createdAt) });
-  rows.push({ label: 'Visible to', value: visibilityWords({ scope: item.scope, canWiden: false }) });
+  rows.push({ label: 'Visible to', value: visibilityWords({ scope: item.scope, canWiden: false, boardVisible: item.audience === 'board' }) });
   rows.push({ label: 'Outcome', value: item.outcome });
   return rows;
 }
