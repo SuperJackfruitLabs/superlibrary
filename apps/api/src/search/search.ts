@@ -49,6 +49,16 @@ function snippet(text: string, query: string): string {
   return (start > 0 ? '…' : '') + text.slice(start, start + 280).replace(/\s+/g, ' ').trim() + (start + 280 < text.length ? '…' : '');
 }
 
+/** A replacement the viewer cannot see is not named (spec §4): same visibility and liveness as any result. */
+export async function visibleSupersededBy(env: Env, v: Viewer, scopes: string[], raw: Map<string, string>): Promise<Map<string, string>> {
+  const repIds = [...new Set(raw.values())];
+  if (repIds.length === 0) return new Map();
+  const ok = new Set((await env.DB.prepare(
+    `SELECT i.id FROM items i WHERE i.id IN (SELECT value FROM json_each(?4)) AND ${visibleSql('i')} AND i.revoked_at IS NULL AND (i.expires_at IS NULL OR i.expires_at > ?5)`,
+  ).bind(...visibleBinds(v, scopes), JSON.stringify(repIds), new Date().toISOString()).all<{ id: string }>()).results.map((r) => r.id));
+  return new Map([...raw].filter(([, n]) => ok.has(n)));
+}
+
 const live = `AND i.revoked_at IS NULL AND (i.expires_at IS NULL OR i.expires_at > ?4)`;
 
 export async function search(env: Env, v: Viewer, q: SearchQuery): Promise<SearchResult[]> {
@@ -116,12 +126,7 @@ export async function search(env: Env, v: Viewer, q: SearchQuery): Promise<Searc
   const ids = [...score.keys()];
   const rows = (await env.DB.prepare(`SELECT * FROM items WHERE id IN (SELECT value FROM json_each(?))`).bind(JSON.stringify(ids)).all<ItemRow>()).results;
   const [sources, rawSuperseded, chunks] = await Promise.all([sourcesOf(env, ids), supersededByMap(env, ids), bestChunks(env, ids, hit)]);
-  // A replacement the viewer cannot see is not named (spec §4): same visibility and liveness as any result.
-  const repIds = [...new Set(rawSuperseded.values())];
-  const repVisible = new Set(repIds.length === 0 ? [] : (await env.DB.prepare(
-    `SELECT i.id FROM items i WHERE i.id IN (SELECT value FROM json_each(?8)) AND ${visibleSql('i')} ${live}`,
-  ).bind(...binds.slice(0, 4), null, null, null, JSON.stringify(repIds)).all<{ id: string }>()).results.map((r) => r.id));
-  const superseded = new Map([...rawSuperseded].filter(([, n]) => repVisible.has(n)));
+  const superseded = await visibleSupersededBy(env, v, scopes, rawSuperseded);
   return rows
     .map((i) => ({
       itemId: i.id, kind: i.kind, title: i.title, outcome: i.outcome as Outcome, scope: i.scope,
