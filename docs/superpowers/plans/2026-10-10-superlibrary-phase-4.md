@@ -41,16 +41,17 @@
 - **The suite shell rule:** product mark and name left, primary nav, then the suite switcher and an account menu holding the theme and Sign out, right; the footer links "Super Jackfruit Labs" with the parent mark. Every page uses kit components, not page-local styles.
 - **The operator's phone review of phase 1 is fixed here:** a styled header (Task 13), embed toolbar controls labelled or in a labelled More panel on phones (Task 9), and the item title block reduced to a title and one meta line before the content (Task 15).
 - **Names.** Never put local host names or agent names in shipped code, docs, tests or fixtures; use synthetic ids (`brd_00000000000000b1`, `prn_000000000000000000a2`). The product word is **workspace**.
-- **Migrations:** phase 4 owns `apps/api/migrations/0040`–`0049` (Stage 0 `0004`, lane A `0010`–`0019`, lane B `0020`–`0029`, Stage 3 `0030`–`0039`).
+- **Migrations:** phase 4 owns `apps/api/migrations/0040`–`0049` (Stage 0 `0004`, lane A `0010`–`0019`, lane B `0020`–`0029`, Stage 3 `0030`–`0039`; reconciled: only `0001`–`0004` exist on main). `0040` Task 2, `0041` Task 25, `0042` Task 29.
 - **Every guard is revert-proof.** Each named test must fail when the guarded line is reverted; each task's last test step says which line to revert. Record the observed failure in the task report.
-- **Secrets** only through `wrangler secret put`. Phase 4 needs no new secret.
+- **Secrets** only through `wrangler secret put`. Phase 4 needs no new secret. The hub's `ROSTER_READERS` already lists Superlibrary's service principal; Task 25H's station read uses the same allowlist and needs no new credential.
 - **Commits** end with:
   ```
   Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
   Claude-Session: https://claude.ai/code/session_01XwhK8QQtRh5hPEfqY5Arp8
   ```
   PR bodies end with `🤖 Generated with [Claude Code](https://claude.com/claude-code)`.
-- **Merge rules.** superlibrary: the controller merges on green CI, and CI deploys `main`. superpipeline: the controller opens the PR and gets CI green; **the operator merges** (it then auto-deploys). Never deploy by hand.
+- **Merge rules.** superlibrary: the controller merges on green CI, and CI deploys `main`. superpipeline: the controller opens the PR and gets CI green; **the operator merges** (it then auto-deploys). agentpod (P4-AP1, P4-AP2): the controller merges on green required checks (`gh pr update-branch` when BEHIND); the hub is the one thing deployed by hand (pull, install, restart, `/health`, `deploy/smoke.sh`), and the console deploys through its Pages project. Nothing else is deployed by hand.
+- **Stage 3 gaps S1–S5 are in scope** (operator, 2026-10-09): Tasks 8a and 25–29 (see "Reconciliation (Task 0)"). Agents reach Superlibrary through the node-local MCP proxy (agentpod #714) for the harnesses that speak HTTP MCP; nothing is built for OpenClaw or Pi. Retention stays `report` (P14): no task switches it.
 - **Worktrees.** Never check out a branch in the main checkouts (other agents use them). Each branch lives in its own worktree under `/Users/rakeshgangwar/SuperJackfruit/.worktrees/`.
 
 ## Assumed interfaces from phases 2–3
@@ -115,13 +116,18 @@ Items marked **OPERATOR** need the operator's yes. The plan implements the state
 ## Execution map
 
 ```
-Task 0  reconcile against shipped phases 2–3 (after Stage 3 is complete)
+Task 0  reconcile against shipped phases 2–3 (done: see "Reconciliation (Task 0)")
   │
-  ├─ PR P4-API   superlibrary feat/p4-api     1 → 2 → 3 → 4 → 5 → 6 → 7 → 8   (merge on green; CI deploys)
-  ├─ PR P4-EMB   superlibrary feat/p4-embed   9 → 10                          (beside P4-API; merge on green)
+  ├─ PR P4-API   superlibrary feat/p4-api     1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 8a   (merge on green; CI deploys)
+  ├─ PR P4-EMB   superlibrary feat/p4-embed   9 → 10                              (beside P4-API; merge on green)
+  ├─ PR P4-AP1   agentpod feat/library-station-owner   25H → 28H                  (beside P4-API; merge on green; hub pull + restart)
   │       │ P4-API merged (and PR #16, the mark)
   ├─ PR P4-APP   superlibrary feat/p4-app     11 → 12 → 13 → 14 → 15 → 16 → 17 → 18 → 19   (merge on green)
-  ├─ PR P4-CLI   superlibrary feat/p4-cli     20                                (beside P4-APP; merge on green)
+  ├─ PR P4-CLI   superlibrary feat/p4-cli     20                                  (beside P4-APP; merge on green)
+  │       │ P4-API deployed and P4-AP1 deployed
+  ├─ PR P4-GAP   superlibrary feat/p4-gaps    28 Step 1 (baseline) → 25 → 26 → 27 → 28 → 29   (beside P4-APP/P4-CLI; merge on green)
+  │       │ P4-GAP deployed
+  ├─ PR P4-AP2   agentpod feat/library-basis-console   27H → 25C                  (merge on green; hub pull + restart; console Pages)
   │       │ P4-API deployed and P4-EMB merged
   ├─ PR P4-SP    superpipeline feat/superlibrary-drawer   21 → 22 → 23          (stop at green CI; operator merges)
   │
@@ -130,10 +136,13 @@ Task 24 live checks (after every PR is deployed)
 
 | PR | Repo | Branch | Tasks | Merge |
 |---|---|---|---|---|
-| P4-API | superlibrary | `feat/p4-api` | 1–8 | controller, on green |
+| P4-API | superlibrary | `feat/p4-api` | 1–8, 8a | controller, on green |
 | P4-EMB | superlibrary | `feat/p4-embed` | 9–10 | controller, on green |
 | P4-APP | superlibrary | `feat/p4-app` | 11–19 | controller, on green |
 | P4-CLI | superlibrary | `feat/p4-cli` | 20 | controller, on green |
+| P4-GAP | superlibrary | `feat/p4-gaps` | 25, 26, 27, 28, 29 | controller, on green |
+| P4-AP1 | agentpod | `feat/library-station-owner` | 25H, 28H | controller, on green; hub deployed by hand |
+| P4-AP2 | agentpod | `feat/library-basis-console` | 27H, 25C | controller, on green, **only after P4-GAP is deployed**; hub deployed by hand; console via Pages |
 | P4-SP | superpipeline | `feat/superlibrary-drawer` | 21–23 | **operator** (controller stops at green CI) |
 
 Each branch starts with `git -C <repo> fetch origin && git -C <repo> worktree add -b <branch> /Users/rakeshgangwar/SuperJackfruit/.worktrees/<repo>-<branch-slug> origin/main`. Two controllers never share a worktree. The PR recipe, run in the worktree:
@@ -236,6 +245,18 @@ superlibrary/
   apps/web/e2e/library.spec.ts, responsive.spec.ts, helpers.ts                             19
   packages/cli/src/library.ts, commands.ts, index.ts, artifacts.ts (exports)               20
   docs/reference/cli/library.md (generated)                                                20
+  apps/api/src/timing.ts, src/cost.ts   stage timings in Server-Timing (gap S4)            8a
+  apps/api/migrations/0041_console_link.sql   item_sources rebuilt (linked_by), station_file  25
+  apps/api/src/clients/stations.ts, src/sources/link.ts, src/uploads/routes.ts  console link 25
+  apps/api/src/search/search.ts, related.ts, routes.ts   floor, explain, text basis, speed   26, 27, 28
+  apps/api/src/indexing/vector-index.ts   VectorIndex.get (stored vectors)                  28
+  apps/api/migrations/0042_board_missing.sql, src/sources/subscribe.ts, src/ingest/consumer.ts  deleted boards 29
+  packages/contract/src/provenance.ts, model.ts, retrieval.ts, events.ts  StationFile, linkedBy, RELEVANCE, RelatedQuery.text, board.deleted  25–29
+  apps/api/test/timing, console-link, relevance, related-basis, related-speed, board-deleted .test.ts; helpers/fake-hub.ts  8a, 25–29
+agentpod/
+  apps/hub/src/routes/bridge-roster.ts   GET /api/bridge/stations/:id (owner, for Superlibrary)  25H
+  apps/hub/src/services/superlibrary/{client,related}.ts, services/bridge/dispatch.ts  timing, prefetch, basis  27H, 28H
+  apps/console/src/lib/api/superlibrary.ts   Link this file sends stationFile                 25C
 superpipeline/
   apps/api/src/auth/plane-signin.ts  the Superlibrary-audience token (?library=1)          21
   apps/api/src/env.ts, apps/api/wrangler.jsonc  SUPERLIBRARY_AUDIENCE                      21
@@ -375,6 +396,58 @@ git commit -m "docs(plan): phase 4 reconciled against shipped phases 2-3
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01XwhK8QQtRh5hPEfqY5Arp8"
 ```
+
+---
+
+## Reconciliation (Task 0)
+
+Checked on 2026-10-09 against superlibrary `origin/main` `121f88e` (Stage 3 #18 merged; lanes A #14, B #13/#12, foundation #11, mark #16, R-H1 tests #15), superpipeline `1f08470` (only CI changes since `938e2c4`), accounts `e0b9d12`, agentpod `bf03a2f8` (#712 console link, #713 related work, #714 node-local MCP proxy, v0.1.95). **Every later task trusts this table over its own text.** Where a row says "plan change", the task text below has already been edited.
+
+| Id | Assumed | Actual on origin/main (121f88e) | Plan change |
+|---|---|---|---|
+| A1 | `search`, `searchAudited`, `supersededByMap`, `visibleSupersededBy`, `sourcesOf`, `ftsQuery`; binds `?1`–`?3` visibility, `?4` now, `?5` kinds, `?6` outcomes, `?7` board scope, `?8` MATCH / id list; `supersededByMap` reads `work_records` only | ✅ same binds and names. Also: `search(env, v, q, precomputedScopes?)` (4th parameter); exported `bestChunks`, `rankLists`, `fuse` (S3-R10/R13: the outcome weight is a rank offset on the **vector list only**; FTS contributes plain RRF); `visibleSupersededBy(env, v, scopes, raw)` binds `?4` ids, `?5` now | None for Tasks 3/6. Task 8a adds a 5th parameter `opts: SearchOptions` (timer); Tasks 26 and 28 add fields to it. Ranking changes (Task 26) must keep `fuse` as is. |
+| A2 | `canManage(p, item, scopes = [])`, `visibleSql`, `visibleBinds`, … | ✅ names and binds. **`canManage(p, item, scopes)` has no default** (S3 final fix wave); `viewerScopes` for people = `workspace` + `source_boards` boards only (B-R12) | None (Task 6 already passes scopes). Every new caller passes scopes. |
+| A3 | `summary(i, extra?)`; private `extrasFor(env, items)`; local `corsFor`/`hostsOf`; `ITEM` regex | ✅ `summary`, `ITEM` regex, `hostsOf`, `readable`, `manageable`. **Differs:** `extrasFor(env, p: Person, items, scopes?)` — it takes the person because it names a replacement only when that person can see it (`visibleSupersededBy`). Local `corsFor = (request, env) => corsForOrigins(request, env.EMBED_HOSTS)` | Task 3 exports it with the real signature; every call passes `p` and the scopes in hand (Tasks 3, 4, 5, 6). Task 6's replacement query keeps the visibility filter (+ test `a replacement revoked later is no longer named`); `respond(env, p, id, scopes?)`. |
+| A4 | search, library get, related via `resolveViewer` | ✅ (plus operator-only `/api/v1/admin/index/*` and hub-only `/api/v1/roster/invalidate` in the same group) | None. |
+| A5 | `related(env, v, q)`; `cardId` basis = its record, `[]` when none or invisible | ✅. Audited inside `related`; `search` runs with `limit * 3` and the item itself is filtered **after** search | Gap S3 (Task 27): a card with no record yet may send a text basis. Task 26 moves the self-filter into `search` (`exclude`). |
+| A6 | `syncCard(env, m, snapshots?)`; `UPDATE items SET title = ?, outcome = ?, scope = ? WHERE id = ?` after the digest check; `deleteCardRecord` | ✅ identical statement and order. `syncCard` returns `'created'`, `'updated'`, `'unchanged'` or `'deleted'`; a delete needs the board snapshot to read 200 without the card (A13 ruling) | None. |
+| A7 | `deleteItem(env, itemId, actor, reason)`; `sweep`; `STALE` | ✅. `deleteItem` deletes `item_references WHERE item_id = ? OR (from_kind = 'work-record' AND from_id = ?)`; chunks/FTS/vectors go through `item.changed deleted` | None (Task 5's `collection_items` line goes before `DELETE FROM items`). |
+| A8 | `corsFor`, `preflight`, `withCors` in `http.ts` | ✅ on main | None. |
+| A9 | `extractText`; artifact text starts with the title; no text file → title + paths | ✅ exact lines Task 6 replaces | None. |
+| A10 | index digest covers text, scope, outcome, kind, title | ✅ (also version and embedder ids) | None. |
+| A11 | `work_records.body` JSON, `source_updated_at` ISO, `item_references ('work-record')` | ✅ | None. |
+| A12 | `source_boards` filled by the subscription job | ✅ hourly `subscribeWorkspace` (`SUBSCRIBE_CRON '0 * * * *'`); rows are never deleted (gap S5) | Task 29 adds `missing_since` and removes a confirmed-deleted board's row. |
+| A13 | Stage 3 uses only `0030`–`0039` | **Differs:** no migration after `0004_foundation.sql` exists; lanes and Stage 3 added none | None: `0040` still sorts after `0004`. Gap tasks take `0041` (Task 25) and `0042` (Task 29). |
+| A14 | `SearchQuery` strict; `RelatedQuery`; `SearchResult`; `ItemSummary.audience?`, `supersededBy?` | ✅ (`KINDS` local const in retrieval.ts; `RelatedQuery` a strict union of `{cardId,…}` and `{itemId,…}`) | Task 27 adds an optional `text` to the `cardId` branch. |
+| A15 | `station_name` written; `sourceOf` may not map it | ✅ as assumed: neither `sourceOf` (`SOURCE_COLS` lacks it) nor `sourcesOf` maps it, so `stationName` never reaches a reader | Task 3 maps it in both (+ test); Tasks 14/15 read `provenance.stationName`. |
+| A16 | helpers `seedRecord`, `fakePipeline`, `card`, `ORG`, `devHeaders`, `planeToken`, `withOrgPlane`, `HUMAN`, `HUMAN_2`, `AGENT`, `upload`, `API`, `fakeEmbedder`, `fakeVectorize`, `setIndexingForTests` | ✅ all exist. Also `HUB_SVC`, `hubHeaders` (upload.ts), `OTHER_ORG`, `PLANE_ENV` (org-plane.ts); `seedRecord` writes an `item_sources` row (`source 'superpipeline'`); `__resetServiceTokensForTests` (clients/plane.ts) | None. |
+| A17 | MCP schemas are their own literals | ✅ (`library_related` takes `cardId` or `itemId` only) | None; Task 27 leaves MCP unchanged (agents never send a basis). |
+| A18 | `resolvePerson` refuses agents and delegated person tokens | ✅ (R-H1: `act` or amr `assertion` → 403 `delegated_person`, audited) | None. |
+| A19 | `handlers = [uploadRoutes, itemRoutes, searchRoutes, sourceRoutes]`; `/api/v1/me` inline | ✅ (also `/api/v1/whoami` and `/mcp` inline) | None. |
+| A20 | superpipeline `/hub/token` shape, `tokenRequest`, `ttlOf`, `readCookie` | ✅ unchanged since `938e2c4` (`readCookie` is imported from `./hub-oauth`) | None. |
+| A21 | accounts `superpipeline-web` may request `https://app.superlibrary.dev` | ✅ `src/products/registry.ts:51` | None. |
+| A22 | `EMBED_HOSTS` holds `https://app.superpipeline.dev`; content `FRAME_ANCESTORS` too | ✅, and both also hold `https://console.agentpod.dev`; `CONSOLE_ORIGINS` (`https://console.agentpod.dev`) serves the station-items route | None: Task 8's reads answer both embedding hosts. |
+| A23 | PR #16 merged: `Mark.svelte`, `AppHeader.svelte` (`onsignout`), app.css `--accent`/`--on-accent`/`--mark` | ✅ merged (`a43c31e`); `fill: var(--mark, #ff7a59)`; `AppHeader` takes `onsignout`; app.css has the three tokens | None. |
+
+Also found on main and used below:
+- `cost.ts` `withCost` already answers `Server-Timing` (D1 statements, round trips, R2 ops, `app;dur`) and **replaces** any route-set header (Task 8a makes it append).
+- `rosterBoards` caches an agent's boards in D1 for `ROSTER_TTL_SECONDS` (300 s) and the hub already pushes invalidation (`notifyRosterChanged` → `/api/v1/roster/invalidate`); a cold read mints a service token and calls the hub with a 3 s timeout.
+- The hub's `superlibraryClient` already caches agent and service tokens until 30 s before expiry; plane tokens live 300 s.
+- `item_sources` CHECK (R3, tightened in Stage 0 final): `source = 'agentpod'` requires prn-shaped `agent_principal` **and** `via_service`. A person's console link cannot be recorded as `agentpod` without a table rebuild (Task 25).
+- The hub's person file route (`GET /api/stations/:id/file`) admits only the station's owner (`stations.user_id = the person's prn`).
+- Superpipeline deletes a board hard (`DELETE /v1/boards/:id`: the DO is destroyed, then the catalog row); no event is pushed, and the service route then answers 404 for it.
+
+### Stage 3 gaps folded in
+
+| Gap | Where | PR |
+|---|---|---|
+| S1 console-link provenance (a person's link records station and path) | Task 25 (Superlibrary), Task 25H (hub: station-owner lookup), Task 25C (console sends it) | P4-GAP, P4-AP1, P4-AP2 |
+| S2 relevance floor in hybrid search | Task 26 | P4-GAP |
+| S3 a card's first claim gets related work before its record syncs | Task 27 (Superlibrary: text basis), Task 27H (hub sends title + spec) | P4-GAP, P4-AP2 |
+| S4 related within the 2.5 s claim budget | Task 8a (measure, P4-API), Task 28H (hub timing + token prefetch, P4-AP1), Task 28 (fix, P4-GAP) | P4-API, P4-AP1, P4-GAP |
+| S5 a deleted board's records are removed | Task 29 | P4-GAP |
+
+Deploy order is load-bearing: P4-AP1 (hub route) before P4-GAP's S1 goes live; P4-GAP deployed before P4-AP2 (Superlibrary's strict `RelatedQuery` and `UploadCreate` refuse the new fields until then).
 
 ---
 
@@ -748,7 +821,8 @@ Claude-Session: https://claude.ai/code/session_01XwhK8QQtRh5hPEfqY5Arp8"
   - `browse(env, p: Person, q: BrowseQuery): Promise<BrowsePage>`, `class BadCursor`
   - `facets(env, p: Person): Promise<Facets>`
   - `libraryRoutes: Handler` serving `POST /api/v1/browse`, `GET /api/v1/facets` (Tasks 4–7 add routes to it)
-  - `export async function extrasFor(env, items: ItemRow[]): Promise<Map<string, Extras>>` from `items/routes.ts`
+  - `export async function extrasFor(env, p: Person, items: ItemRow[], scopes?: string[]): Promise<Map<string, Extras>>` from `items/routes.ts` (reconciled, A3: the real signature takes the person, because it names only replacements that person can see; pass the `scopes` you already computed)
+  - `ItemSource.stationName` filled from `item_sources.station_name` by both `sourcesOf` (search) and `sourceOf` (item routes) (reconciled, A15)
   - test helpers `workspaceOf(principal?)`, `knowBoard(ws, board?, name?)`, `recordBody(over?)`, `seedWorkRecord(o)`, `call(path, init?)`, `B1`, `B2`
 
 - [ ] **Step 1: Write the shared test helpers**
@@ -854,6 +928,11 @@ describe('search filters (spec §11)', () => {
     expect(await ids({ until: '2026-10-01T00:00:00.000Z' })).toEqual(['itm_00000000000000f1']);
     expect(await ids({ agent: 'prn_000000000000000000ff' })).toEqual([]);
   });
+  it('names the station by its readable key in every result (reconciled, A15)', async () => {
+    await seed('itm_00000000000000f3', { agent: A2, station: 'stn_03', stationName: 'notes-station', updatedAt: '2026-10-15T10:00:00.000Z' });
+    const r = (await search(env, person, SearchQuery.parse({ query: 'release notes' }))).find((x) => x.itemId === 'itm_00000000000000f3');
+    expect(r!.provenance).toMatchObject({ station: 'stn_03', stationName: 'notes-station' });
+  });
 });
 ```
 
@@ -899,6 +978,8 @@ import { extraFilterBind, extraFilterSql } from '../library/filters';
 ```
 
 Then in the FTS query append `${extraSql}` after `${boardSql}` and bind `.bind(...binds, match, filters)`; in the vector re-check query append `${extraSql}` after `${boardSql}` and bind `.bind(...binds, JSON.stringify(ids), filters)`.
+
+(Reconciled, A15.) The station's readable key is stored (`item_sources.station_name`) but never read back. In `sourcesOf` (search.ts) add `...(r.station_name ? { stationName: r.station_name } : {}),` after the `station` entry. In `apps/api/src/items/routes.ts` add `station_name: string | null;` to `SourceRow`, `if (r.station_name) s.stationName = r.station_name;` after `if (r.station) …` in `sourceOf`, and `station_name` to `SOURCE_COLS` after `station`.
 
 - [ ] **Step 5: Run the filter test**
 
@@ -1048,7 +1129,7 @@ export async function browse(env: Env, p: Person, q: BrowseQuery): Promise<Brows
   const counts = Object.fromEntries(OUTCOMES.map((o) => [o, 0])) as OutcomeCounts;
   for (const c of counted) if (c.outcome in counts) counts[c.outcome as keyof OutcomeCounts] = c.n;
   const page = rows.slice(0, q.limit);
-  const extras = await extrasFor(env, page);
+  const extras = await extrasFor(env, p, page, scopes);
   const last = page.at(-1);
   await audit(env.DB, { workspaceId: p.workspaceId, actor: p.principalId, act: p.act, action: 'items.browsed', detail: { count: page.length } }).run();
   return {
@@ -1135,6 +1216,7 @@ Expected: PASS.
 1. Remove `${extraSql}` from the FTS query only; run `search-filters`; expect FAIL. Restore. Remove it from the vector re-check only; expect FAIL. Restore.
 2. Replace `${visibleSql('i')}` in `browse`'s `where` with `i.workspace_id = ?1`; expect `never lists or counts what the person cannot see` to FAIL. Restore.
 3. Remove the `CURSOR.exec` check (use the raw split); expect `refuses a cursor it did not issue` to FAIL. Restore.
+4. Remove the `stationName` line from `sourcesOf`; expect `names the station by its readable key…` to FAIL. Restore.
 
 - [ ] **Step 11: Commit**
 
@@ -1245,7 +1327,7 @@ export async function recordView(env: Env, p: Person, id: string): Promise<Respo
       ORDER BY i.created_at, i.id`,
   ).bind(...visibleBinds(p, scopes), new Date().toISOString(), id).all<ItemRow>()).results;
   const board = await env.DB.prepare(`SELECT name FROM source_boards WHERE workspace_id = ? AND board_id = ?`).bind(item.workspace_id, w.board_id).first<{ name: string }>();
-  const extras = await extrasFor(env, [item, ...linked]);
+  const extras = await extrasFor(env, p, [item, ...linked], scopes);
   await audit(env.DB, { workspaceId: p.workspaceId, actor: p.principalId, act: p.act, action: 'item.read', itemId: id, detail: { via: 'record' } }).run();
   const view: WorkRecordView = {
     item: summary(item, extras.get(item.id)),
@@ -1477,7 +1559,7 @@ export async function collectionDetail(env: Env, p: Person, c: ColRow): Promise<
     `SELECT i.*, ci.added_by AS ci_added_by, ci.added_at AS ci_added_at, ci.note AS ci_note FROM collection_items ci JOIN items i ON i.id = ci.item_id
       WHERE ci.collection_id = ?5 AND ${visibleSql('i')} AND ${LIVE} ORDER BY ci.added_at DESC, i.id DESC LIMIT 1000`,
   ).bind(...visibleBinds(p, scopes), new Date().toISOString(), c.id).all<ItemRow & { ci_added_by: string; ci_added_at: string; ci_note: string | null }>()).results;
-  const extras = await extrasFor(env, rows);
+  const extras = await extrasFor(env, p, rows, scopes);
   const out: CollectionDetail = {
     ...summaryOf(p, c, rows.length),
     entries: rows.map((r) => ({ item: summary(r, extras.get(r.id)), addedBy: r.ci_added_by, addedAt: r.ci_added_at, note: r.ci_note })),
@@ -1628,9 +1710,9 @@ Claude-Session: https://claude.ai/code/session_01XwhK8QQtRh5hPEfqY5Arp8"
 - Produces:
   - `POST /api/v1/items/:id/supersede { by: itm_ | null }` → `{ item: ItemSummary }`; `400 invalid` for itself or a loop; `404` for a replacement the person cannot see
   - `PATCH /api/v1/items/:id/caption { caption }` → `{ item: ItemSummary }`; `400` for a work record
-  - `moderatable(env, p, id, opts?): Promise<{ item: ItemRow; scopes: string[] } | Response>` and `respond(env, id)` (Task 7 uses both)
+  - `moderatable(env, p, id, opts?): Promise<{ item: ItemRow; scopes: string[] } | Response>` and `respond(env, p, id, scopes?)` (Task 7 may use both; reconciled, A3: `extrasFor` needs the person)
   - `ItemRow` gains `caption?: string | null; superseded_by?: string | null; superseded_prior?: string | null`
-  - `supersededByMap` and `extrasFor` name a person-set replacement first, else the card's.
+  - `supersededByMap` and `extrasFor` name a person-set replacement first, else the card's; `extrasFor` still names it only when the person can see it and it is live (`visibleSupersededBy`, as on `origin/main`).
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1680,6 +1762,14 @@ describe('mark superseded by another item (spec §11)', () => {
     const hidden = (await upload([{ path: 'h.md', body: '# h' }], { title: 'H', scope: 'board:brd_00000000000000b9', headers: devHeaders(HUMAN_2) })).body.itemId as string;
     expect((await supersede(b, hidden)).status).toBe(404);
     expect((await loadItem(env, b))!.outcome).toBe('completed');
+  });
+  it('a replacement revoked later is no longer named (spec §4; reconciled, A3)', async () => {
+    const old = await art('Old guide');
+    const next = await art('New guide');
+    expect((await supersede(old, next)).status).toBe(200);
+    expect((await call(`/api/v1/items/${next}/revoke`, { method: 'POST', body: {} })).status).toBe(200);
+    const shown = await (await call(`/api/v1/items/${old}`)).json<{ item: ItemSummary }>();
+    expect(shown.item).toMatchObject({ outcome: 'superseded', supersededBy: null });
   });
   it('a work record keeps its card-derived replacement unless a person sets one', async () => {
     await seedWorkRecord({ id: 'itm_00000000000003a1', ws });
@@ -1743,17 +1833,20 @@ In `apps/api/src/items/routes.ts` (A3), in `summary()` before `return out;`:
   if (i.caption) out.caption = i.caption;
 ```
 
-and in `extrasFor` replace the `work_records` replacement query and its loop with:
+and in `extrasFor` (signature on `origin/main`: `extrasFor(env, p, items, scopes?)`) replace everything from `const wr = await env.DB.prepare(` to the end of the `for (const r of wr.results) …` loop with (reconciled, A3: the visibility filter on `origin/main` stays):
 
 ```ts
-  // A person's replacement first (spec §11), else the card's `supersedes` link (spec §15).
+  // A person's replacement first (spec §11), else the card's `supersedes` link (spec §15). A
+  // replacement the person cannot see, or that is revoked or expired, is not named (spec §4).
   const sup = await env.DB.prepare(
     `SELECT i.id AS item_id, i.kind AS kind, COALESCE(i.superseded_by, n.item_id) AS next FROM items i
        LEFT JOIN work_records w ON w.item_id = i.id
        LEFT JOIN work_records n ON n.workspace_id = w.workspace_id AND n.card_id = w.superseded_by_card
       WHERE i.id IN (SELECT value FROM json_each(?1))`,
   ).bind(ids).all<{ item_id: string; kind: string; next: string | null }>();
-  for (const r of sup.results) if (r.next !== null || r.kind === 'work-record') out.get(r.item_id)!.supersededBy = r.next;
+  const raw = new Map<string, string>(sup.results.flatMap((r) => (r.next ? [[r.item_id, r.next] as [string, string]] : [])));
+  const visible = await visibleSupersededBy(env, p, scopes ?? (await viewerScopes(env, p)), raw);
+  for (const r of sup.results) if (r.next !== null || r.kind === 'work-record') out.get(r.item_id)!.supersededBy = visible.get(r.item_id) ?? null;
 ```
 
 In `apps/api/src/search/search.ts` (A1), replace the body of `supersededByMap`'s query with:
@@ -1804,9 +1897,9 @@ export async function moderatable(env: Env, p: Person, id: string, opts: { allow
   return { item, scopes };
 }
 
-export async function respond(env: Env, id: string): Promise<Response> {
+export async function respond(env: Env, p: Person, id: string, scopes?: string[]): Promise<Response> {
   const now = (await loadItem(env, id))!;
-  return json({ item: summary(now, (await extrasFor(env, [now])).get(id)) });
+  return json({ item: summary(now, (await extrasFor(env, p, [now], scopes)).get(id)) });
 }
 
 async function body<S extends z.ZodType>(request: Request, schema: S): Promise<z.infer<S> | Response> {
@@ -1837,7 +1930,7 @@ export async function supersede(request: Request, env: Env, p: Person, id: strin
       ]);
       await itemChanged(env, id, m.item.workspace_id, 'upserted');
     }
-    return respond(env, id);
+    return respond(env, p, id, m.scopes);
   }
   if (b.by === id) return error(400, 'invalid', { detail: 'an item cannot supersede itself' });
   const target = await loadItem(env, b.by);
@@ -1850,7 +1943,7 @@ export async function supersede(request: Request, env: Env, p: Person, id: strin
   ]);
   // Outcome changes the ranking weight (spec §7): the index consumer re-reads the item.
   await itemChanged(env, id, m.item.workspace_id, 'upserted');
-  return respond(env, id);
+  return respond(env, p, id, m.scopes);
 }
 
 export async function setCaption(request: Request, env: Env, p: Person, id: string): Promise<Response> {
@@ -1865,7 +1958,7 @@ export async function setCaption(request: Request, env: Env, p: Person, id: stri
     audit(env.DB, { workspaceId: p.workspaceId, actor: p.principalId, act: p.act, action: 'item.caption_set', itemId: id, detail: { length: caption?.length ?? 0 } }),
   ]);
   await itemChanged(env, id, m.item.workspace_id, 'upserted');
-  return respond(env, id);
+  return respond(env, p, id, m.scopes);
 }
 ```
 
@@ -1895,6 +1988,7 @@ Expected: PASS.
 2. Remove `!canSee(p, target, m.scopes) ||`; expect the same test to FAIL at the hidden replacement. Restore.
 3. Remove `COALESCE(i.superseded_by, n.item_id)` from `supersededByMap` (back to `n.item_id`); expect `supersede marks the outcome…` to FAIL at `supersededByMap`. Restore.
 4. Remove the `titled` line's caption (use `item.title`); expect `a caption is indexed…` to FAIL. Restore.
+5. In `extrasFor`, assign `raw.get(r.item_id) ?? null` instead of `visible.get(…)`; expect `a replacement revoked later is no longer named` to FAIL. Restore.
 
 - [ ] **Step 6: Commit**
 
@@ -1915,7 +2009,7 @@ Claude-Session: https://claude.ai/code/session_01XwhK8QQtRh5hPEfqY5Arp8"
 - Test: `apps/api/test/ingest-moderation.test.ts`
 
 **Interfaces:**
-- Consumes: `moderatable`, `respond` (Task 6); `RemoveBody` (Task 1); `deleteItem` (A7); `syncCard` (A6); `fakePipeline`, `card`, `ORG` (A16); `ensureWorkspace`.
+- Consumes: `moderatable`, `respond(env, p, id, scopes?)` (Task 6, reconciled); `RemoveBody` (Task 1); `deleteItem` (A7); `syncCard` (A6); `fakePipeline`, `card`, `ORG` (A16); `ensureWorkspace`.
 - Produces:
   - `POST /api/v1/items/:id/remove { reason }` → `{ removed: true }`; deletes everything (spec §12) through `deleteItem(env, id, <person prn>, reason)`, whose `item.deleted` audit row records the person and the reason; a work record's card is tombstoned in `removed_cards`.
   - `syncCard` returns `'unchanged'` for a tombstoned card, keeps `scope = 'workspace'` once widened, and keeps `outcome = 'superseded'` while `items.superseded_by` is set (updating `superseded_prior` to the card's own outcome).
@@ -2216,7 +2310,7 @@ Expected: PASS (the existing embed CORS tests still pass).
 
 Drop `withCors` from the `GET` detail line; expect `the item, me, scope and related…` to FAIL. Restore. Change `hostRead` to `true`; expect nothing to fail? Add to the second test `expect(acao(await call(`/api/v1/items/${a}/revoke`, { method: 'POST', body: {}, headers: HOST }))).toBeNull();`, run, and see it FAIL with `hostRead = true`. Restore.
 
-- [ ] **Step 6: Commit, push and open P4-API**
+- [ ] **Step 6: Commit** (reconciled: P4-API is pushed at the end of Task 8a, which lands the timing S4 measures on this same PR)
 
 ```bash
 git add apps/api/src/items/routes.ts apps/api/src/search/routes.ts apps/api/src/index.ts apps/api/test/cors.test.ts
@@ -2224,17 +2318,157 @@ git commit -m "feat(api): embedding hosts may read the item, who is signed in, a
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01XwhK8QQtRh5hPEfqY5Arp8"
+```
+
+---
+## Task 8a: Stage timings on search and related (gap S4: measure first)
+
+Stage 3's live claims missed the 2.5 s "Related prior work" budget in 2 of 4 claims, and a person's own related call took 1.1–2.4 s from the operator's machine, but nothing says where the time goes. This task only measures: every `/api/v1/search` and `/api/v1/related` answer names the duration of each stage in `Server-Timing`, beside the request cost `withCost` already reports. It lands on P4-API so the baseline is measured live before Task 28 changes anything.
+
+**Files:**
+- Create: `apps/api/src/timing.ts`
+- Modify: `apps/api/src/cost.ts` (`withCost` appends instead of replacing), `apps/api/src/search/search.ts` (`SearchOptions`), `apps/api/src/search/related.ts`, `apps/api/src/search/routes.ts`
+- Test: `apps/api/test/timing.test.ts`
+
+**Interfaces:**
+- Consumes: `withCost`, `counted` (cost.ts, on `origin/main`: it already answers `Server-Timing: d1q;desc=…, d1rt;desc=…, r2;desc=…, app;dur=…` and **replaces** any header a route set); `search` (A1, Task 3); `related` (A5); the `/api/v1/related` block as Task 8 left it.
+- Produces:
+  - `class Timer { time<T>(stage: Stage, fn: () => Promise<T>): Promise<T>; add(stage: Stage, ms: number): void; header(): string }` and `type Stage = 'auth' | 'scopes' | 'basis' | 'embed' | 'vector' | 'fts' | 'recheck' | 'hydrate' | 'fit' | 'audit'`
+  - `export interface SearchOptions { timer?: Timer }` and `search(env, v, q, precomputedScopes?, opts: SearchOptions = {})` (Tasks 26 and 28 add fields to `SearchOptions`)
+  - `related(env, v, q, timer?: Timer)`
+  - Every search and related answer: `Server-Timing: auth;dur=…, scopes;dur=…, …, d1q;desc=…, d1rt;desc=…, r2;desc=…, app;dur=…`. Stage names and durations only: never an id, a board or query text.
+
+- [ ] **Step 1: Write the failing test**
+
+```ts
+// apps/api/test/timing.test.ts
+import { env } from 'cloudflare:test';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { setIndexingForTests } from '../src/indexing/vector-index';
+import { indexItem } from '../src/indexing/consumer';
+import { fakeEmbedder, fakeVectorize } from './helpers/fake-vectors';
+import { upload } from './helpers/upload';
+import { call, workspaceOf } from './helpers/library';
+
+const stages = (h: string | null) => (h ?? '').split(',').map((s) => s.trim().split(';')[0]);
+
+beforeEach(async () => {
+  setIndexingForTests({ embedders: { 'workers-ai/bge-m3': fakeEmbedder() }, bindings: { a: fakeVectorize() } });
+  await workspaceOf();
+});
+afterEach(() => setIndexingForTests(null));
+
+describe('stage timings (gap S4)', () => {
+  it('related answers its stage timings beside the request cost', async () => {
+    const a = (await upload([{ path: 'q.md', body: '# Queue workers drain the backlog' }], { title: 'Queue workers' })).body.itemId as string;
+    await indexItem(env, a);
+    const res = await call('/api/v1/related', { method: 'POST', body: { itemId: a } });
+    expect(res.status).toBe(200);
+    expect(stages(res.headers.get('Server-Timing'))).toEqual(expect.arrayContaining(['auth', 'scopes', 'basis', 'embed', 'vector', 'fts', 'hydrate', 'fit', 'audit', 'd1rt', 'app']));
+  });
+  it('search answers the same stages', async () => {
+    const a = (await upload([{ path: 's.md', body: '# Queue workers in search' }], { title: 'Queue search' })).body.itemId as string;
+    await indexItem(env, a);
+    const res = await call('/api/v1/search', { method: 'POST', body: { query: 'queue workers' } });
+    expect(stages(res.headers.get('Server-Timing'))).toEqual(expect.arrayContaining(['auth', 'scopes', 'embed', 'vector', 'fts', 'hydrate', 'audit', 'd1rt', 'app']));
+  });
+  it('timings name stages only: no ids and no query text', async () => {
+    const a = (await upload([{ path: 'z.md', body: '# Zephyr notes' }], { title: 'Zephyr' })).body.itemId as string;
+    const res = await call('/api/v1/related', { method: 'POST', body: { itemId: a } });
+    const h = res.headers.get('Server-Timing')!;
+    expect(h).not.toContain(a);
+    expect(h.toLowerCase()).not.toContain('zephyr');
+    expect(h).toMatch(/^[a-z0-9]+;(dur=\d+|desc="\d+")(, [a-z0-9]+;(dur=\d+|desc="\d+"))*$/);
+  });
+});
+```
+
+- [ ] **Step 2: Run it to verify it fails**
+
+Run: `pnpm --filter @superlibrary/api test -- test/timing.test.ts`
+Expected: FAIL (the header holds only `d1q`, `d1rt`, `r2`, `app`).
+
+- [ ] **Step 3: Write the timer and thread it through**
+
+```ts
+// apps/api/src/timing.ts
+/**
+ * Gap S4: where a search or a related call spends its time, as `Server-Timing` stage durations.
+ * Names and milliseconds only. In Workers, Date.now() advances on I/O, not during CPU work, so a
+ * stage measures its storage, AI and network waits, which is what the claim budget is spent on.
+ */
+export type Stage = 'auth' | 'scopes' | 'basis' | 'embed' | 'vector' | 'fts' | 'recheck' | 'hydrate' | 'fit' | 'audit';
+
+export class Timer {
+  private readonly ms = new Map<Stage, number>();
+  async time<T>(stage: Stage, fn: () => Promise<T>): Promise<T> {
+    const t0 = Date.now();
+    try {
+      return await fn();
+    } finally {
+      this.add(stage, Date.now() - t0);
+    }
+  }
+  add(stage: Stage, ms: number): void {
+    this.ms.set(stage, (this.ms.get(stage) ?? 0) + ms);
+  }
+  header(): string {
+    return [...this.ms].map(([s, ms]) => `${s};dur=${ms}`).join(', ');
+  }
+}
+```
+
+In `apps/api/src/cost.ts`, `withCost` keeps what a route already said: replace `const value = …` with
+
+```ts
+  const spent = `d1q;desc="${cost.d1q}", d1rt;desc="${cost.d1rt}", r2;desc="${cost.r2}", app;dur=${Date.now() - startedAt}`;
+  const prior = res.headers.get('Server-Timing');
+  const value = prior ? `${prior}, ${spent}` : spent;
+```
+
+In `apps/api/src/search/search.ts`: `import type { Timer } from '../timing';`, add `export interface SearchOptions { timer?: Timer }`, change the signature to `search(env, v, q, precomputedScopes?: string[], opts: SearchOptions = {})`, and wrap, with `const t = opts.timer;` and a helper `const timed = <T>(s: Stage, f: () => Promise<T>) => (t ? t.time(s, f) : f());`:
+- `viewerScopes(env, v)` in `scopes` (only when not precomputed);
+- the FTS query in `fts`;
+- `readSlots` + `embedderFor(...).embed` in `embed`;
+- `indexFor(...).query` in `vector`;
+- the vector re-check query in `recheck`;
+- the items read and the `Promise.all([sourcesOf, supersededByMap, bestChunks])` + `visibleSupersededBy` in `hydrate`.
+
+`searchAudited(env, v, q, timer?: Timer)` passes `{ timer }` and wraps its audit write in `audit`.
+
+In `apps/api/src/search/related.ts`: `related(env, v, q, timer?: Timer)` passes the timer to `relatedItems`, which wraps `viewerScopes` in `scopes`, the record/item lookup and `extractText` in `basis`, passes `{ timer }` to `search`, wraps the per-hit chunk loop in `fit`; `related` wraps its audit write in `audit`.
+
+In `apps/api/src/search/routes.ts`, for `/api/v1/search` and `/api/v1/related`: `const timer = new Timer();`, `const v = await timer.time('auth', () => resolveViewer(request, env));`, pass `timer` to `searchAudited` / `related`, and set `Server-Timing` on the answer: `const res = json(...); res.headers.set('Server-Timing', timer.header()); return withCors(...)` (the related route keeps Task 8's `withCors`).
+
+- [ ] **Step 4: Run the tests**
+
+Run: `pnpm --filter @superlibrary/api test -- test/timing.test.ts test/search.test.ts test/related.test.ts test/mcp.test.ts && pnpm --filter @superlibrary/api test && pnpm -r typecheck`
+Expected: PASS (MCP calls `related` and `searchAudited` without a timer).
+
+- [ ] **Step 5: Revert-proof**
+
+1. In `withCost`, set `value = spent` (drop `prior`); expect `related answers its stage timings…` to FAIL (only the cost entries remain). Restore.
+2. Remove the `timed('embed', …)` wrap in `search`; expect both stage tests to FAIL. Restore.
+
+- [ ] **Step 6: Commit, push and open P4-API**
+
+```bash
+git add apps/api/src/timing.ts apps/api/src/cost.ts apps/api/src/search/search.ts apps/api/src/search/related.ts apps/api/src/search/routes.ts apps/api/test/timing.test.ts
+git commit -m "feat(api): search and related answer their stage timings (gap S4, measure first)
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01XwhK8QQtRh5hPEfqY5Arp8"
 pnpm -r typecheck && pnpm -r test
 git push -u origin feat/p4-api
-gh pr create --title "Phase 4 API: filters, browse, record view, collections, moderation, host CORS" --body "$(cat <<'EOF'
-Plan tasks 1-8 of docs/superpowers/plans/2026-10-10-superlibrary-phase-4.md: search filters (agent, station, last activity), browse with outcome counts and facets, the work-record view, collections (membership keeps artifacts from retention), moderation (supersede without loops, caption, remove from memory with a reason), re-sync keeps a person's acts, and CORS for embedding hosts on the reads they need.
+gh pr create --title "Phase 4 API: filters, browse, record view, collections, moderation, host CORS, stage timings" --body "$(cat <<'EOF'
+Plan tasks 1-8 and 8a of docs/superpowers/plans/2026-10-10-superlibrary-phase-4.md (reconciled in Task 0): search filters (agent, station, last activity), browse with outcome counts and facets, the work-record view, collections (membership keeps artifacts from retention), moderation (supersede without loops, caption, remove from memory with a reason), re-sync keeps a person's acts, CORS for embedding hosts on the reads they need, and Server-Timing stage durations on search and related (gap S4 baseline).
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 EOF
 )"
 ```
 
-Merge on green (`gh pr merge --merge`), then watch the `main` run: `deploy-api` applies `0040_library.sql`. Live check: `curl -s https://app.superlibrary.dev/api/health` answers `{"ok":true,…}`.
+Merge on green (`gh pr merge --merge`), then watch the `main` run: `deploy-api` applies `0040_library.sql`. Live check: `curl -s https://app.superlibrary.dev/api/health` answers `{"ok":true,…}`, and an authenticated `curl -s -D - -o /dev/null -X POST https://app.superlibrary.dev/api/v1/search …` shows `server-timing:` with the stage names (Task 28 Step 1 records the baseline).
 
 ---
 ## Task 9: The embed toolbar on phones, and host theme hooks
@@ -6706,7 +6940,7 @@ Stop here: report the PR URL and its green checks. **Do not merge** (operator ru
 
 ## Task 24: Live checks
 
-After P4-API, P4-APP and P4-CLI are deployed by superlibrary CI, and the operator has merged P4-SP (which deploys on merge). Checks needing a person's browser session are listed for the operator; everything else the controller runs.
+After P4-API, P4-APP, P4-CLI and P4-GAP are deployed by superlibrary CI, P4-AP1 and P4-AP2 are merged and the hub redeployed, and the operator has merged P4-SP (which deploys on merge). Checks needing a person's browser session are listed for the operator; everything else the controller runs. Task 24 runs last, after Tasks 25–29.
 
 **Files:**
 - Modify: `.superpowers/sdd/2026-10-10-superlibrary-phase-4/progress.md` (the results)
@@ -6739,9 +6973,1349 @@ Expected: ranked lines with outcomes (or `Nothing matches.`); the collections (o
 6. On the phone: the header shows the book-spine mark and "Superlibrary", the four nav items, Products and Account; Account holds the theme and Sign out; an artifact's title and meta line take two lines at most before the viewer; the viewer's toolbar shows words, with the rest under **More**. The footer reads "Super Jackfruit Labs" with the hexagon mark (provisional).
 7. In Superpipeline, open a card with a `https://app.superlibrary.dev/a/itm_…` reference: the first one previews in the viewer; **Related prior work** lists items with outcomes (or says nothing is related yet).
 
+- [ ] **Step 3b: The Stage 3 gaps (results already in the ledger from each task's live step)**
+
+Confirm the ledger holds: Task 25C Step 7 (a console link names its station; OPERATOR-RUN), Task 26 Step 7 (the floor's pass criteria), Task 27H Step 7 (a new card's first claim had related work, `basis: 'text'`), Task 28 Step 8 (p95 within the target, no skip), Task 29 Step 7 (exercised live with the operator's yes, or "not exercised live"). Any missing one is run now.
+
 - [ ] **Step 4: Record and close**
 
-Write each check's result into the phase-4 ledger, then remove the phase-4 worktrees whose PRs merged: `git -C /Users/rakeshgangwar/SuperJackfruit/superlibrary worktree remove /Users/rakeshgangwar/SuperJackfruit/.worktrees/superlibrary-p4-api` (and `-p4-embed`, `-p4-app`, `-p4-cli`; superpipeline's after the operator merges).
+Write each check's result into the phase-4 ledger, then remove the phase-4 worktrees whose PRs merged: `git -C /Users/rakeshgangwar/SuperJackfruit/superlibrary worktree remove /Users/rakeshgangwar/SuperJackfruit/.worktrees/superlibrary-p4-api` (and `-p4-embed`, `-p4-app`, `-p4-cli`, `-p4-gaps`; agentpod's `agentpod-library-station-owner` and `agentpod-library-basis-console` with `git -C /Users/rakeshgangwar/SuperJackfruit/agentpod worktree remove …`; superpipeline's after the operator merges).
+
+---
+
+## Stage 3 gaps (operator-added scope): Tasks 25–29
+
+Five gaps the Stage 3 live checks found (phases 2–3 ledger `progress-stage-3.md`, `stage3-backfill-review.md`). Superlibrary work is one PR, **P4-GAP** (`feat/p4-gaps`), started from `origin/main` after P4-API is merged and deployed (it edits `search.ts`, `related.ts`, `items/routes.ts` after Tasks 3, 6 and 8a): `git -C /Users/rakeshgangwar/SuperJackfruit/superlibrary fetch origin && git -C /Users/rakeshgangwar/SuperJackfruit/superlibrary worktree add -b feat/p4-gaps /Users/rakeshgangwar/SuperJackfruit/.worktrees/superlibrary-p4-gaps origin/main`. AgentPod work is two PRs, because each side's strict schema refuses the other's new fields until it is deployed:
+
+- **P4-AP1** (`feat/library-station-owner`, Tasks 25H and 28H): the hub's station-owner lookup and the related-work timing and token prefetch. Nothing in it needs a new Superlibrary. Runs beside P4-API: `git -C /Users/rakeshgangwar/SuperJackfruit/agentpod fetch origin && git -C /Users/rakeshgangwar/SuperJackfruit/agentpod worktree add -b feat/library-station-owner /Users/rakeshgangwar/SuperJackfruit/.worktrees/agentpod-library-station-owner origin/main`.
+- **P4-AP2** (`feat/library-basis-console`, Tasks 27H and 25C): the hub sends a card's title and spec with `cardId`; the console sends a link's station and path. Starts only after P4-GAP is deployed: `git -C /Users/rakeshgangwar/SuperJackfruit/agentpod fetch origin && git -C /Users/rakeshgangwar/SuperJackfruit/agentpod worktree add -b feat/library-basis-console /Users/rakeshgangwar/SuperJackfruit/.worktrees/agentpod-library-basis-console origin/main`.
+
+AgentPod PRs merge on green required checks (`gh pr update-branch` when BEHIND). The hub is deployed by hand on the hub host: `git pull --ff-only`, install, `systemctl restart`, `/health`, then `sh deploy/smoke.sh https://hub.agentpod.dev`. The console deploys through its Cloudflare Pages project on merge to `main`; confirm the Pages deployment for the merge commit. Nothing here is built for OpenClaw or Pi.
+
+---
+
+## Task 25: A person's console link records its station and path (gap S1, Superlibrary)
+
+The console's **Link this file** (agentpod #712) uploads as the signed-in person with their own Superlibrary token, so Superlibrary refuses its `source` (`source_not_trusted`: only the hub acting for an agent may send one) and the item has no provenance. This task records **station, station name and path** for a person's link, without weakening R-H1:
+
+- The hub never acts for the person. The console still calls Superlibrary with the person's own token; a token with `act` or amr `assertion` is still refused by `principalOf`.
+- The person never vouches for the station. Superlibrary asks the hub itself (its own service token for the person's org, the same allowlisted path the roster read uses, Task 25H) whose station it is, and records it only when the hub answers that this person **owns** it in this workspace. That is the hub's own rule for reading a station's files (`GET /api/stations/:id/file` admits only `stations.user_id`), so a person can record exactly the stations whose files they can already read.
+- A separate body field, `stationFile`, carries it. `source` keeps its meaning and its trust rule untouched.
+
+**Files:**
+- Create: `apps/api/migrations/0041_console_link.sql`, `apps/api/src/clients/stations.ts`, `apps/api/test/helpers/fake-hub.ts`, `apps/api/test/console-link.test.ts`
+- Modify: `packages/contract/src/provenance.ts` (`StationFile`), `packages/contract/src/model.ts` (`UploadCreate.stationFile`, `ItemSource.linkedBy`), `packages/contract/test/library.test.ts` (or the contract's provenance test), `apps/api/src/sources/link.ts`, `apps/api/src/uploads/routes.ts`, `apps/api/src/search/search.ts` (`sourcesOf`), `apps/api/src/items/routes.ts` (`sourceOf`, `SOURCE_COLS`), `apps/api/test/helpers/upload.ts` (`stationFile` option)
+
+**Interfaces:**
+- Consumes: `checkLinkSource`, `linkSessionItem` (lane A); `serviceToken(env, org, audience)` (clients/plane.ts); `HUB_URL`, `HUB_AUDIENCE`; `checkPath`; Task 3's `stationName` mapping; Task 2's `item_sources_agent` index (recreated here).
+- Produces:
+  - contract `StationFile = { station: string (1–100), path: string (1–1024) }`, strict; `UploadCreate.stationFile?: StationFile`; `ItemSource.linkedBy?: string` (the person's prn)
+  - `hubStation(env, org, stationId): Promise<{ id; key; owner } | null>` (null = the hub does not know it in this workspace; throws `HubUnavailable` otherwise)
+  - `checkStationFile(env, p, body): Promise<PersonStationFile | null | Response>`; `personStationItem(env, workspaceId, prn, file, scope): Promise<string | null>`
+  - declare refusals: `400 invalid` (an agent's `stationFile`; `stationFile` with `source` or with `item`), `400 path_refused`, `403 station_not_yours` (unknown and not-yours answer the same), `502 hub_unreachable`
+  - `item_sources` rebuilt: new column `linked_by`; the `agentpod` CHECK takes either an agent with the hub (as before) or a person alone with a station and a path
+  - `upload_sessions.station_file` (JSON `PersonStationFile`)
+
+- [ ] **Step 1: Write the failing tests**
+
+Add to `apps/api/test/helpers/upload.ts`: `stationFile?: unknown;` in `UploadOpts`, and `stationFile: opts.stationFile` in the declare body beside `source`.
+
+```ts
+// apps/api/test/helpers/fake-hub.ts
+import { env } from 'cloudflare:test';
+import { __resetServiceTokensForTests } from '../../src/clients/plane';
+import { ORG } from './org-plane';
+
+/** The hub's station-owner read (Task 25H) and the plane's service token; restore with the returned function. */
+export function fakeHub(stations: Record<string, { key: string; owner: string }> | 'down', seen: string[] = []): () => void {
+  const bag = env as unknown as Record<string, unknown>;
+  bag.ORG_PLANE_URL = 'https://accounts.test';
+  bag.SERVICE_CREDENTIALS = JSON.stringify({ [ORG]: 'svc_lib:secret' });
+  const real = globalThis.fetch;
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const u = new URL(input instanceof Request ? input.url : String(input));
+    seen.push(`${u.origin}${u.pathname}`);
+    if (u.origin === 'https://accounts.test' && u.pathname === '/api/token/service') return Response.json({ access_token: 'svc-token', expires_in: 300 });
+    if (u.origin !== 'https://hub.test') return real(input as RequestInfo, init);
+    if (stations === 'down') return new Response(null, { status: 503 });
+    const m = /^\/api\/bridge\/stations\/([^/]+)$/.exec(u.pathname);
+    const id = m ? decodeURIComponent(m[1]!) : '';
+    const s = stations[id];
+    return s ? Response.json({ id, key: s.key, owner: s.owner }) : Response.json({ error: 'not found' }, { status: 404 });
+  }) as typeof fetch;
+  return () => { globalThis.fetch = real; bag.ORG_PLANE_URL = ''; bag.SERVICE_CREDENTIALS = ''; __resetServiceTokensForTests(); };
+}
+```
+
+```ts
+// apps/api/test/console-link.test.ts
+import { env } from 'cloudflare:test';
+import { afterEach, describe, expect, it } from 'vitest';
+import type { ItemSummary } from '@superlibrary/contract';
+import { AGENT, HUMAN, HUMAN_2, planeToken, withOrgPlane } from './helpers/org-plane';
+import { HUB_SVC, hubHeaders, upload } from './helpers/upload';
+import { fakeHub } from './helpers/fake-hub';
+import { call, workspaceOf } from './helpers/library';
+
+const STN = 'stn_00000000000000c1';
+let restore: (() => void) | null = null;
+afterEach(() => { restore?.(); restore = null; });
+const mine = () => { restore = fakeHub({ [STN]: { key: 'notes-station', owner: HUMAN } }); };
+const sessions = async () => (await env.DB.prepare(`SELECT COUNT(*) AS n FROM upload_sessions`).first<{ n: number }>())!.n;
+
+describe("a person's console link (gap S1)", () => {
+  it('records the station, its name and the path, and names the person', async () => {
+    await workspaceOf();
+    mine();
+    const r = await upload([{ path: 'report.md', body: '# Report' }], { title: 'report.md', stationFile: { station: STN, path: 'out/report.md' } });
+    expect(r.status).toBe(201);
+    const src = await env.DB.prepare(`SELECT source, station, station_name, source_path, linked_by, agent_principal, via_service FROM item_sources WHERE item_id = ?`).bind(r.body.itemId).first();
+    expect(src).toEqual({ source: 'agentpod', station: STN, station_name: 'notes-station', source_path: 'out/report.md', linked_by: HUMAN, agent_principal: null, via_service: null });
+    const shown = await (await call(`/api/v1/items/${r.body.itemId}`)).json<{ item: ItemSummary }>();
+    expect(shown.item.source).toMatchObject({ sourceKind: 'agentpod', agent: false, station: STN, stationName: 'notes-station', path: 'out/report.md', linkedBy: HUMAN });
+  });
+  it('the same path linked again by the same person is the next version', async () => {
+    await workspaceOf();
+    mine();
+    const first = await upload([{ path: 'a.md', body: '# one' }], { title: 'a.md', stationFile: { station: STN, path: 'docs/a.md' } });
+    const again = await upload([{ path: 'a.md', body: '# two' }], { title: 'a.md', stationFile: { station: STN, path: 'docs/a.md' } });
+    expect(again.body).toMatchObject({ itemId: first.body.itemId, version: 2 });
+  });
+  it("someone else's station, or one the hub does not know, is refused the same way and nothing is stored", async () => {
+    await workspaceOf(); await workspaceOf(HUMAN_2);
+    restore = fakeHub({ [STN]: { key: 'notes-station', owner: HUMAN_2 } });
+    const before = await sessions();
+    const theirs = await upload([{ path: 'x.md', body: '# x' }], { title: 'x', stationFile: { station: STN, path: 'x.md' } });
+    const unknown = await upload([{ path: 'x.md', body: '# x' }], { title: 'x', stationFile: { station: 'stn_00000000000000ff', path: 'x.md' } });
+    expect([theirs.status, unknown.status]).toEqual([403, 403]);
+    expect(theirs.body).toEqual(unknown.body);   // no oracle for which stations exist
+    expect(theirs.body.error).toBe('station_not_yours');
+    expect(await sessions()).toBe(before);
+  });
+  it('the hub unreachable refuses with 502 and records nothing', async () => {
+    await workspaceOf();
+    restore = fakeHub('down');
+    const r = await upload([{ path: 'x.md', body: '# x' }], { title: 'x', stationFile: { station: STN, path: 'x.md' } });
+    expect(r.status).toBe(502);
+    expect(r.body.error).toBe('hub_unreachable');
+  });
+  it("the path is checked like any link's, and a station file never comes with a source or an item", async () => {
+    await workspaceOf();
+    mine();
+    expect((await upload([{ path: 'e', body: 'K=v' }], { title: 'e', stationFile: { station: STN, path: '.env' } })).status).toBe(400);
+    const a = await upload([{ path: 'b.md', body: '# b' }], { title: 'b' });
+    expect((await upload([{ path: 'b.md', body: '# b2' }], { title: 'b', item: a.body.itemId, stationFile: { station: STN, path: 'b.md' } })).status).toBe(400);
+  });
+  it('R-H1 is unchanged: an agent may not send a station file, a person may not send a source, a delegated person token is refused', async () => {
+    const bag = env as unknown as Record<string, unknown>;
+    bag.HUB_SERVICE_PRINCIPAL = HUB_SVC;
+    mine();   // before withOrgPlane, so each restores the fetch it wrapped
+    try {
+      await withOrgPlane(async () => {
+        const asAgent = await upload([{ path: 'g.md', body: '# g' }], { title: 'g', headers: await hubHeaders(AGENT), stationFile: { station: STN, path: 'g.md' }, source: { station: STN, path: 'g.md', board: 'brd_00000000000000b1' } });
+        expect(asAgent.status).toBe(400);
+        const own = await planeToken({ sub: HUMAN, principalKind: 'human' });
+        const asPerson = await upload([{ path: 'g.md', body: '# g' }], { title: 'g', headers: { Authorization: `Bearer ${own}` }, source: { station: STN, path: 'g.md', board: 'brd_00000000000000b1' } });
+        expect(asPerson.status).toBe(403);
+        const delegated = await planeToken({ sub: HUMAN, principalKind: 'human', act: { sub: HUB_SVC } });
+        const r = await upload([{ path: 'g.md', body: '# g' }], { title: 'g', headers: { Authorization: `Bearer ${delegated}` }, stationFile: { station: STN, path: 'g.md' } });
+        expect(r.status).toBe(403);
+      });
+    } finally { bag.HUB_SERVICE_PRINCIPAL = ''; }
+  });
+});
+
+describe('0041: the agentpod CHECK', () => {
+  it('takes an agent with the hub, or a person alone with a station and a path, and nothing in between', async () => {
+    const ws = await workspaceOf();
+    await env.DB.prepare(`INSERT INTO items (id, workspace_id, kind, title, scope, created_by) VALUES ('itm_00000000000025c1', ?, 'artifact', 't', 'workspace', ?)`).bind(ws, HUMAN).run();
+    const put = (cols: string, vals: unknown[]) => env.DB.prepare(`INSERT INTO item_sources (item_id, source, ${cols}) VALUES ('itm_00000000000025c1', 'agentpod', ${vals.map(() => '?').join(', ')})`).bind(...vals).run();
+    await expect(put('station, source_path', [STN, 'a.md'])).rejects.toThrow(/CHECK/);                                     // nobody named
+    await expect(put('linked_by, agent_principal, via_service, station, source_path', [HUMAN, AGENT, HUB_SVC, STN, 'a.md'])).rejects.toThrow(/CHECK/);   // both
+    await expect(put('linked_by, station', [HUMAN, STN])).rejects.toThrow(/CHECK/);                                       // no path
+    await put('linked_by, station, source_path', [HUMAN, STN, 'a.md']);
+  });
+});
+```
+
+In the contract's tests add: `StationFile.safeParse({ station: 's', path: 'p', board: 'brd_00000000000000b1' }).success === false` (strict) and `UploadCreate.parse({ title: 't', files: [...], stationFile: { station: 's', path: 'p' } }).stationFile` equals the input.
+
+- [ ] **Step 2: Run them to verify they fail**
+
+Run: `pnpm --filter @superlibrary/api test -- test/console-link.test.ts`
+Expected: FAIL (`UploadCreate` is not strict, so `stationFile` is dropped and the item has no `item_sources` row; the 0041 test fails with `no such column: linked_by`).
+
+- [ ] **Step 3: Contract**
+
+In `packages/contract/src/provenance.ts`, after `LinkSource`:
+
+```ts
+/**
+ * Gap S1: a file a person links from a station in the AgentPod console, with their own token.
+ * Superlibrary records it only when the hub says the station is that person's (never on the
+ * person's word): `station` is the hub's station id, `path` relative to the station's workspace.
+ */
+export const StationFile = z.object({ station: z.string().min(1).max(100), path: z.string().min(1).max(1024) }).strict();
+export type StationFile = z.infer<typeof StationFile>;
+```
+
+In `model.ts`: `import { LinkSource, StationFile } from './provenance';`, add to `UploadCreate` after `source`: `/** A person's link from their own station (gap S1); never with \`source\`. */ stationFile: StationFile.optional(),`; and to `ItemSource` after `via`: `/** The person who linked it from their station in the console (gap S1). */ linkedBy?: string;`.
+
+- [ ] **Step 4: The migration**
+
+```sql
+-- apps/api/migrations/0041_console_link.sql
+-- Gap S1: a person's "Link this file" in the AgentPod console records its station and path. The
+-- agentpod CHECK (Stage 0 ruling R3) names an agent and the hub that acted for it; a person's link
+-- names neither, and names the person instead (linked_by). SQLite cannot alter a CHECK: rebuilt.
+PRAGMA defer_foreign_keys = true;
+
+CREATE TABLE item_sources_new (
+  item_id TEXT PRIMARY KEY REFERENCES items(id),
+  source TEXT NOT NULL CHECK (source IN ('upload', 'agentpod', 'superpipeline')),
+  board_id TEXT,
+  card_id TEXT,
+  stage TEXT,
+  run_id TEXT,
+  agent_principal TEXT,
+  via_service TEXT,
+  station TEXT,
+  station_name TEXT,
+  source_path TEXT,
+  source_id TEXT,
+  source_url TEXT,
+  station_removed_at TEXT,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+  -- The person who linked it from their own station (gap S1); the hub confirmed the station is theirs.
+  linked_by TEXT,
+  CHECK (source <> 'agentpod' OR (
+    (agent_principal IS NOT NULL AND agent_principal GLOB 'prn_[0-9a-f]*' AND length(agent_principal) = 24
+      AND via_service IS NOT NULL AND via_service GLOB 'prn_[0-9a-f]*' AND length(via_service) = 24
+      AND linked_by IS NULL)
+    OR
+    (agent_principal IS NULL AND via_service IS NULL
+      AND linked_by IS NOT NULL AND linked_by GLOB 'prn_[0-9a-f]*' AND length(linked_by) = 24
+      AND station IS NOT NULL AND source_path IS NOT NULL)
+  ))
+);
+INSERT INTO item_sources_new (item_id, source, board_id, card_id, stage, run_id, agent_principal, via_service, station, station_name, source_path, source_id, source_url, station_removed_at, created_at)
+  SELECT item_id, source, board_id, card_id, stage, run_id, agent_principal, via_service, station, station_name, source_path, source_id, source_url, station_removed_at, created_at FROM item_sources;
+DROP TABLE item_sources;
+ALTER TABLE item_sources_new RENAME TO item_sources;
+-- Every index the old table had: 0004's two and 0040's agent filter (Task 2).
+CREATE INDEX item_sources_station_path ON item_sources(station, source_path);
+CREATE INDEX item_sources_card ON item_sources(card_id);
+CREATE INDEX item_sources_agent ON item_sources(agent_principal);
+
+-- The confirmed station file rides on its upload session until commit, like a hub link's source.
+ALTER TABLE upload_sessions ADD COLUMN station_file TEXT;
+```
+
+- [ ] **Step 5: Ask the hub, check, store**
+
+```ts
+// apps/api/src/clients/stations.ts
+import type { Env } from '../env';
+import { serviceToken } from './plane';
+
+export interface HubStation { id: string; key: string; owner: string }
+export class HubUnavailable extends Error {}
+
+/**
+ * Gap S1: the hub's own record of a station in this workspace, read with Superlibrary's service token
+ * for the workspace's org (Task 25H; the reader allowlist the roster read uses). Null when the hub does
+ * not know the station there. Anything else (network, 5xx, 401/403, a malformed answer) throws: no
+ * answer is not an answer.
+ */
+export async function hubStation(env: Env, org: string, stationId: string): Promise<HubStation | null> {
+  let res: Response;
+  try {
+    const token = await serviceToken(env, org, env.HUB_AUDIENCE!);
+    res = await fetch(`${env.HUB_URL}/api/bridge/stations/${encodeURIComponent(stationId)}`, { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(3000) });
+  } catch (e) {
+    throw new HubUnavailable(e instanceof Error ? e.message : String(e));
+  }
+  if (res.status === 404) return null;
+  if (!res.ok) throw new HubUnavailable(`hub station ${res.status}`);
+  const b = (await res.json().catch(() => null)) as Partial<HubStation> | null;
+  if (!b || b.id !== stationId || typeof b.key !== 'string' || typeof b.owner !== 'string') throw new HubUnavailable('hub station answer malformed');
+  return { id: b.id, key: b.key, owner: b.owner };
+}
+```
+
+Append to `apps/api/src/sources/link.ts` (imports: `StationFile` from the contract, `hubStation`, `HubUnavailable`):
+
+```ts
+export interface PersonStationFile { station: string; stationName: string; path: string }
+
+/**
+ * Gap S1: a person's link from their own station (the AgentPod console). R-H1 holds: this is the
+ * person's own token, never the hub acting for them; Superlibrary itself asks the hub whose station
+ * it is and records it only for its owner. Unknown and not-yours answer the same (no oracle).
+ */
+export async function checkStationFile(env: Env, p: Uploader, body: { stationFile?: StationFile; source?: LinkSource; item?: string }): Promise<PersonStationFile | null | Response> {
+  if (!body.stationFile) return null;
+  if (p.kind !== 'human') return error(400, 'invalid', { detail: 'an agent links through AgentPod, with its source' });
+  if (body.source) return error(400, 'invalid', { detail: 'give a source or a station file, not both' });
+  if (body.item) return error(400, 'invalid', { detail: 'a station file finds its own item' });
+  const c = checkPath(body.stationFile.path);
+  if (!c.ok) return error(400, 'path_refused', { path: c.path, reason: c.reason, ...(c.rule ? { rule: c.rule } : {}) });
+  let st: HubStation | null;
+  try {
+    st = await hubStation(env, p.org, body.stationFile.station);
+  } catch (e) {
+    console.error('station check failed', e instanceof Error ? e.message : String(e));
+    return error(502, 'hub_unreachable', { detail: 'AgentPod could not confirm the station; try again shortly' });
+  }
+  if (!st || st.owner !== p.principalId) return error(403, 'station_not_yours', { detail: 'Superlibrary records a station only for the person it belongs to' });
+  return { station: st.id, stationName: st.key, path: c.path };
+}
+
+/** Spec §3 for a person's link: the same person, station, path and scope is the next version of their live item. */
+export async function personStationItem(env: Env, workspaceId: string, prn: string, f: PersonStationFile, scope: string): Promise<string | null> {
+  const row = await env.DB.prepare(
+    `SELECT i.id FROM item_sources s JOIN items i ON i.id = s.item_id
+      WHERE i.workspace_id = ?1 AND s.source = 'agentpod' AND s.linked_by = ?2 AND s.station = ?3 AND s.source_path = ?4 AND i.scope = ?5
+        AND i.revoked_at IS NULL AND (i.expires_at IS NULL OR i.expires_at > ?6)
+      ORDER BY i.created_at DESC LIMIT 1`,
+  ).bind(workspaceId, prn, f.station, f.path, scope, new Date().toISOString()).first<{ id: string }>();
+  return row?.id ?? null;
+}
+```
+
+In `apps/api/src/uploads/routes.ts`:
+- `SessionRow` gains `station_file: string | null;`
+- in `create`, after `if (source && !body.item) itemForSource = …`:
+  ```ts
+  // Gap S1: a person's link from their own station, confirmed by the hub.
+  const file = await checkStationFile(env, p, body);
+  if (file instanceof Response) return file;
+  if (file) itemForSource = await personStationItem(env, p.workspaceId, p.principalId, file, body.scope);
+  ```
+  and the session INSERT gains the column `station_file` and the value `file ? JSON.stringify(file) : null`.
+- in `commit`, after `const src = …`: `const file = s.station_file ? (JSON.parse(s.station_file) as PersonStationFile) : null;`. In the `s.item_id` branch, after the agent's `UPDATE item_sources …`: `if (file && p.kind === 'human') statements.push(env.DB.prepare(\`UPDATE item_sources SET station_name = ? WHERE item_id = ? AND source = 'agentpod' AND linked_by = ?\`).bind(file.stationName, itemId, p.principalId));`. In the new-item branch, after the agent's INSERT: `if (file && p.kind === 'human') statements.push(env.DB.prepare(\`INSERT INTO item_sources (item_id, source, station, station_name, source_path, linked_by) VALUES (?, 'agentpod', ?, ?, ?, ?)\`).bind(itemId, file.station, file.stationName, file.path, p.principalId));`
+
+In `sourcesOf` (search.ts) add `...(r.linked_by ? { linkedBy: r.linked_by } : {}),`; in items/routes.ts `SourceRow` gains `linked_by: string | null`, `sourceOf` gains `if (r.linked_by) s.linkedBy = r.linked_by;`, `SOURCE_COLS` gains `linked_by`.
+
+- [ ] **Step 6: Run the tests**
+
+Run: `pnpm --filter @superlibrary/contract test && pnpm --filter @superlibrary/api test -- test/console-link.test.ts test/link.test.ts test/uploads.test.ts test/library-schema.test.ts test/foundation-schema.test.ts && pnpm --filter @superlibrary/api test && pnpm -r typecheck`
+Expected: PASS (lane A's agent-link tests are unchanged: their rows satisfy the first branch of the CHECK).
+
+- [ ] **Step 7: Revert-proof**
+
+1. Change `st.owner !== p.principalId` to `false`; expect `someone else's station…` to FAIL. Restore.
+2. Make `hubStation`'s catch return `null` instead of throwing; expect `the hub unreachable refuses with 502…` to FAIL. Restore.
+3. Drop `AND linked_by IS NULL` from the first CHECK branch (rebuild the test DB); expect `0041: the agentpod CHECK` to FAIL at "both". Restore.
+4. Remove the `if (p.kind !== 'human')` line; expect `R-H1 is unchanged…` to FAIL. Restore.
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add packages/contract/src/provenance.ts packages/contract/src/model.ts packages/contract/test apps/api/migrations/0041_console_link.sql apps/api/src/clients/stations.ts apps/api/src/sources/link.ts apps/api/src/uploads/routes.ts apps/api/src/search/search.ts apps/api/src/items/routes.ts apps/api/test/helpers/fake-hub.ts apps/api/test/helpers/upload.ts apps/api/test/console-link.test.ts
+git commit -m "feat(api): a person's console link records its station and path once the hub confirms the station is theirs (gap S1)
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01XwhK8QQtRh5hPEfqY5Arp8"
+```
+
+---
+
+## Task 25H (agentpod, P4-AP1): The hub says whose station it is (gap S1)
+
+**Files:**
+- Modify: `apps/hub/src/routes/bridge-roster.ts`, `apps/hub/src/routes/bridge-roster.test.ts`, `apps/hub/tests/integration/bridge-roster-endpoint.test.ts`, `docs/` (the page that documents `ROSTER_READERS` and the roster read, if any: one sentence for the new read)
+
+**Interfaces:**
+- Consumes: `verifyPlaneBearer`, `ROSTER_READERS` (the same allowlist as the roster read); `stations` (`id`, `tenantId`, `userId`, `stationKey`).
+- Produces: `GET /api/bridge/stations/:id` → `200 { id, key, owner }` for a station in the caller's tenant (`owner` = `stations.user_id`, the person who adopted it); `404 { error: 'not found' }` otherwise; `401`/`403`/`400` exactly as the roster read. `stationOwnerFor(tenantId, stationId)` exported for its integration test. Never acts for anyone: a read for Superlibrary's own service.
+
+- [ ] **Step 1: Write the failing tests**
+
+In `bridge-roster.test.ts`, give `app()` a `station` dep (`async (tenantId, id) => tenantId === "tnt_1" && id === "stn_00000000000000c1" ? { id, key: "notes-station", owner: "prn_000000000000000000a1" } : null`) and add:
+
+```ts
+const station = (a: ReturnType<typeof app>, id: string, authorization: string | null = "Bearer x.y.z") =>
+  a.request(`/api/bridge/stations/${id}`, { headers: authorization ? { authorization } : {} });
+
+test("a listed service reads whose station it is", async () => {
+  const r = await station(app(), "stn_00000000000000c1");
+  expect(r.status).toBe(200);
+  expect(await r.json()).toEqual({ id: "stn_00000000000000c1", key: "notes-station", owner: "prn_000000000000000000a1" });
+});
+test("a station the tenant does not have is 404", async () => {
+  expect((await station(app(), "stn_00000000000000ff")).status).toBe(404);
+});
+test("the station read refuses an unlisted service, a person and an agent", async () => {
+  expect((await station(app("service", "prn_0000000000000000c0b9"), "stn_00000000000000c1")).status).toBe(403);
+  expect((await station(app("human"), "stn_00000000000000c1")).status).toBe(403);
+  expect((await station(app("agent"), "stn_00000000000000c1")).status).toBe(403);
+  expect((await station(app(), "stn_00000000000000c1", null)).status).toBe(401);
+});
+test("a malformed station id is 400", async () => {
+  expect((await station(app(), "not a station")).status).toBe(400);
+});
+```
+
+In `tests/integration/bridge-roster-endpoint.test.ts` add `stationOwnerFor reads only the caller's tenant`: insert a station in `TENANT` and one with the same shape in a second tenant (create the tenant row as the file's other tenant-scoped tests do); `stationOwnerFor(TENANT, S1)` returns `{ id: S1, key, owner: userId }`; `stationOwnerFor("<other tenant>", S1)` returns `null`.
+
+- [ ] **Step 2: Run them to verify they fail**
+
+Run: `cd apps/hub && bun test src/routes/bridge-roster.test.ts` → FAIL (404 from Hono: no route). The integration test fails on the missing export.
+
+- [ ] **Step 3: Write the route**
+
+In `bridge-roster.ts`:
+
+```ts
+const STATION = /^[A-Za-z0-9_-]{1,100}$/;
+
+/** Superlibrary gap S1: whose station this is, in the caller's tenant. Superlibrary records a person's console link only for its owner. */
+export async function stationOwnerFor(tenantId: string, stationId: string): Promise<{ id: string; key: string; owner: string } | null> {
+  const [r] = await db
+    .select({ id: stations.id, key: stations.stationKey, owner: stations.userId })
+    .from(stations)
+    .where(and(eq(stations.id, stationId), eq(stations.tenantId, tenantId)))
+    .limit(1);
+  return r ?? null;
+}
+```
+
+Add `station: (tenantId: string, stationId: string) => Promise<{ id: string; key: string; owner: string } | null>` to `BridgeRosterDeps` and `station: stationOwnerFor` to `defaults`. Factor the bearer/verify/reader checks of the roster handler into one `async function reader(c)` returning the verified caller or the refusal `Response`, use it in both handlers, and chain:
+
+```ts
+    .get("/api/bridge/stations/:id", async (c) => {
+      const r = await reader(c);
+      if (r instanceof Response) return r;
+      const id = c.req.param("id");
+      if (!STATION.test(id)) return c.json({ error: "invalid station" }, 400);
+      const s = await deps.station(r.tenantId, id);
+      return s ? c.json(s) : c.json({ error: "not found" }, 404);
+    })
+```
+
+- [ ] **Step 4: Run the tests**
+
+Run: `cd apps/hub && bun test src/routes/bridge-roster.test.ts && DATABASE_URL=… bun test tests/integration/bridge-roster-endpoint.test.ts && bun run typecheck` (typecheck count equals the baseline).
+Expected: PASS.
+
+- [ ] **Step 5: Revert-proof**
+
+1. Drop `eq(stations.tenantId, tenantId)` from `stationOwnerFor`; expect the integration test to FAIL (the other tenant reads the station). Restore.
+2. Remove the reader-allowlist check from `reader`; expect `the station read refuses an unlisted service…` to FAIL. Restore.
+
+- [ ] **Step 6: Commit** (Task 28H follows on the same branch; the PR opens there)
+
+```bash
+git add apps/hub/src/routes/bridge-roster.ts apps/hub/src/routes/bridge-roster.test.ts apps/hub/tests/integration/bridge-roster-endpoint.test.ts docs
+git commit -m "feat(hub): Superlibrary may read whose station it is, for a person's console link (Superlibrary gap S1)
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01XwhK8QQtRh5hPEfqY5Arp8"
+```
+
+---
+
+## Task 25C (agentpod, P4-AP2): The console sends the link's station and path (gap S1)
+
+After P4-GAP is deployed (Superlibrary's `UploadCreate` accepts `stationFile`; before that a deployed console would have it silently dropped). **Check first** that no other agent holds a branch on `apps/console/src/lib/api/superlibrary.ts` (`gh pr list --repo SuperJackfruitLabs/agentpod --search superlibrary`); if one does, stop and report.
+
+**Files:**
+- Modify: `apps/console/src/lib/api/superlibrary.ts`, `apps/console/src/lib/api/superlibrary.test.ts`
+
+**Interfaces:**
+- Consumes: Superlibrary `POST /api/v1/uploads { …, stationFile: { station, path } }` and its refusals `403 station_not_yours`, `502 hub_unreachable` (Task 25).
+- Produces: `linkFileToLibrary(stationId, path)` declares with `stationFile: { station: stationId, path }`; the two refusals read as sentences.
+
+- [ ] **Step 1: Write the failing tests** (in `superlibrary.test.ts`, with the file's existing fetch fake)
+
+- `the link names its station and the path it came from`: the declare body's `stationFile` equals `{ station: <the stationId passed>, path: "out/report.md" }`, and it carries no `source`.
+- `a station Superlibrary will not record reads as a sentence`: the declare answers `403 { error: "station_not_yours" }` → the thrown message is `This station is not yours, so its link was not recorded.`; `502 { error: "hub_unreachable" }` → `AgentPod could not confirm the station — try again.`
+
+- [ ] **Step 2: Run them to verify they fail** — `cd apps/console && pnpm test -- src/lib/api/superlibrary.test.ts` → FAIL.
+
+- [ ] **Step 3: Code**
+
+In the declare body: `JSON.stringify({ title: name.slice(0, 200), files: [{ path: name, bytes: bytes.byteLength, sha256 }], stationFile: { station: stationId, path } })`. In `SAID`: `station_not_yours: "This station is not yours, so its link was not recorded."`, `hub_unreachable: "AgentPod could not confirm the station — try again."`. In the module comment, replace "No `source`: Superlibrary takes provenance only from the hub linking for an agent, and refuses it from a person." with "No `source` (that is only the hub's, linking for an agent): a `stationFile`, which Superlibrary records after asking the hub itself that the station is this person's (gap S1, R-H1 unchanged)."
+
+- [ ] **Step 4: Run** — `cd apps/console && pnpm check && pnpm test && pnpm build` → PASS.
+
+- [ ] **Step 5: Revert-proof** — remove `stationFile` from the body; expect `the link names its station…` to FAIL. Restore.
+
+- [ ] **Step 6: Commit** (on `feat/library-basis-console`, after Task 27H; the PR opens at the end of this task)
+
+```bash
+git add apps/console/src/lib/api/superlibrary.ts apps/console/src/lib/api/superlibrary.test.ts
+git commit -m "feat(console): Link this file names its station and path, which Superlibrary records once the hub confirms the station (gap S1)
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01XwhK8QQtRh5hPEfqY5Arp8"
+git push -u origin feat/library-basis-console
+gh pr create --title "Superlibrary: related work by title and spec before a card's record syncs; console links record their station" --body "$(cat <<'EOF'
+Superlibrary phase-4 plan Tasks 27H and 25C (gaps S3 and S1). Superlibrary P4-GAP is deployed, so both new fields are accepted.
+
+- The hub sends a card's title and spec with `cardId` to `POST /api/v1/related`; Superlibrary uses it only while the card has no record yet, so a card's first claim gets related prior work.
+- The console's Link this file sends `stationFile { station, path }`; Superlibrary asks the hub (its own service token) whose station it is and records it only for its owner. R-H1 unchanged: the hub never acts for a person.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+EOF
+)"
+```
+
+Merge on green; deploy the hub (pull, install, restart, `/health`, `deploy/smoke.sh`); confirm the console's Pages deployment for the merge commit.
+
+- [ ] **Step 7: Live check (OPERATOR-RUN, browser)** — in the console, on a station you own, **Link this file** on a small text file; open the Superlibrary item: Provenance names the station by its key and the path. Controller: `GET /api/v1/sources/agentpod/items?station=<id>` with the operator's `suli` credential lists the item. Record in the ledger.
+
+---
+
+## Task 26: A relevance floor in hybrid search (gap S2)
+
+Live (Stage 3, 55 items): the vector top-50 holds nearly every item, so every item earns a meaning contribution, and the words path ORs every query word, so a common word ("on", "the") makes nearly every item a word match. Two large many-chunk documents (a 68k-character record and the phases 2–3 plan upload) appear in nearly every top 5. The floor:
+
+1. **Common words are not word matches** while the query has any other word (`ftsQuery` drops a short stopword list; a query of only common words still searches them).
+2. **A candidate found only by meaning** is kept only when its best chunk scores within `RELEVANCE.vectorGap` of the best meaning match for the query. The best match is measured **without the item itself** (related passes `exclude`), or related would set the bar at a self-match of 1.0.
+3. **An exact-word match is never dropped** by the floor, however weak its meaning (spec §7 "never hidden", rulings S3-R10/S3-R13). Ranking (`fuse`) is unchanged.
+4. Results may be fewer than `limit`; nothing pads them.
+
+**Files:**
+- Modify: `packages/contract/src/retrieval.ts` (`RELEVANCE`, `STOPWORDS`), `apps/api/src/search/search.ts` (`ftsQuery`, the floor, `SearchOptions.exclude`, `SearchOptions.explain`), `apps/api/src/search/related.ts` (`exclude`), `apps/api/src/search/routes.ts` (operator explain route)
+- Test: `apps/api/test/relevance.test.ts`
+
+**Interfaces:**
+- Consumes: `search`, `SearchOptions` (Task 8a), `rankLists`, `fuse` (A1, unchanged), `VectorMatch.score` (vector-index.ts), `isOperator` (search/routes.ts).
+- Produces:
+  - contract `RELEVANCE = { vectorGap: 0.1 }`, `STOPWORDS: ReadonlySet<string>`
+  - `SearchOptions { timer?; exclude?: string; explain?: ExplainRow[] }`, `interface ExplainRow { itemId: string; fts: number | null; vector: number | null; vectorScore: number | null; kept: boolean }` (ranks 1-based, before the floor)
+  - `POST /api/v1/admin/search/explain` (a person listed in `OPERATORS` only; `SearchQuery` body) → `{ results: [{ itemId, title, outcome, score }], candidates: ExplainRow[] }`, computed as that person's viewer (visibility first, like every search), audited as `items.searched` with `detail.explain: true`. This is how the floor is measured and tuned live.
+
+- [ ] **Step 1: Write the failing test**
+
+```ts
+// apps/api/test/relevance.test.ts
+import { env } from 'cloudflare:test';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { RelatedQuery, SearchQuery } from '@superlibrary/contract';
+import { indexItem } from '../src/indexing/consumer';
+import { setIndexingForTests } from '../src/indexing/vector-index';
+import { ftsQuery, search } from '../src/search/search';
+import { related } from '../src/search/related';
+import type { Person } from '../src/auth/caller';
+import { fakeEmbedder, fakeVectorize } from './helpers/fake-vectors';
+import { upload } from './helpers/upload';
+import { workspaceOf } from './helpers/library';
+import { HUMAN, ORG } from './helpers/org-plane';
+
+let me: Person;
+beforeEach(async () => {
+  setIndexingForTests({ embedders: { 'workers-ai/bge-m3': fakeEmbedder() }, bindings: { a: fakeVectorize() } });
+  me = { kind: 'human', principalId: HUMAN, org: ORG, workspaceId: await workspaceOf(), role: 'owner', act: null };
+});
+afterEach(() => setIndexingForTests(null));
+const art = async (title: string, body: string) => {
+  const id = (await upload([{ path: `${title}.md`, body }], { title })).body.itemId as string;
+  await indexItem(env, id);
+  return id;
+};
+const found = async (query: string) => (await search(env, me, SearchQuery.parse({ query, limit: 25 }))).map((r) => r.itemId);
+const big = (words: string, n: number) => Array.from({ length: n }, () => words).join('\n\n');
+
+describe('the relevance floor (gap S2)', () => {
+  it('a candidate found only by meaning, far below the best meaning match, is not returned', async () => {
+    const a = await art('Ledger', 'ledger reconciliation runs nightly');
+    const b = await art('Garden', big('garden tomato soil water compost', 400));   // many chunks, nothing in common
+    const ids = await found('ledger reconciliation');
+    expect(ids).toContain(a);
+    expect(ids).not.toContain(b);
+  });
+  it('an exact-word match is never dropped by the floor, however weak its meaning (S3-R10/R13)', async () => {
+    await art('Ledger', 'ledger reconciliation runs nightly');
+    const c = await art('Mostly other', `${big('harbour ferry timetable winter schedule', 30)}\n\nledger`);
+    expect(await found('ledger reconciliation')).toContain(c);
+  });
+  it('common words alone no longer make an item a word match', async () => {
+    await art('Notes', 'ledger notes for the quarter');
+    const d = await art('Road', 'on the road again');
+    expect(ftsQuery('notes on the ledger')).toBe('"notes" OR "ledger"');
+    expect(await found('notes on the ledger')).not.toContain(d);
+  });
+  it('a query of only common words still searches them', async () => {
+    const e = await art('The', 'the of and to in');
+    expect(ftsQuery('the of')).toBe('"the" OR "of"');
+    expect(await found('the of')).toContain(e);
+  });
+  it('related never measures the floor against the item itself', async () => {
+    const a = await art('Aaa', 'the of and to in alpha');
+    const e = await art('Eee', 'the of and to in beta');   // no shared telling word: found only by meaning
+    const items = await related(env, me, RelatedQuery.parse({ itemId: a }));
+    expect(items.map((x) => x.itemId)).toContain(e);
+    expect(items.map((x) => x.itemId)).not.toContain(a);
+  });
+});
+```
+
+- [ ] **Step 2: Run it to verify it fails**
+
+Run: `pnpm --filter @superlibrary/api test -- test/relevance.test.ts`
+Expected: FAIL (the garden document is returned; `ftsQuery` keeps `on` and `the`; related measures against the item itself).
+
+- [ ] **Step 3: Write the floor**
+
+In `packages/contract/src/retrieval.ts`:
+
+```ts
+/**
+ * Gap S2: the relevance floor (spec §7). A candidate found only by meaning is kept when its best
+ * chunk scores within `vectorGap` (cosine) of the best meaning match for the query; one with an
+ * exact-word match is never dropped (S3-R10/R13). Tuned from the live measurement (Task 26 Step 7).
+ */
+export const RELEVANCE = { vectorGap: 0.1 } as const;
+/** Words that match nearly every item; they count as word matches only when a query has no other word. */
+export const STOPWORDS: ReadonlySet<string> = new Set([
+  'a', 'an', 'and', 'are', 'as', 'at', 'be', 'by', 'for', 'from', 'in', 'into', 'is', 'it', 'of', 'on', 'or', 'that', 'the', 'this', 'to', 'with',
+]);
+```
+
+In `apps/api/src/search/search.ts`:
+
+```ts
+export function ftsQuery(text: string): string | null {
+  const words = text.match(/[\p{L}\p{N}\p{M}_]+/gu)?.filter((w) => !/^(AND|OR|NOT|NEAR)$/.test(w)) ?? [];
+  // Gap S2: a common word matches nearly everything; it counts only when the query has nothing else.
+  const telling = words.filter((w) => !STOPWORDS.has(w.toLowerCase()));
+  const use = telling.length > 0 ? telling : words;
+  return use.length === 0 ? null : use.slice(0, 32).map((w) => `"${w}"`).join(' OR ');
+}
+
+export interface ExplainRow { itemId: string; fts: number | null; vector: number | null; vectorScore: number | null; kept: boolean }
+export interface SearchOptions { timer?: Timer; exclude?: string; explain?: ExplainRow[] }
+```
+
+Inside `search()`:
+- after the FTS query: `const ftsHits = fts.filter((r) => r.item_id !== opts.exclude);` and use `ftsHits` below in place of `fts`;
+- the vector path keeps each match's score: `semantic = matches.filter((m) => visible.has(m.itemId) && m.itemId !== opts.exclude).map((m) => ({ item_id: m.itemId, chunk_id: m.id, score: m.score }));` (type `Array<{ item_id: string; chunk_id: string; score: number }>`);
+- before `// 3. Reciprocal rank fusion`:
+
+```ts
+  // Gap S2: the relevance floor. Meaning-only candidates within RELEVANCE.vectorGap of the best
+  // meaning match are kept; an exact-word match always is (spec §7 "never hidden", S3-R10/R13).
+  const words = new Set(ftsHits.map((r) => r.item_id));
+  const top = semantic.reduce((best, m) => Math.max(best, m.score), Number.NEGATIVE_INFINITY);
+  const kept = semantic.filter((m) => words.has(m.item_id) || m.score >= top - RELEVANCE.vectorGap);
+  if (opts.explain) {
+    const before = rankLists(ftsHits, semantic);
+    const best = new Map<string, number>();
+    for (const m of semantic) best.set(m.item_id, Math.max(best.get(m.item_id) ?? Number.NEGATIVE_INFINITY, m.score));
+    const keptIds = new Set([...ftsHits.map((r) => r.item_id), ...kept.map((m) => m.item_id)]);
+    for (const [itemId, r] of before) opts.explain.push({ itemId, fts: r.fts ?? null, vector: r.vector ?? null, vectorScore: best.get(itemId) ?? null, kept: keptIds.has(itemId) });
+  }
+```
+
+and rank `rankLists(ftsHits, kept)` and build `hit` from `[ftsHits, kept]`.
+
+In `related.ts`, pass `{ timer, exclude: selfId ?? undefined }` to `search` (keep the `.filter((r) => r.itemId !== selfId)` as a second guard).
+
+In `search/routes.ts`, before the `/api/v1/search` block:
+
+```ts
+  // Gap S2: how the floor treated each candidate, for tuning it live. Operators only, as themselves.
+  if (url.pathname === '/api/v1/admin/search/explain' && request.method === 'POST') {
+    const p = await resolvePerson(request, env);
+    if (p instanceof Response) return p;
+    if (!isOperator(env, p.principalId)) return error(403, 'not_permitted');
+    const q = SearchQuery.safeParse(await request.json().catch(() => null));
+    if (!q.success) return error(400, 'invalid');
+    const explain: ExplainRow[] = [];
+    const results = await search(env, p, q.data, undefined, { explain });
+    await audit(env.DB, { workspaceId: p.workspaceId, actor: p.principalId, act: p.act, action: 'items.searched', detail: { count: results.length, queryLength: q.data.query.length, explain: true } }).run();
+    return json({ results: results.map((r) => ({ itemId: r.itemId, title: r.title, outcome: r.outcome, score: r.score })), candidates: explain });
+  }
+```
+
+Add to `relevance.test.ts` one route test: `the explain route answers operators only` (a person not in `OPERATORS` gets 403; with `bag.OPERATORS = HUMAN` the answer lists a candidate with `kept: false` for the garden document; restore `OPERATORS` in `finally`).
+
+- [ ] **Step 4: Run the tests**
+
+Run: `pnpm --filter @superlibrary/api test -- test/relevance.test.ts test/search.test.ts test/related.test.ts test/p23-integration.test.ts && pnpm --filter @superlibrary/api test && pnpm -r typecheck`
+Expected: PASS. If an existing test relied on a weak meaning-only match being returned, move its fixture within the gap (shared words) and say so in the report; **never** change the expectations of the S3-R10/S3-R13 tests (an abandoned or rejected exact-title match is returned), and never change an `ftsQuery` test's expectation for a query with no common word.
+
+- [ ] **Step 5: Revert-proof**
+
+1. Apply the floor to every candidate (drop `words.has(m.item_id) ||`); expect `an exact-word match is never dropped…` to FAIL. Restore.
+2. Set `RELEVANCE.vectorGap` to `Infinity`; expect `a candidate found only by meaning…` to FAIL. Restore.
+3. Use `words` instead of `use` in `ftsQuery`; expect `common words alone…` to FAIL. Restore.
+4. Remove `exclude: selfId` from related's `search` call; expect `related never measures the floor against the item itself` to FAIL. Restore.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add packages/contract/src/retrieval.ts apps/api/src/search/search.ts apps/api/src/search/related.ts apps/api/src/search/routes.ts apps/api/test/relevance.test.ts
+git commit -m "feat(search): a relevance floor; common words are not word matches; exact-word matches are never hidden (gap S2)
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01XwhK8QQtRh5hPEfqY5Arp8"
+```
+
+- [ ] **Step 7: Live measurement (after P4-GAP deploys; the operator's `suli` credential, operator listed in `OPERATORS`)**
+
+For each Stage 3 query (`Reclaim disk`, `homepage mobile clarity`, `LinkedIn publishing approval`, `Coordinator dispatch canary`, `superwitness acceptance probe`, `report disk usage`), `POST /api/v1/admin/search/explain { query, limit: 10 }` and record in the ledger: result count, the rank of the two large documents, the rank of the abandoned/rejected exact-title records, and the spread of `vectorScore` (best, 5th, 20th, median). **Pass** when: (i) neither large document is in a top 5 unless the explain row shows a word match (`fts` not null) on a telling word, or a `vectorScore` within the gap; (ii) the abandoned canary records and the rejected probe are still returned for their own titles (within limit 10); (iii) a query with a clear best match returns fewer than 10 results. If (i) fails, tune `RELEVANCE.vectorGap` from the recorded spread (one constant, a follow-up commit on a new branch with the reason in its message) and re-measure; if (ii) fails, stop: that is a regression of S3-R10/R13.
+
+---
+
+## Task 27: A card's first claim gets related work before its record syncs (gap S3, Superlibrary)
+
+Live: a claim one second after a card is created asked `related({ cardId })`, the card's record synced six seconds later, and Superlibrary answered `[]`. The hub already holds the card's title and spec at claim time (`assemblePrompt`). `RelatedQuery`'s `cardId` form gains an optional `text`: the hub sends title and spec, and Superlibrary uses them **only while the card has no record** in the workspace. A record, once it exists, always wins, and a record the caller cannot see still answers `[]`, whatever text is sent. The text is the caller's own words searched with the caller's own visibility, exactly like `POST /api/v1/search`, so it can show nothing a caller could not already find. It is never stored, logged or audited.
+
+**Files:**
+- Modify: `packages/contract/src/retrieval.ts` (`RelatedQuery`), `apps/api/src/search/related.ts`
+- Test: `apps/api/test/related-basis.test.ts`, `packages/contract/test/library.test.ts` (or the retrieval contract test)
+
+**Interfaces:**
+- Consumes: `related`, `relatedItems` (A5, Tasks 8a and 26), `rosterBoards` (for the agent test, via a hub fetch fake as `visibility-v2.test.ts` does).
+- Produces: `RelatedQuery` = `{ cardId, text?: string (trimmed, 1–4000), limit, maxTokens } | { itemId, limit, maxTokens }`, both strict; `items.related` audit detail gains `basis: 'record' | 'item' | 'text' | 'none'`. MCP's `library_related` is unchanged (A17): agents give a `cardId` and the hub's claim path is the one that sends a basis.
+
+- [ ] **Step 1: Write the failing tests**
+
+Contract: `RelatedQuery.safeParse({ itemId: 'itm_0123456789abcdef', text: 'x' }).success === false`; `{ cardId, text: '   ' }` fails; `{ cardId, text: 'x'.repeat(4001) }` fails; `{ cardId, text: ' Rotate keys ' }` parses to `text: 'Rotate keys'`.
+
+```ts
+// apps/api/test/related-basis.test.ts
+import { env } from 'cloudflare:test';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { RelatedQuery } from '@superlibrary/contract';
+import { indexItem } from '../src/indexing/consumer';
+import { setIndexingForTests } from '../src/indexing/vector-index';
+import { related } from '../src/search/related';
+import { __resetServiceTokensForTests } from '../src/clients/plane';
+import type { AgentViewer, Person } from '../src/auth/caller';
+import { fakeEmbedder, fakeVectorize } from './helpers/fake-vectors';
+import { seedRecord } from './helpers/records';
+import { HUMAN, ORG } from './helpers/org-plane';
+import { B1, B2, knowBoard, workspaceOf } from './helpers/library';
+
+const bag = env as unknown as Record<string, unknown>;
+const realFetch = globalThis.fetch;
+let ws: string;
+let me: Person;
+beforeEach(async () => {
+  setIndexingForTests({ embedders: { 'workers-ai/bge-m3': fakeEmbedder() }, bindings: { a: fakeVectorize() } });
+  ws = await workspaceOf();
+  me = { kind: 'human', principalId: HUMAN, org: ORG, workspaceId: ws, role: 'owner', act: null };
+  await knowBoard(ws, B1); await knowBoard(ws, B2, 'Other');
+});
+afterEach(async () => { setIndexingForTests(null); globalThis.fetch = realFetch; bag.ORG_PLANE_URL = ''; bag.SERVICE_CREDENTIALS = ''; __resetServiceTokensForTests(); await env.DB.prepare(`DELETE FROM roster_cache`).run(); });
+const rec = async (id: string, text: string, board = B1) => { await seedRecord({ id, ws, board, text, title: text }); await indexItem(env, id); };
+const ids = async (q: unknown, v: Person | AgentViewer = me) => (await related(env, v, RelatedQuery.parse(q))).map((r) => r.itemId);
+const NEW_CARD = 'card_0000000000000fff';
+
+describe('related for a card with no record yet (gap S3)', () => {
+  it('is related by the title and spec the hub sends', async () => {
+    await rec('itm_00000000000027a1', 'rotate the signing keys quarterly');
+    expect(await ids({ cardId: NEW_CARD, text: 'Rotate signing keys\n{"goal":"rotate the keys"}' })).toContain('itm_00000000000027a1');
+    expect(await ids({ cardId: NEW_CARD })).toEqual([]);   // no record and no text: nothing, as before
+  });
+  it('the record wins over the sent text once it exists', async () => {
+    await rec('itm_00000000000027b1', 'disk usage report for the hosts');      // the card's own record
+    await rec('itm_00000000000027b2', 'disk usage weekly summary');
+    await rec('itm_00000000000027b3', 'rotate the signing keys quarterly');
+    const got = await ids({ cardId: 'card_00000000000027b1', text: 'rotate signing keys' });
+    expect(got).toContain('itm_00000000000027b2');
+    expect(got).not.toContain('itm_00000000000027b3');
+  });
+  it('a record the caller cannot see answers nothing, whatever text is sent', async () => {
+    await rec('itm_00000000000027c1', 'disk usage on a hidden board', 'brd_00000000000000b9');   // a board Superlibrary does not know
+    await rec('itm_00000000000027c2', 'disk usage weekly summary');
+    expect(await ids({ cardId: 'card_00000000000027c1', text: 'disk usage' })).toEqual([]);
+  });
+  it('an agent sees, through a text basis, only what its roster lets it see', async () => {
+    await rec('itm_00000000000027d1', 'release checklist for payments', B1);
+    await rec('itm_00000000000027d2', 'release checklist for billing', B2);
+    bag.ORG_PLANE_URL = 'https://accounts.test';
+    bag.SERVICE_CREDENTIALS = JSON.stringify({ [ORG]: 'svc_lib:secret' });
+    globalThis.fetch = (async (i: RequestInfo | URL) => String(i).endsWith('/api/token/service') ? Response.json({ access_token: 't', expires_in: 300 }) : Response.json({ boards: [B1] })) as typeof fetch;
+    const agent: AgentViewer = { kind: 'agent', principalId: 'prn_000000000000000000a2', org: ORG, workspaceId: ws, act: null, via: null };
+    const got = await ids({ cardId: NEW_CARD, text: 'release checklist' }, agent);
+    expect(got).toContain('itm_00000000000027d1');
+    expect(got).not.toContain('itm_00000000000027d2');
+  });
+  it('the text is never stored or audited: the audit names the basis only', async () => {
+    await rec('itm_00000000000027e1', 'rotate the signing keys quarterly');
+    await ids({ cardId: NEW_CARD, text: 'Zanzibar rotate signing keys' });
+    const row = await env.DB.prepare(`SELECT detail FROM audit_events WHERE action = 'items.related' ORDER BY rowid DESC LIMIT 1`).first<{ detail: string }>();
+    expect(JSON.parse(row!.detail)).toMatchObject({ basis: 'text' });
+    expect(row!.detail).not.toContain('Zanzibar');
+  });
+});
+```
+
+- [ ] **Step 2: Run them to verify they fail**
+
+Run: `pnpm --filter @superlibrary/api test -- test/related-basis.test.ts`
+Expected: FAIL (`RelatedQuery` refuses `text`: unknown key in a strict object).
+
+- [ ] **Step 3: Contract and related**
+
+In `retrieval.ts`, the `cardId` branch becomes:
+
+```ts
+  z.object({
+    cardId: z.string().regex(CARD_ID),
+    /** Gap S3: the card's title and spec as the caller has them, used only while the card has no record yet. Never stored. */
+    text: z.string().trim().min(1).max(4000).optional(),
+    ...relatedCaps,
+  }).strict(),
+```
+
+In `related.ts`, `relatedItems` returns `{ items: RelatedItem[]; basis: 'record' | 'item' | 'text' | 'none' }` (and `related` audits `basis` beside `count` and `itemIds`). Its `cardId` branch:
+
+```ts
+  if ('cardId' in q) {
+    const w = await env.DB.prepare(`SELECT item_id, text FROM work_records WHERE workspace_id = ? AND card_id = ?`).bind(v.workspaceId, q.cardId).first<{ item_id: string; text: string }>();
+    if (w) {
+      // A record, once it exists, is the basis; one the caller cannot see answers nothing (spec §4).
+      if (!(await visibleItem(env, v, w.item_id, scopes))) return { items: [], basis: 'none' };
+      selfId = w.item_id;
+      basis = w.text;
+      kind = 'record';
+    } else if (q.text) {
+      // Gap S3: the record has not synced yet. The caller's own words, searched with its own visibility.
+      basis = q.text;
+      kind = 'text';
+    } else {
+      return { items: [], basis: 'none' };
+    }
+  }
+```
+
+(the `itemId` branch sets `kind = 'item'`).
+
+- [ ] **Step 4: Run the tests**
+
+Run: `pnpm --filter @superlibrary/contract test && pnpm --filter @superlibrary/api test -- test/related-basis.test.ts test/related.test.ts test/mcp.test.ts && pnpm --filter @superlibrary/api test && pnpm -r typecheck`
+Expected: PASS.
+
+- [ ] **Step 5: Revert-proof**
+
+1. Move the `q.text` branch before the record lookup (text first); expect `the record wins over the sent text…` to FAIL. Restore.
+2. When the record is invisible, fall back to `q.text` instead of returning; expect `a record the caller cannot see answers nothing…` to FAIL. Restore.
+3. Add `text: q.text` to the audit detail; expect `the text is never stored or audited…` to FAIL. Restore.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add packages/contract/src/retrieval.ts packages/contract/test apps/api/src/search/related.ts apps/api/test/related-basis.test.ts
+git commit -m "feat(related): a card with no record yet is related by the title and spec the caller sends (gap S3)
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01XwhK8QQtRh5hPEfqY5Arp8"
+```
+
+---
+
+## Task 27H (agentpod, P4-AP2): The hub sends the card's title and spec with `cardId` (gap S3)
+
+After P4-GAP is deployed (until then Superlibrary's strict `RelatedQuery` answers `400` to `text`, and the claim would go ahead without the section).
+
+**Files:**
+- Modify: `apps/hub/src/services/superlibrary/related.ts`, `apps/hub/src/services/superlibrary/related.test.ts`, `apps/hub/src/services/bridge/dispatch.ts` (`assemblePrompt`), the `assemblePrompt` unit test (`dispatch.test.ts` or wherever `assemblePrompt` is tested today)
+
+**Interfaces:**
+- Consumes: `CardPrompt` card `title`, `spec` (dispatch.ts); Superlibrary `RelatedQuery.text` (Task 27).
+- Produces: `RelatedWorkInput.text?: string`; `relatedBasis(title, spec): string | undefined` (title, a newline, the spec as JSON when not a string; trimmed; capped at 4000; undefined when empty); the related request body `{ cardId, text? }`. The text is never logged.
+
+- [ ] **Step 1: Write the failing tests**
+
+In `related.test.ts`: `sends the card's title and spec as the basis beside the cardId` (capture the request's `json`; equals `{ cardId: input.cardId, text: "Pricing v2\n{\"goal\":\"raise\"}" }` for `input.text = relatedBasis("Pricing v2", { goal: "raise" })`); `relatedBasis caps at 4000 characters and is undefined for an empty card`; `the basis is never logged` (the info and warn calls' metadata, stringified, do not contain the title). In the `assemblePrompt` test: the injected `relatedWork` receives `text` built from the run context's `card.title` and `card.spec`.
+
+- [ ] **Step 2: Run them to verify they fail** — `cd apps/hub && bun test src/services/superlibrary/related.test.ts` → FAIL.
+
+- [ ] **Step 3: Code**
+
+In `related.ts`:
+
+```ts
+/** Gap S3: what Superlibrary relates a card by while its record has not synced: title and spec, capped. Never logged. */
+export function relatedBasis(title: string | null | undefined, spec: unknown): string | undefined {
+  const s = typeof spec === "string" ? spec : spec === null || spec === undefined ? "" : JSON.stringify(spec);
+  const text = [title ?? "", s].filter((x) => x.trim() !== "").join("\n").trim();
+  return text === "" ? undefined : text.slice(0, 4000);
+}
+```
+
+`RelatedWorkInput` gains `text?: string`; the request body becomes `{ cardId: i.cardId, ...(i.text ? { text: i.text } : {}) }`. In `assemblePrompt`, pass `text: relatedBasis(ctx.card.title ?? work.card.title, ctx.card.spec)` to the related call.
+
+- [ ] **Step 4: Run** — `cd apps/hub && bun test src/services/superlibrary src/services/bridge && bun run typecheck` (count equals the baseline) → PASS.
+
+- [ ] **Step 5: Revert-proof** — drop `text` from the request body; expect `sends the card's title and spec…` to FAIL. Restore.
+
+- [ ] **Step 6: Commit** (Task 25C follows on this branch and opens P4-AP2)
+
+```bash
+git add apps/hub/src/services/superlibrary/related.ts apps/hub/src/services/superlibrary/related.test.ts apps/hub/src/services/bridge
+git commit -m "feat(hub): related prior work for a new card uses its title and spec until its record syncs (Superlibrary gap S3)
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01XwhK8QQtRh5hPEfqY5Arp8"
+```
+
+- [ ] **Step 7: Live check (after P4-AP2 deploys)** — create one test card as the operator with `supi` (draft-only spec, as Stage 3 did) whose title shares words with existing records of its board, and move it to running at once. Pass: the hub journal's `related prior work attached` line for that card's **first** claim has `count > 0`, and Superlibrary's `items.related` audit row for it reads `basis: 'text'`. Archive the card. Record in the ledger.
+
+---
+
+## Task 28H (agentpod, P4-AP1): Related-work timing in the hub's journal, and the agent token minted early (gap S4)
+
+**Files:**
+- Modify: `apps/hub/src/services/superlibrary/client.ts` (`warmAgent`), `apps/hub/src/services/superlibrary/related.ts` (timing fields, `prefetchRelatedWork`), `apps/hub/src/services/bridge/dispatch.ts` (`assemblePrompt` starts the prefetch before the run-context read), the tests beside them
+
+**Interfaces:**
+- Consumes: `superlibraryClient`, `relatedWorkEnabled`, `RelatedWorkInput` (lazy `principal`), `assemblePrompt`; Superlibrary's `Server-Timing` (Task 8a).
+- Produces:
+  - `SuperlibraryClient.warmAgent(agentPrincipal): Promise<void>`: mints and caches the agent's Superlibrary token; never throws
+  - `createPrefetchRelatedWork(deps)` / `prefetchRelatedWork(i): void`: when Superlibrary is configured and the board's switch is on, resolves the principal and warms its token, fire-and-forget; never awaited by the claim and never throws
+  - journal: `related prior work attached` gains `elapsedMs` and `serverTiming` (Superlibrary's header, only `name;dur=N` / `name;desc="N"` entries, at most 400 characters); `related prior work skipped` gains `elapsedMs`. Never a title, a body, a basis or a token (unchanged rule).
+
+- [ ] **Step 1: Write the failing tests**
+
+`related.test.ts`: `the attached line carries the elapsed time and Superlibrary's stage timings` (the fake answers `Server-Timing: auth;dur=5, embed;dur=200, app;dur=310` plus a forged `x;desc="itm_0000000000000001"` entry; the logged `serverTiming` holds the first three and not the forged one; `elapsedMs` is a number); `the skipped line carries the elapsed time`. `assemblePrompt` test: `the agent token is warmed while the run context is read` (a `context()` fake that resolves after 100 ms and records `context:end`; an injected `prefetchRelated` that records `prefetch`; expect `prefetch` before `context:end`, and the related call's `principal` lookup to have run once); `no prefetch when Superlibrary is unconfigured or the board is off` (in `related.test.ts`, `createPrefetchRelatedWork`: client `null` → `enabled` never called; `enabled` false → `principal` never called; a `warmAgent` that rejects is swallowed).
+
+- [ ] **Step 2: Run them to verify they fail** — `cd apps/hub && bun test src/services/superlibrary src/services/bridge` → FAIL.
+
+- [ ] **Step 3: Code**
+
+In `client.ts`, add to the interface and the returned object: `async warmAgent(prn) { try { await agent(prn); } catch (err) { log.warn("superlibrary token warm-up failed", { principal: prn, error: String(err) }); } }`.
+
+In `related.ts`:
+
+```ts
+/** Superlibrary's own stage timings (its Server-Timing), names and numbers only. */
+export function stageTimings(h: string | null): string {
+  return (h ?? "").split(",").map((s) => s.trim()).filter((s) => /^[a-z0-9]+;(dur=\d+|desc="\d+")$/.test(s)).join(", ").slice(0, 400);
+}
+
+/** Gap S4: mint the agent's token while the claim reads its run context, so the related call finds it cached. */
+export function createPrefetchRelatedWork(deps: { client: () => SuperlibraryClient | null; enabled: (tenantId: string, boardId: string) => Promise<boolean> }) {
+  return function prefetchRelatedWork(i: RelatedWorkInput): void {
+    const lib = deps.client();
+    if (!lib || i.principal === null) return;
+    void (async () => {
+      if (!(await deps.enabled(i.tenantId, i.boardId))) return;
+      const principal = typeof i.principal === "function" ? await i.principal() : i.principal;
+      if (principal) await lib.warmAgent(principal);
+    })().catch(() => {});
+  };
+}
+export const prefetchRelatedWork = createPrefetchRelatedWork({ client: superlibraryClient, enabled: relatedWorkEnabled });
+```
+
+`attempt` returns `{ items, serverTiming: stageTimings(res.headers.get("server-timing")) }`; `fetchRelatedWork` takes `const t0 = Date.now()` first and logs `elapsedMs: Date.now() - t0` on both lines and `serverTiming` on the attached line. In `assemblePrompt`, before `const ctx = await deps.client.context(work.runId);`: `(deps.prefetchRelated ?? prefetchRelatedWork)({ tenantId: deps.tenantId, boardId: deps.agent.boardId, cardId: work.card.id, principal: occupant });` (`DispatchDeps.prefetchRelated?` is the test seam). The occupant lookup is memoised by dispatch, so the related call reuses it.
+
+- [ ] **Step 4: Run** — `cd apps/hub && bun test && bun run typecheck` (count equals the baseline) → PASS.
+
+- [ ] **Step 5: Revert-proof** — remove the prefetch call in `assemblePrompt`; expect `the agent token is warmed while the run context is read` to FAIL. Restore. Drop the regex filter in `stageTimings`; expect the forged entry to appear and the timing test to FAIL. Restore.
+
+- [ ] **Step 6: Commit, push and open P4-AP1**
+
+```bash
+git add apps/hub/src/services/superlibrary apps/hub/src/services/bridge
+git commit -m "feat(hub): related work logs its elapsed time and Superlibrary's stage timings; the agent token is minted during the context read (Superlibrary gap S4)
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01XwhK8QQtRh5hPEfqY5Arp8"
+git push -u origin feat/library-station-owner
+gh pr create --title "Superlibrary: whose station it is (for console links); related-work timing and early token mint" --body "$(cat <<'EOF'
+Superlibrary phase-4 plan Tasks 25H and 28H (gaps S1 and S4). Needs no Superlibrary change to deploy.
+
+- `GET /api/bridge/stations/:id` for Superlibrary's own service (the `ROSTER_READERS` allowlist): the station's key and owner in the caller's tenant, 404 otherwise. Superlibrary records a person's console link only for the station's owner. The hub acts for no one.
+- The related-work journal lines carry `elapsedMs` and Superlibrary's `Server-Timing` stage durations, so the 2.5 s claim budget can be measured; the agent's Superlibrary token is minted while the claim reads its run context.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+EOF
+)"
+```
+
+Merge on green; deploy the hub (pull, install, restart, `/health`, `deploy/smoke.sh`).
+
+---
+
+## Task 28: Related within the claim budget (gap S4, Superlibrary)
+
+**Target.** Over at least 10 live claims, at least 3 of them cold (the agent's token and roster caches expired: the first claim after 6 minutes or more without one), the hub's `related prior work …` lines show `elapsedMs` **p95 ≤ 1500 ms** (60% of the 2.5 s budget) and **no** `no answer within 2500 ms` skip; Superlibrary's `app;dur` in those lines has **p95 ≤ 900 ms**. Raising the budget is not the fix (it is the claim's latency).
+
+**Files:**
+- Modify: `apps/api/src/indexing/vector-index.ts` (`VectorIndex.get`, `VectorizeLike` gains `getByIds`), `apps/api/src/search/search.ts` (`SearchOptions.vector`), `apps/api/src/search/related.ts`, `apps/api/test/helpers/fake-vectors.ts` (`getByIds`), and only if Step 1 says so `apps/api/wrangler.jsonc` (`ROSTER_TTL_SECONDS`)
+- Test: `apps/api/test/related-speed.test.ts`
+
+**Interfaces:**
+- Consumes: Task 8a's stage timings; Task 28H's journal fields; `readSlots`, `indexFor` (A1/B), `chunks` (`id` = `<item>:<version>:<position>`).
+- Produces: `VectorIndex.get(ids): Promise<Array<{ id: string; values: number[] }>>` (values checked against the slot's dims); `SearchOptions.vector?: number[]` (used instead of embedding the query when given); related reuses the basis item's stored first-chunk vector from the active slot and falls back to embedding when it is missing; related reads every hit's first chunk in one statement.
+
+- [ ] **Step 1: Measure the baseline (after P4-API and P4-AP1 are deployed)**
+
+The controller creates one test card as the operator with `supi` on a board with two rostered agents (draft-only spec, as Stage 3 did) and moves it to running 10 times over at least 30 minutes, with at least 3 gaps of 6 minutes or more. From the hub's journal, collect each `related prior work attached|skipped` line's `elapsedMs` and `serverTiming`. Record in the ledger: p50/p95 of `elapsedMs`, of `app;dur`, and of each stage (`auth`, `scopes`, `basis`, `embed`, `vector`, `fts`, `recheck`, `hydrate`, `fit`, `audit`), cold and warm separately, and `elapsedMs − app;dur` (network plus the hub's token mint). Archive the card.
+
+- [ ] **Step 2: Write the failing test**
+
+```ts
+// apps/api/test/related-speed.test.ts
+import { env } from 'cloudflare:test';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { RelatedQuery } from '@superlibrary/contract';
+import { indexItem } from '../src/indexing/consumer';
+import { setIndexingForTests } from '../src/indexing/vector-index';
+import { related } from '../src/search/related';
+import type { Person } from '../src/auth/caller';
+import { fakeEmbedder, fakeVectorize } from './helpers/fake-vectors';
+import { seedRecord } from './helpers/records';
+import { HUMAN, ORG } from './helpers/org-plane';
+import { B1, call, knowBoard, workspaceOf } from './helpers/library';
+
+let embedder: ReturnType<typeof fakeEmbedder>;
+let vectors: ReturnType<typeof fakeVectorize>;
+let me: Person;
+beforeEach(async () => {
+  embedder = fakeEmbedder(); vectors = fakeVectorize();
+  setIndexingForTests({ embedders: { 'workers-ai/bge-m3': embedder }, bindings: { a: vectors } });
+  const ws = await workspaceOf();
+  me = { kind: 'human', principalId: HUMAN, org: ORG, workspaceId: ws, role: 'owner', act: null };
+  await knowBoard(ws, B1);
+  for (const [id, text] of [['itm_00000000000028a1', 'deploy the payments service'], ['itm_00000000000028a2', 'deploy the billing service'], ['itm_00000000000028a3', 'deploy the ledger service'],
+    ['itm_00000000000028a4', 'deploy the search service'], ['itm_00000000000028a5', 'deploy the index service'], ['itm_00000000000028a6', 'deploy the upload service']] as const) {
+    await seedRecord({ id, ws, text, title: text });
+    await indexItem(env, id);
+  }
+});
+afterEach(() => setIndexingForTests(null));
+
+describe('related within the claim budget (gap S4)', () => {
+  it("a card's related call reuses its record's stored vector: no embedding call", async () => {
+    const before = embedder.calls.length;
+    const items = await related(env, me, RelatedQuery.parse({ cardId: 'card_00000000000028a1' }));
+    expect(embedder.calls.length).toBe(before);
+    expect(items.map((x) => x.itemId)).toContain('itm_00000000000028a2');
+  });
+  it('a record not yet in the vector index falls back to embedding its text', async () => {
+    for (const k of [...vectors.store.keys()]) if (k.startsWith('itm_00000000000028a1:')) vectors.store.delete(k);
+    const before = embedder.calls.length;
+    await related(env, me, RelatedQuery.parse({ cardId: 'card_00000000000028a1' }));
+    expect(embedder.calls.length).toBe(before + 1);
+  });
+  it("related reads every hit's first chunk in one round trip", async () => {
+    const rt = async (limit: number) => {
+      const res = await call('/api/v1/related', { method: 'POST', body: { cardId: 'card_00000000000028a1', limit } });
+      return Number(/d1rt;desc="(\d+)"/.exec(res.headers.get('Server-Timing') ?? '')![1]);
+    };
+    expect((await rt(5)) - (await rt(1))).toBeLessThanOrEqual(1);
+  });
+});
+```
+
+Add `getByIds` to `fakeVectorize`: `async getByIds(ids: string[]) { return ids.flatMap((id) => (store.has(id) ? [store.get(id)!] : [])) as any; }`.
+
+- [ ] **Step 3: Run it to verify it fails** — `pnpm --filter @superlibrary/api test -- test/related-speed.test.ts` → FAIL (an embedding call per related; the round-trip difference is 4).
+
+- [ ] **Step 4: Code**
+
+In `vector-index.ts`: `VectorizeLike = Pick<VectorizeIndex, 'upsert' | 'deleteByIds' | 'query' | 'getByIds'>`; `VectorIndex` gains `get(ids: string[]): Promise<Array<{ id: string; values: number[] }>>`, implemented as `(await raw.getByIds(ids)).map((v) => ({ id: v.id, values: Array.from(v.values as ArrayLike<number>) })).filter((v) => v.values.length === dims)`.
+
+In `search.ts`: `SearchOptions` gains `vector?: number[]`; in the vector path `const values = opts.vector && opts.vector.length === active.dims ? opts.vector : (await embedderFor(env, active.embedder_id!).embed([q.query]))[0]!;` (the `embed` stage is timed only when it runs).
+
+In `related.ts`, after the basis is chosen and when `selfId` is set (a record or an item):
+
+```ts
+  // Gap S4: the basis item's own first-chunk vector, already in the active slot; embed only if it is missing.
+  let vector: number[] | undefined;
+  const first = await env.DB.prepare(`SELECT id FROM chunks WHERE item_id = ? ORDER BY position LIMIT 1`).bind(selfId).first<{ id: string }>();
+  if (first) {
+    try {
+      const { active } = await readSlots(env);
+      vector = (await indexFor(env, active).get([first.id]))[0]?.values;
+    } catch (e) {
+      console.error('stored vector unavailable; embedding the basis', e instanceof Error ? e.message : String(e));
+    }
+  }
+```
+
+(timed as `basis`), and pass `vector` in the `search` options. Replace the per-hit `SELECT text FROM chunks … LIMIT 1` loop's query with one read before the loop: `const firsts = new Map((await env.DB.prepare(\`SELECT item_id, text FROM chunks WHERE item_id IN (SELECT value FROM json_each(?)) AND position = 0\`).bind(JSON.stringify(hits.map((h) => h.itemId))).all<{ item_id: string; text: string }>()).results.map((r) => [r.item_id, r.text]));` and `const chunk = firsts.get(r.itemId) ?? r.snippet;` inside it.
+
+**Only if Step 1 measured the cold `scopes` stage p95 above 300 ms on the agent path:** set `ROSTER_TTL_SECONDS` to `"1800"` in `apps/api/wrangler.jsonc`. The hub already invalidates a principal's cached roster when its bridge rows change (`notifyRosterChanged` → `/api/v1/roster/invalidate`), so the TTL bounds only a missed invalidation; record the measured value and this choice as a ruling (it widens the window in which a missed invalidation shows an agent a board it was removed from, from 5 to 30 minutes). Otherwise leave it.
+
+- [ ] **Step 5: Run the tests**
+
+In `test/timing.test.ts` (Task 8a), `related answers its stage timings…` loses `'embed'` from its expected stages: a related call whose basis item is indexed no longer embeds (that is this task's point). The search test keeps `'embed'`.
+
+Run: `pnpm --filter @superlibrary/api test -- test/related-speed.test.ts test/related.test.ts test/related-basis.test.ts test/relevance.test.ts test/timing.test.ts test/vectors.test.ts && pnpm --filter @superlibrary/api test && pnpm -r typecheck`
+Expected: PASS.
+
+- [ ] **Step 6: Revert-proof**
+
+1. Pass no `vector` to `search` from related; expect `…reuses its record's stored vector…` to FAIL. Restore.
+2. Return `[]` from `VectorIndex.get` without the fallback embed (i.e. skip embedding when `vector` is undefined); expect `…falls back to embedding its text` to FAIL. Restore.
+3. Put the per-hit chunk query back inside the loop; expect `…in one round trip` to FAIL. Restore.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add apps/api/src/indexing/vector-index.ts apps/api/src/search/search.ts apps/api/src/search/related.ts apps/api/test/helpers/fake-vectors.ts apps/api/test/related-speed.test.ts apps/api/test/timing.test.ts apps/api/wrangler.jsonc
+git commit -m "perf(related): reuse the basis item's stored vector and read every hit's chunk in one round trip (gap S4)
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01XwhK8QQtRh5hPEfqY5Arp8"
+```
+
+- [ ] **Step 8: Live re-measure (after P4-GAP deploys)** — repeat Step 1 exactly. Pass at the target above. If it misses, the ledger names the dominant stage from the numbers and the controller stops and reports with them; it does not raise the budget or change anything else unmeasured.
+
+---
+
+## Task 29: Remove a deleted board's work records (gap S5)
+
+Superpipeline deletes a board hard and pushes no event; each of its cards' `card.deleted` hints then fails the board read-back (A13 ruling: delete only when the board reads 200 without the card), retries 8 times and drops. The records stay, and people keep seeing them because the board stays in `source_boards`. This task removes them, **only on positive evidence**: the board list answered and does not list the board, **and** the board's own read answers exactly `404`, on two hourly runs at least an hour apart, **and** once more at the moment of deleting. A `403`, a `5xx`, a network error, an error on the board list, or an empty board list is no evidence and changes nothing. If at once two or more and at least half of a workspace's known boards look gone, nothing is marked (that is a credential or tenant problem, not deletions). Deletion is `deleteItem` per record (everything goes, `item.changed deleted`), in pages, then the board's `source_boards` row, audited `board.removed`.
+
+Artifacts scoped to the deleted board are not removed (spec §12 deletes a board's records, not the files people and agents linked); with its `source_boards` row gone they are visible only to their uploader, and age into the retention report like any unreferenced artifact.
+
+**Files:**
+- Create: `apps/api/migrations/0042_board_missing.sql`, `apps/api/test/board-deleted.test.ts`
+- Modify: `packages/contract/src/events.ts` (`IngestMessage` gains `board.deleted`), `apps/api/src/sources/subscribe.ts`, `apps/api/src/ingest/consumer.ts`, `apps/api/test/helpers/fake-pipeline.ts` (`boardStatus`, `listStatus`)
+
+**Interfaces:**
+- Consumes: `subscribeWorkspace`, `pipelineFor(...).boards()` / `.snapshot()` (throws `PipelineError(404)` for a missing board, `PipelineError(status)` otherwise), `deleteItem` (A7), `ingestBatch`, `orgOf`.
+- Produces:
+  - `source_boards.missing_since TEXT` (ISO; null when listed)
+  - `subscribeWorkspace(env, workspaceId, org, now = new Date())` (the `now` parameter is for tests) marks, clears and confirms missing boards; a confirmed one is sent as `{ type: 'board.deleted', workspaceId, boardId }` on `INGEST`
+  - `removeDeletedBoard(env, workspaceId, boardId)`: re-checks the evidence, deletes up to `BOARD_DELETE_PAGE` (25) records per message and re-sends itself while more remain, then deletes the `source_boards` row with an audit row `board.removed { boardId, records }`
+  - `BOARD_GONE_AFTER_MS = 3_600_000`
+
+- [ ] **Step 1: Write the failing test**
+
+Extend `fake-pipeline.ts`: `FakeState` gains optional `boardStatus?: Map<string, number>` (any `/v1/boards/<id>…` path of that board answers that status) and `listStatus?: number` (the `/v1/boards` list answers it); both absent by default, so existing tests are unchanged.
+
+```ts
+// apps/api/test/board-deleted.test.ts
+import { env } from 'cloudflare:test';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { ORG, card, fakePipeline, type FakeState } from './helpers/fake-pipeline';
+import { ensureWorkspace } from '../src/auth/caller';
+import { __resetServiceTokensForTests } from '../src/clients/plane';
+import { removeDeletedBoard, syncCard } from '../src/ingest/consumer';
+import { subscribeWorkspace } from '../src/sources/subscribe';
+
+const B = 'brd_000000000000d001';
+const KEEP = 'brd_000000000000d002';
+const OTHER = 'brd_000000000000d003';
+const bag = env as unknown as Record<string, unknown>;
+let state: FakeState;
+let restore: () => void;
+let ws: string;
+const T0 = new Date('2026-10-20T10:00:00.000Z');
+const later = (min: number) => new Date(T0.getTime() + min * 60_000);
+const board = (id: string, cards: string[]) => ({ id, name: id, cards: new Map(cards.map((c) => [c, { card: card(c), attempts: [], comments: [], links: [], gates: [], references: [] }])) });
+const records = async (b: string) => (await env.DB.prepare(`SELECT COUNT(*) AS n FROM work_records WHERE workspace_id = ? AND board_id = ?`).bind(ws, b).first<{ n: number }>())!.n;
+const missing = async (b: string) => (await env.DB.prepare(`SELECT missing_since FROM source_boards WHERE workspace_id = ? AND board_id = ?`).bind(ws, b).first<{ missing_since: string | null }>())?.missing_since;
+const gone = (b: string) => { state.boards.delete(b); };
+
+beforeEach(async () => {
+  bag.PUSH_SIGNING_KEY = 'k'.repeat(32);
+  state = { boards: new Map([[B, board(B, ['card_000000000000d0a1', 'card_000000000000d0a2'])], [KEEP, board(KEEP, ['card_000000000000d0b1'])], [OTHER, board(OTHER, [])]]), pushConfigs: [], calls: [] };
+  restore = fakePipeline(state);
+  ws = await ensureWorkspace(env.DB, ORG);
+  await subscribeWorkspace(env, ws, ORG, T0);
+  for (const [b, c] of [[B, 'card_000000000000d0a1'], [B, 'card_000000000000d0a2'], [KEEP, 'card_000000000000d0b1']] as const) await syncCard(env, { workspaceId: ws, boardId: b, cardId: c });
+});
+afterEach(() => { restore(); __resetServiceTokensForTests(); bag.PUSH_SIGNING_KEY = ''; vi.restoreAllMocks(); });
+
+describe("a deleted board's records (gap S5)", () => {
+  it('a board gone from the list and answering 404 on two runs an hour apart loses its records and its row, and nothing else', async () => {
+    const send = vi.spyOn(env.INGEST, 'send').mockResolvedValue(undefined as never);   // RA13: no real consumer
+    gone(B);
+    await subscribeWorkspace(env, ws, ORG, later(60));
+    expect(await missing(B)).toBe(later(60).toISOString());
+    expect(send).not.toHaveBeenCalled();
+    await subscribeWorkspace(env, ws, ORG, later(121));
+    expect(send).toHaveBeenCalledWith({ type: 'board.deleted', workspaceId: ws, boardId: B });
+    await removeDeletedBoard(env, ws, B);
+    expect(await records(B)).toBe(0);
+    expect(await records(KEEP)).toBe(1);
+    expect(await missing(B)).toBeUndefined();   // the row is gone
+    expect(await env.DB.prepare(`SELECT 1 FROM audit_events WHERE action = 'board.removed'`).first()).not.toBeNull();
+  });
+  it('a board that answers 403 or 5xx is never marked or emptied', async () => {
+    for (const status of [403, 500, 503]) {
+      state.boards.delete(B);
+      state.boardStatus = new Map([[B, status]]);
+      await subscribeWorkspace(env, ws, ORG, later(60));
+      await subscribeWorkspace(env, ws, ORG, later(200));
+      expect(await missing(B)).toBeNull();
+      expect(await records(B)).toBe(2);
+    }
+  });
+  it('a board missing on one run keeps its records', async () => {
+    const send = vi.spyOn(env.INGEST, 'send').mockResolvedValue(undefined as never);   // RA13: no real consumer
+    gone(B);
+    await subscribeWorkspace(env, ws, ORG, later(60));
+    await subscribeWorkspace(env, ws, ORG, later(100));   // 40 minutes later: not yet an hour
+    expect(send).not.toHaveBeenCalled();
+    expect(await records(B)).toBe(2);
+  });
+  it('a board back on the list clears its mark', async () => {
+    const saved = state.boards.get(B)!;
+    gone(B);
+    await subscribeWorkspace(env, ws, ORG, later(60));
+    state.boards.set(B, saved);
+    await subscribeWorkspace(env, ws, ORG, later(121));
+    expect(await missing(B)).toBeNull();
+  });
+  it('when two or more and at least half of the known boards vanish at once, nothing is marked', async () => {
+    gone(B); gone(OTHER);
+    await subscribeWorkspace(env, ws, ORG, later(60));
+    expect(await missing(B)).toBeNull();
+    expect(await missing(OTHER)).toBeNull();
+  });
+  it('an error on the board list, or an empty list, confirms nothing', async () => {
+    gone(B);
+    state.listStatus = 503;
+    await subscribeWorkspace(env, ws, ORG, later(60)).catch(() => {});
+    expect(await missing(B)).toBeNull();
+    state.listStatus = undefined;
+    state.boards.clear();
+    await subscribeWorkspace(env, ws, ORG, later(60));
+    expect(await missing(B)).toBeNull();
+  });
+  it('the delete re-checks the evidence: a board readable again keeps everything', async () => {
+    const saved = state.boards.get(B)!;
+    gone(B);
+    await subscribeWorkspace(env, ws, ORG, later(60));
+    await subscribeWorkspace(env, ws, ORG, later(121));
+    state.boards.set(B, saved);
+    await removeDeletedBoard(env, ws, B);
+    expect(await records(B)).toBe(2);
+    expect(await missing(B)).toBeNull();
+  });
+});
+```
+
+- [ ] **Step 2: Run it to verify it fails**
+
+Run: `pnpm --filter @superlibrary/api test -- test/board-deleted.test.ts`
+Expected: FAIL (`no such column: missing_since`; `removeDeletedBoard` is not exported).
+
+- [ ] **Step 3: Migration, contract, code**
+
+```sql
+-- apps/api/migrations/0042_board_missing.sql
+-- Gap S5: when the hourly subscription run first found a known board missing (not listed, and its
+-- own read answered exactly 404). Null while the board is listed. Two runs an hour apart confirm it.
+ALTER TABLE source_boards ADD COLUMN missing_since TEXT;
+```
+
+`events.ts`: add `| { type: 'board.deleted'; workspaceId: string; boardId: string }` to `IngestMessage`.
+
+`subscribe.ts`: `subscribeWorkspace(env, workspaceId, org, at = new Date())`, `const now = at.toISOString();`; the upsert's `ON CONFLICT … DO UPDATE SET name = excluded.name, last_seen_at = excluded.last_seen_at, missing_since = NULL`; after the loop, `await noteMissingBoards(env, workspaceId, sp, boards, at);`:
+
+```ts
+export const BOARD_GONE_AFTER_MS = 3_600_000;
+
+/**
+ * Gap S5: Superpipeline deletes a board without an event. Positive evidence only: the list answered
+ * (we are here) and does not list it, and its own read answers exactly 404, on two runs at least an
+ * hour apart. Anything else is no evidence. Many boards vanishing at once is a credential or tenant
+ * problem, never deletions: nothing is marked.
+ */
+async function noteMissingBoards(env: Env, workspaceId: string, sp: SuperpipelineClient, listed: Array<{ id: string }>, at: Date): Promise<void> {
+  const known = (await env.DB.prepare(`SELECT board_id, missing_since FROM source_boards WHERE workspace_id = ?`).bind(workspaceId).all<{ board_id: string; missing_since: string | null }>()).results;
+  const on = new Set(listed.map((b) => b.id));
+  const absent = known.filter((k) => !on.has(k.board_id));
+  if (absent.length === 0) return;
+  if (listed.length === 0 || (absent.length >= 2 && absent.length * 2 >= known.length)) {
+    console.error('board sweep refused: too many boards missing at once', JSON.stringify({ workspaceId, missing: absent.length, known: known.length }));
+    return;
+  }
+  for (const k of absent) {
+    let status: 'readable' | 'gone' | 'unknown' = 'unknown';
+    try { await sp.snapshot(k.board_id); status = 'readable'; } catch (e) { if (e instanceof PipelineError && e.status === 404) status = 'gone'; }
+    if (status === 'readable') {
+      await env.DB.prepare(`UPDATE source_boards SET missing_since = NULL WHERE workspace_id = ? AND board_id = ?`).bind(workspaceId, k.board_id).run();
+    } else if (status === 'gone' && !k.missing_since) {
+      await env.DB.prepare(`UPDATE source_boards SET missing_since = ? WHERE workspace_id = ? AND board_id = ?`).bind(at.toISOString(), workspaceId, k.board_id).run();
+    } else if (status === 'gone' && at.getTime() - Date.parse(k.missing_since!) >= BOARD_GONE_AFTER_MS) {
+      await env.INGEST.send({ type: 'board.deleted', workspaceId, boardId: k.board_id });
+    }
+  }
+}
+```
+
+(import `PipelineError`, `type SuperpipelineClient` from `./superpipeline`.)
+
+`consumer.ts`:
+
+```ts
+export const BOARD_DELETE_PAGE = 25;
+
+/**
+ * Gap S5: a confirmed-deleted board's records go, everything with them (deleteItem). The evidence is
+ * read again here: a board that reads again keeps everything; any answer but 404 retries the message.
+ */
+export async function removeDeletedBoard(env: Env, workspaceId: string, boardId: string): Promise<void> {
+  const row = await env.DB.prepare(`SELECT missing_since FROM source_boards WHERE workspace_id = ? AND board_id = ?`).bind(workspaceId, boardId).first<{ missing_since: string | null }>();
+  if (!row?.missing_since) return;   // listed again since, or already removed
+  try {
+    await pipelineFor(env, await orgOf(env, workspaceId)).snapshot(boardId);
+    await env.DB.prepare(`UPDATE source_boards SET missing_since = NULL WHERE workspace_id = ? AND board_id = ?`).bind(workspaceId, boardId).run();
+    return;
+  } catch (e) {
+    if (!(e instanceof PipelineError && e.status === 404)) throw e;
+  }
+  const page = (await env.DB.prepare(`SELECT item_id FROM work_records WHERE workspace_id = ? AND board_id = ? LIMIT ?`).bind(workspaceId, boardId, BOARD_DELETE_PAGE).all<{ item_id: string }>()).results;
+  for (const r of page) await deleteItem(env, r.item_id, ACTOR, 'board deleted');
+  if (page.length === BOARD_DELETE_PAGE) {
+    await env.INGEST.send({ type: 'board.deleted', workspaceId, boardId });
+    return;
+  }
+  await env.DB.batch([
+    env.DB.prepare(`DELETE FROM source_boards WHERE workspace_id = ? AND board_id = ?`).bind(workspaceId, boardId),
+    audit(env.DB, { workspaceId, actor: ACTOR, action: 'board.removed', detail: { boardId } }),
+  ]);
+}
+```
+
+In `ingestBatch`: the dedupe key is `null` for `board.deleted` too, and a branch `else if (m.type === 'board.deleted') await removeDeletedBoard(env, m.workspaceId, m.boardId);`.
+
+- [ ] **Step 4: Run the tests**
+
+Run: `pnpm --filter @superlibrary/api test -- test/board-deleted.test.ts test/superpipeline-source.test.ts test/ingest.test.ts test/backfill.test.ts && pnpm --filter @superlibrary/api test && pnpm -r typecheck`
+Expected: PASS.
+
+- [ ] **Step 5: Revert-proof**
+
+1. Treat any `PipelineError` as evidence (`if (e instanceof PipelineError) status = 'gone'`); expect `a board that answers 403 or 5xx…` to FAIL. Restore.
+2. Drop the `BOARD_GONE_AFTER_MS` comparison (send on the second sighting at any age); expect `a board missing on one run keeps its records` to FAIL. Restore.
+3. Remove the breaker condition; expect `when two or more and at least half…` to FAIL. Restore.
+4. Remove the re-check `snapshot` in `removeDeletedBoard`; expect `the delete re-checks the evidence…` to FAIL. Restore.
+
+- [ ] **Step 6: Commit, push and open P4-GAP**
+
+```bash
+git add packages/contract/src/events.ts apps/api/migrations/0042_board_missing.sql apps/api/src/sources/subscribe.ts apps/api/src/ingest/consumer.ts apps/api/test/helpers/fake-pipeline.ts apps/api/test/board-deleted.test.ts
+git commit -m "feat(ingest): a board confirmed deleted loses its work records, only on positive evidence (gap S5)
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01XwhK8QQtRh5hPEfqY5Arp8"
+pnpm -r typecheck && pnpm -r test
+git push -u origin feat/p4-gaps
+gh pr create --title "Stage 3 gaps: console-link provenance, relevance floor, related before a record syncs, related within budget, deleted boards" --body "$(cat <<'EOF'
+Plan tasks 25-29 of docs/superpowers/plans/2026-10-10-superlibrary-phase-4.md (Stage 3 gaps S1-S5):
+
+- S1: a person's console link records station and path once the hub (Superlibrary's own service read) confirms the station is theirs; R-H1 unchanged. Migration 0041 rebuilds item_sources for the CHECK.
+- S2: a relevance floor for meaning-only candidates; common words are not word matches; exact-word matches are never hidden (S3-R10/R13); an operator explain route to tune it.
+- S3: related({cardId, text}) uses the caller's title and spec only while the card has no record.
+- S4: related reuses the basis item's stored vector and reads hit chunks in one round trip.
+- S5: a board confirmed deleted (list + 404, twice an hour apart, re-checked at delete) loses its records. Migration 0042.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+EOF
+)"
+```
+
+Merge on green; the `main` run's `deploy-api` applies `0041` and `0042`. Then run Task 26 Step 7 and Task 28 Step 8, and start P4-AP2.
+
+- [ ] **Step 7: Live check (OPERATOR-OPTIONAL)** — only with the operator's yes: create a scratch board with `supi`, add one card, wait until its record exists, delete the board, and after two hourly runs confirm (read-only D1 queries) that its `work_records` row and `source_boards` row are gone and an audit row `board.removed` names it. Without the yes, record "not exercised live" in the ledger.
 
 ---
 
@@ -6756,6 +8330,8 @@ Write each check's result into the phase-4 ledger, then remove the phase-4 workt
 - §14 phase 4, §15 revert-proof guards (each task's revert step), §16 decisions (no public links; agents never moderate; signed embedding).
 - Operator direction (working, 2026-10-09): one token source in the suite's shape with a product `--accent-*` layer and the provisional "Ink" parent → 11; a reusable kit → 12; the suite shell with switcher and footer → 13; phone review fixes → 9, 13, 15; nothing hard-coded outside the token source and the two Mark components → guard in 12; no rollout to other products (none planned).
 
+**1b. Stage 3 gaps (operator-added).** S1 console-link provenance → 25, 25H, 25C (R-H1 tests in 25); S2 relevance floor → 26 (S3-R10/R13 kept, explain route for the live measure); S3 first claim before the record → 27, 27H; S4 claim budget → 8a (measure), 28H, 28 (fix, re-measure against a stated p95); S5 deleted boards → 29 (positive evidence only, breaker, re-check at delete).
+
 **2. Placeholder scan.** No "TBD", "add validation" or "similar to Task N". Task 0's table is filled by the executor by design (it records facts that do not exist until Stage 3 ships); every check has its command.
 
 **3. Type consistency.** `BrowseQuery`/`BrowsePage`/`OutcomeCounts`/`Facets`/`Collection*`/`WorkRecordView` (Task 1) are used with the same names in Tasks 3–5, 14, 17, 18, 20. `extraFilterSql(alias, n)` binds `?9` in search and `?8` in browse. `moderatable`/`respond` (Task 6) are reused in Task 7. Kit names (`Button`, `Field`, `Tabs`, `Toolbar`/`ToolbarItem`, `Toast`, `EmptyState`, `OutcomeBadge`, `ConfirmDialog`, `outcomeVar`) come from Task 12 and are imported from `$kit/…` in Tasks 13–18; `themeState`/`applyTheme`/`readTheme` (Task 13, `theme.svelte.ts`) are what `ItemView` uses; `PARENT`/`PRODUCTS` (Task 11, generated) feed the switcher and footer (Task 13). `change(api, path, method, body?)` gains `DELETE` in Task 17, its first `DELETE` caller. `libraryToken`/`forgetLibraryToken` (Task 21) match Task 22. The embed host hooks `--sl-host-*` (Task 9) are the names `kit.css` sets (Task 12), from the `-light`/`-dark` fixed tokens Task 11 generates.
@@ -6766,4 +8342,4 @@ Write each check's result into the phase-4 ledger, then remove the phase-4 workt
 
 ## Execution handoff
 
-Recommended: **subagent-driven** (superpowers:subagent-driven-development). 25 tasks across two repositories, with dense cross-task interfaces (one contract, one route group grown over five tasks, four phases-2–3 files edited, a token layer and kit every page task builds on) and guards whose value depends on an independent reviewer reverting them; a shipped visibility or re-sync mistake would show people or agents what they must not see, or silently undo a person's moderation. Run Task 0 first, then P4-API and P4-EMB in parallel worktrees, then P4-APP (after PR #16) and P4-CLI in parallel, then P4-SP (stopping at green CI for the operator), then Task 24.
+Recommended: **subagent-driven** (superpowers:subagent-driven-development). 35 tasks (0–29 with 8a, 25H, 25C, 27H, 28H) across three repositories, with dense cross-task interfaces (one contract, one route group grown over five tasks, four phases-2–3 files edited, a token layer and kit every page task builds on) and guards whose value depends on an independent reviewer reverting them; a shipped visibility or re-sync mistake would show people or agents what they must not see, or silently undo a person's moderation. Task 0 is done. Run P4-API, P4-EMB and P4-AP1 in parallel worktrees, then P4-APP, P4-CLI and P4-GAP in parallel (P4-GAP after P4-API and P4-AP1 are deployed, starting with Task 28's baseline), then P4-AP2 (after P4-GAP is deployed), then P4-SP (stopping at green CI for the operator), then Task 24.

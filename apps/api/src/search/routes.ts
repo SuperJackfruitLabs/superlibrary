@@ -1,6 +1,7 @@
 // apps/api/src/search/routes.ts (created here; B5 and B6 add the search, get and related routes)
 import type { Handler } from '../http';
-import { error, json } from '../http';
+import { error, json, preflight, withCors } from '../http';
+import { Timer } from '../timing';
 import { resolvePerson, resolveViewer, serviceCaller } from '../auth/caller';
 import { RelatedQuery, SearchQuery } from '@superlibrary/contract';
 import { searchAudited } from './search';
@@ -55,11 +56,14 @@ export const searchRoutes: Handler = async (request, env, _ctx, url) => {
     return new Response(null, { status: 204 });
   }
   if (url.pathname === '/api/v1/search' && request.method === 'POST') {
-    const v = await resolveViewer(request, env);
+    const timer = new Timer();
+    const v = await timer.time('auth', () => resolveViewer(request, env));
     if (v instanceof Response) return v;
     const q = SearchQuery.safeParse(await request.json().catch(() => null));
     if (!q.success) return error(400, 'invalid', { issues: q.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message })) });
-    return json({ results: await searchAudited(env, v, q.data) });
+    const res = json({ results: await searchAudited(env, v, q.data, timer) });
+    res.headers.set('Server-Timing', timer.header());
+    return res;
   }
   const lib = /^\/api\/v1\/library\/(itm_[0-9a-f]{16})$/.exec(url.pathname);
   if (lib && request.method === 'GET') {
@@ -71,13 +75,17 @@ export const searchRoutes: Handler = async (request, env, _ctx, url) => {
     const g = await getForViewer(env, v, lib[1]!, version);
     return g ? json({ item: g.result, text: g.text, wrapped: g.wrapped }) : error(404, 'not_found');
   }
-  if (url.pathname === '/api/v1/related' && request.method === 'POST') {
-    const v = await resolveViewer(request, env);
-    if (v instanceof Response) return v;
+  if (url.pathname === '/api/v1/related') {
+    if (request.method === 'OPTIONS') return preflight(request, env.EMBED_HOSTS, 'POST');
+    if (request.method !== 'POST') return null;
+    const timer = new Timer();
+    const v = await timer.time('auth', () => resolveViewer(request, env));
+    if (v instanceof Response) return withCors(request, env.EMBED_HOSTS, v);
     const q = RelatedQuery.safeParse(await request.json().catch(() => null));
-    if (!q.success) return error(400, 'invalid');
-    const items = await related(env, v, q.data);
-    return json({ items });
+    if (!q.success) return withCors(request, env.EMBED_HOSTS, error(400, 'invalid'));
+    const res = json({ items: await related(env, v, q.data, timer) });
+    res.headers.set('Server-Timing', timer.header());
+    return withCors(request, env.EMBED_HOSTS, res);
   }
   return null;
 };

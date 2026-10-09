@@ -39,6 +39,9 @@ export async function syncCard(
   m: { workspaceId: string; boardId: string; cardId: string },
   snapshots?: SnapshotCache,
 ): Promise<'created' | 'updated' | 'unchanged' | 'deleted'> {
+  // A person removed this card's record from memory (spec §11, decision O5): no event brings it back.
+  const removed = await env.DB.prepare(`SELECT 1 FROM removed_cards WHERE workspace_id = ? AND card_id = ?`).bind(m.workspaceId, m.cardId).first();
+  if (removed) return 'unchanged';
   const existing = await env.DB.prepare(`SELECT item_id, digest, board_id FROM work_records WHERE workspace_id = ? AND card_id = ?`).bind(m.workspaceId, m.cardId).first<{ item_id: string; digest: string; board_id: string }>();
   const boardId = existing?.board_id ?? m.boardId;
   const client = pipelineFor(env, await orgOf(env, m.workspaceId));
@@ -65,10 +68,24 @@ export async function syncCard(
   const refIds = [...new Set(record.references.map((r) => r.itemId).filter((x): x is string => x !== null))];
   const owned = refIds.length === 0 ? [] : (await env.DB.prepare(`SELECT id FROM items WHERE workspace_id = ?1 AND id IN (SELECT value FROM json_each(?2))`).bind(m.workspaceId, JSON.stringify(refIds)).all<{ id: string }>()).results.map((r) => r.id);
 
-  const statements: D1PreparedStatement[] = [];
+  // The tombstone is also checked inside the batch (decision O5): a removal that lands after the
+  // read at the top aborts this write, and the retry returns 'unchanged'. Inserting the tombstone's
+  // own key again violates its primary key, which aborts the whole batch.
+  const statements: D1PreparedStatement[] = [
+    env.DB.prepare(`INSERT INTO removed_cards (workspace_id, card_id, item_id, reason, removed_by) SELECT workspace_id, card_id, item_id, reason, removed_by FROM removed_cards WHERE workspace_id = ? AND card_id = ?`)
+      .bind(m.workspaceId, m.cardId),
+  ];
   if (existing) {
     statements.push(
-      env.DB.prepare(`UPDATE items SET title = ?, outcome = ?, scope = ? WHERE id = ?`).bind(record.title, record.outcome, scope, itemId),
+      // What a person did stays done (gap G1): a widened record stays workspace-wide, and a
+      // person-set replacement keeps it superseded; the card's own outcome is kept for an undo.
+      env.DB.prepare(
+        `UPDATE items SET title = ?1,
+           outcome = CASE WHEN superseded_by IS NOT NULL THEN 'superseded' ELSE ?2 END,
+           superseded_prior = CASE WHEN superseded_by IS NOT NULL THEN ?2 ELSE superseded_prior END,
+           scope = CASE WHEN scope = 'workspace' THEN scope ELSE ?3 END
+         WHERE id = ?4`,
+      ).bind(record.title, record.outcome, scope, itemId),
       env.DB.prepare(`UPDATE work_records SET digest = ?, body = ?, text = ?, redacted = ?, superseded_by_card = ?, source_updated_at = ?, synced_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE item_id = ?`)
         .bind(digest, body, text, redacted, record.supersededByCard, record.updatedAt, itemId),
       env.DB.prepare(`UPDATE item_sources SET stage = ? WHERE item_id = ?`).bind(record.stage, itemId),
@@ -85,7 +102,8 @@ export async function syncCard(
       audit(env.DB, { workspaceId: m.workspaceId, actor: ACTOR, action: 'item.created', itemId, detail: { cardId: m.cardId } }),
     );
   }
-  for (const id of owned) statements.push(env.DB.prepare(`INSERT OR IGNORE INTO item_references (item_id, from_kind, from_id) VALUES (?, 'work-record', ?)`).bind(id, itemId));
+  // Only while the record still exists: a record removed mid-sync must not leave references that keep artifacts (spec §12).
+  for (const id of owned) statements.push(env.DB.prepare(`INSERT OR IGNORE INTO item_references (item_id, from_kind, from_id) SELECT ?1, 'work-record', ?2 WHERE EXISTS (SELECT 1 FROM items WHERE id = ?2)`).bind(id, itemId));
   if (redacted) statements.push(audit(env.DB, { workspaceId: m.workspaceId, actor: ACTOR, action: 'record.redacted', itemId, detail: { redactions: record.redactions } }));
   // A racing first delivery makes the loser's INSERT hit work_records_card; it throws, the message
   // retries and the retry updates.

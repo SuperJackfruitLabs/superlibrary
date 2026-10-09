@@ -5,7 +5,7 @@
 import type { Env } from './env';
 import { resolvePerson, resolveViewer } from './auth/caller';
 import { protectedResourceMetadata } from './auth/org-plane';
-import { error, json, type Handler } from './http';
+import { error, json, preflight, withCors, type Handler } from './http';
 import { uploadRoutes } from './uploads/routes';
 import { itemRoutes } from './items/routes';
 import { sourceRoutes } from './sources/routes';
@@ -16,8 +16,9 @@ import { RECONCILE_CRON, reconcile } from './indexing/consumer';
 import { handleMcp } from './mcp/server';
 import { searchRoutes } from './search/routes';
 import { SUBSCRIBE_CRON, subscribeAll } from './sources/subscribe';
+import { libraryRoutes } from './library/routes';
 
-const handlers: Handler[] = [uploadRoutes, itemRoutes, searchRoutes, sourceRoutes];
+const handlers: Handler[] = [uploadRoutes, itemRoutes, searchRoutes, sourceRoutes, libraryRoutes];
 
 async function route(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
   const url = new URL(request.url);
@@ -36,10 +37,13 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
     if (request.method !== 'POST') return new Response(JSON.stringify({ error: 'method_not_allowed' }), { status: 405, headers: { Allow: 'POST', 'content-type': 'application/json' } });
     return handleMcp(request, env, v);
   }
-  if (url.pathname === '/api/v1/me' && request.method === 'GET') {
+  if (url.pathname === '/api/v1/me') {
+    // An embedding host asks who the person is to offer widening (gap G4).
+    if (request.method === 'OPTIONS') return preflight(request, env.EMBED_HOSTS, 'GET');
+    if (request.method !== 'GET') return error(404, 'not_found');
     const p = await resolvePerson(request, env);
-    if (p instanceof Response) return p;
-    return json({ kind: p.kind, principalId: p.principalId, org: p.org, workspaceId: p.workspaceId, role: p.role });
+    if (p instanceof Response) return withCors(request, env.EMBED_HOSTS, p);
+    return withCors(request, env.EMBED_HOSTS, json({ kind: p.kind, principalId: p.principalId, org: p.org, workspaceId: p.workspaceId, role: p.role }));
   }
   // Read-only identity for people and agents (plan P13); an agent is never made a member.
   if (url.pathname === '/api/v1/whoami' && request.method === 'GET') {

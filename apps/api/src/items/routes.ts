@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { LIMITS, SCOPE_RE, encodePath, orderFiles, type EmbedGrant, type FileEntry, type ItemSource, type ItemSummary, type VersionSummary, type View } from '@superlibrary/contract';
 import type { Env } from '../env';
-import { corsFor as corsForOrigins, error, json, preflight, type Handler } from '../http';
+import { error, json, preflight, withCors, type Handler } from '../http';
 import { audit } from '../audit';
 import { resolvePerson, type Person } from '../auth/caller';
 import { itemChanged } from '../events';
@@ -15,13 +15,14 @@ const hostsOf = (s: string) => s.split(/\s+/).filter((x) => x !== '');
 
 interface SourceRow {
   source: 'upload' | 'agentpod' | 'superpipeline'; board_id: string | null; card_id: string | null; stage: string | null; run_id: string | null;
-  agent_principal: string | null; station: string | null; source_path: string | null; source_id: string | null; source_url: string | null; station_removed_at: string | null;
+  agent_principal: string | null; station: string | null; station_name: string | null; source_path: string | null; source_id: string | null; source_url: string | null; station_removed_at: string | null;
 }
 
 function sourceOf(r: SourceRow): ItemSource {
   const s: ItemSource = { sourceKind: r.source, agent: r.agent_principal !== null, stationRemoved: r.station_removed_at !== null };
   if (r.agent_principal) s.agentPrincipal = r.agent_principal;
   if (r.station) s.station = r.station;
+  if (r.station_name) s.stationName = r.station_name;
   if (r.source_path) s.path = r.source_path;
   if (r.board_id) s.board = r.board_id;
   if (r.card_id) s.card = r.card_id;
@@ -32,7 +33,7 @@ function sourceOf(r: SourceRow): ItemSource {
   return s;
 }
 
-const SOURCE_COLS = `item_id, source, board_id, card_id, stage, run_id, agent_principal, station, source_path, source_id, source_url, station_removed_at`;
+const SOURCE_COLS = `item_id, source, board_id, card_id, stage, run_id, agent_principal, station, station_name, source_path, source_id, source_url, station_removed_at`;
 
 /** What `summary` adds: each item's source, whether its board is known, and a work record's replacement. */
 interface Extras { source?: ItemSource; boardKnown?: boolean; supersededBy?: string | null }
@@ -47,11 +48,12 @@ export function summary(i: ItemRow, extra: Extras = {}): ItemSummary {
   const a = audienceOf(i);
   out.audience = a === 'board' && extra.boardKnown === false ? 'uploader' : a;
   if (extra.supersededBy !== undefined) out.supersededBy = extra.supersededBy;
+  if (i.caption) out.caption = i.caption;
   return out;
 }
 
 /** Sources, known boards and replacements for these items, in one pass each (a list is never N+1). */
-async function extrasFor(env: Env, p: Person, items: ItemRow[], scopes?: string[]): Promise<Map<string, Extras>> {
+export async function extrasFor(env: Env, p: Person, items: ItemRow[], scopes?: string[]): Promise<Map<string, Extras>> {
   const out = new Map<string, Extras>(items.map((i) => [i.id, {}]));
   if (items.length === 0) return out;
   const ids = JSON.stringify(items.map((i) => i.id));
@@ -66,14 +68,17 @@ async function extrasFor(env: Env, p: Person, items: ItemRow[], scopes?: string[
     for (const r of rows.results) known.add(r.board_id);
   }
   for (const i of items) out.get(i.id)!.boardKnown = !i.scope.startsWith('board:') || known.has(i.scope.slice(6));
-  const wr = await env.DB.prepare(
-    `SELECT w.item_id AS item_id, n.item_id AS next FROM work_records w LEFT JOIN work_records n ON n.workspace_id = w.workspace_id AND n.card_id = w.superseded_by_card
-      WHERE w.item_id IN (SELECT value FROM json_each(?1))`,
-  ).bind(ids).all<{ item_id: string; next: string | null }>();
-  // A replacement the person cannot see, or that is revoked or expired, is not named (spec §4).
-  const raw = new Map<string, string>(wr.results.flatMap((r) => (r.next ? [[r.item_id, r.next] as [string, string]] : [])));
+  // A person's replacement first (spec §11), else the card's `supersedes` link (spec §15). A
+  // replacement the person cannot see, or that is revoked or expired, is not named (spec §4).
+  const sup = await env.DB.prepare(
+    `SELECT i.id AS item_id, i.kind AS kind, COALESCE(i.superseded_by, n.item_id) AS next FROM items i
+       LEFT JOIN work_records w ON w.item_id = i.id
+       LEFT JOIN work_records n ON n.workspace_id = w.workspace_id AND n.card_id = w.superseded_by_card
+      WHERE i.id IN (SELECT value FROM json_each(?1))`,
+  ).bind(ids).all<{ item_id: string; kind: string; next: string | null }>();
+  const raw = new Map<string, string>(sup.results.flatMap((r) => (r.next ? [[r.item_id, r.next] as [string, string]] : [])));
   const visible = await visibleSupersededBy(env, p, scopes ?? (await viewerScopes(env, p)), raw);
-  for (const r of wr.results) out.get(r.item_id)!.supersededBy = visible.get(r.item_id) ?? null;
+  for (const r of sup.results) if (r.next !== null || r.kind === 'work-record') out.get(r.item_id)!.supersededBy = visible.get(r.item_id) ?? null;
   return out;
 }
 
@@ -130,8 +135,6 @@ async function detail(env: Env, p: Person, id: string): Promise<Response> {
   }));
   return json({ item: summary(item, (await extrasFor(env, p, [item])).get(id)), versions: out });
 }
-
-const corsFor = (request: Request, env: Env) => corsForOrigins(request, env.EMBED_HOSTS);
 
 async function embed(request: Request, env: Env, p: Person, id: string): Promise<Response> {
   const item = await readable(env, p, id);
@@ -285,22 +288,16 @@ export const itemRoutes: Handler = async (request, env, _ctx, url) => {
   const m = ITEM.exec(url.pathname);
   if (!m) return null;
   const [, id, sub] = m as unknown as [string, string, string | undefined];
-  if (sub === '/embed' && request.method === 'OPTIONS') return preflight(request, env.EMBED_HOSTS, 'POST');
+  // Embedding hosts (spec §9) read the item, mint the grant and widen it with the person's own token.
+  const hostRead = !sub || sub === '/embed' || sub === '/scope';
+  if (request.method === 'OPTIONS') return hostRead ? preflight(request, env.EMBED_HOSTS, sub ? 'POST' : 'GET') : null;
   const p = await resolvePerson(request, env);
-  if (p instanceof Response) {
-    for (const [k, v] of Object.entries(corsFor(request, env))) p.headers.set(k, v);
-    return p;
-  }
-  if (!sub && request.method === 'GET') return detail(env, p, id);
-  if (sub === '/embed' && request.method === 'POST') {
-    // An allowed host must be able to read every answer, refusals included, not an opaque failure.
-    const res = await embed(request, env, p, id);
-    for (const [k, v] of Object.entries(corsFor(request, env))) res.headers.set(k, v);
-    return res;
-  }
+  if (p instanceof Response) return hostRead ? withCors(request, env.EMBED_HOSTS, p) : p;
+  if (!sub && request.method === 'GET') return withCors(request, env.EMBED_HOSTS, await detail(env, p, id));
+  if (sub === '/embed' && request.method === 'POST') return withCors(request, env.EMBED_HOSTS, await embed(request, env, p, id));
   if (!sub && request.method === 'PATCH') return setExpiry(request, env, p, id);
   if (sub === '/revoke' && request.method === 'POST') return revokeItem(request, env, p, id);
-  if (sub === '/scope' && request.method === 'POST') return widenScope(request, env, p, id);
+  if (sub === '/scope' && request.method === 'POST') return withCors(request, env.EMBED_HOSTS, await widenScope(request, env, p, id));
   if (sub?.startsWith('/versions/') && request.method === 'POST') return revokeVersion(env, p, id, Number(m[3]));
   return null;
 };
