@@ -55,6 +55,14 @@ describe('ranking', () => {
     expect(RelatedQuery.safeParse({ cardId: 'card_00000000000000c1', itemId: 'itm_00000000000000e1' }).success).toBe(false);
     expect(RelatedQuery.parse({ cardId: 'card_00000000000000c1' })).toMatchObject({ limit: PROMPT_CAPS.items, maxTokens: PROMPT_CAPS.tokens });
   });
+  it("a card's related query may carry its title and spec (gap S3); an item's never", () => {
+    const cardId = 'card_00000000000000c1';
+    expect(RelatedQuery.safeParse({ itemId: 'itm_0123456789abcdef', text: 'x' }).success).toBe(false);
+    expect(RelatedQuery.safeParse({ cardId, text: '   ' }).success).toBe(false);
+    expect(RelatedQuery.safeParse({ cardId, text: 'x'.repeat(4001) }).success).toBe(false);
+    expect(RelatedQuery.safeParse({ cardId, text: 'x'.repeat(4000) }).success).toBe(true);
+    expect(RelatedQuery.parse({ cardId, text: ' Rotate keys ' })).toMatchObject({ cardId, text: 'Rotate keys' });
+  });
 });
 
 describe('prompt safety', () => {

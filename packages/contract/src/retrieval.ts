@@ -37,7 +37,12 @@ export type SearchQuery = z.infer<typeof SearchQuery>;
 
 const relatedCaps = { limit: z.number().int().min(1).max(10).default(PROMPT_CAPS.items), maxTokens: z.number().int().min(100).max(4000).default(PROMPT_CAPS.tokens) };
 export const RelatedQuery = z.union([
-  z.object({ cardId: z.string().regex(CARD_ID), ...relatedCaps }).strict(),
+  z.object({
+    cardId: z.string().regex(CARD_ID),
+    /** Gap S3: the card's title and spec as the caller has them, used only while the card has no record yet. Never stored. */
+    text: z.string().trim().min(1).max(4000).optional(),
+    ...relatedCaps,
+  }).strict(),
   z.object({ itemId: z.string().regex(ITEM_ID), ...relatedCaps }).strict(),
 ]);
 export type RelatedQuery = z.infer<typeof RelatedQuery>;
