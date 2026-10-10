@@ -2,7 +2,6 @@
   import '@superjackfruit/vibekit/fonts.css';
   import '@superjackfruit/vibekit/vibekit.css';
   import '$lib/vibe/superlibrary.css';
-  import '$kit/tokens.css';
   import '$kit/kit.css';
   import '../app.css';
   import { onDestroy, onMount } from 'svelte';
