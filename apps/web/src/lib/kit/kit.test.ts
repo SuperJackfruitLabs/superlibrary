@@ -31,11 +31,11 @@ describe('the kit reads tokens only (a working direction: a change must be a tok
   });
   it('the bare button rule leaves vibekit-classed buttons alone (an unlayered rule would beat the layered Segmented)', () => {
     const app = readFileSync(join(src, 'app.css'), 'utf8');
-    const rules = app.split('\n').filter((l) => /^(?::where\()?button[^{]*\{/.test(l) && (l.includes('background') || l.includes('font:')));
+    const rules = app.split('\n').filter((l) => /^(?::where\()?button[^{]*\{/.test(l) && (l.includes('background') || l.includes('font:') || l.includes('min-height')));
     expect(rules.length).toBeGreaterThan(0);
     for (const l of rules) {
       for (const sel of l.slice(0, l.indexOf('{')).split(',').map((s) => s.trim()).filter((s) => /^(?::where\()?button/.test(s))) {
-        expect(sel, l).toContain(':not([class*="vk-"])');
+        expect(sel, l).toMatch(/^:where\(button:not\(\[class\*="vk-"\]\)\)/);
       }
     }
   });

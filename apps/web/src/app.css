@@ -11,7 +11,7 @@ a { color: var(--vk-color-primary); }
 /* iOS Safari zooms into any field under 16px when it is focused. */
 input, select, textarea { font-size: max(16px, 1rem); }
 /* Every control is at least var(--vk-target-min) tall: Apple's minimum tap target (iOS is the primary platform). */
-button, .button, input:not([type=checkbox]):not([type=radio]), select { min-height: var(--vk-target-min); box-sizing: border-box; }
+:where(button:not([class*="vk-"])), .button, input:not([type=checkbox]):not([type=radio]), select { min-height: var(--vk-target-min); box-sizing: border-box; }
 /* :where() keeps these at zero specificity, so every product class (.suite-shell-account, .kit-more, …) still wins over them. */
 /* Phase-1 markup and unclassed buttons look like the kit's until each page moves to <Button> (lib/kit/kit.css). */
 :where(button:not([class*="vk-"])), .button { display: inline-flex; align-items: center; justify-content: center; gap: var(--vk-space-2); padding: 0 var(--vk-space-4); border: 0; border-radius: var(--vk-radius-md); background: var(--vk-color-surface); color: var(--vk-color-text); box-shadow: inset 0 0 0 2px var(--vk-color-line), 0 var(--vk-lift) 0 var(--vk-color-ground); font: 600 var(--vk-text-md)/1 var(--vk-font-body); text-decoration: none; cursor: pointer; transition: transform var(--vk-motion-fast) var(--vk-motion-easing); }
