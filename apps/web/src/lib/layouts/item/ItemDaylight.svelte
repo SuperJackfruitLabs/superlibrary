@@ -25,7 +25,7 @@
     <section class="sl-card" aria-labelledby="details-h"><h2 id="details-h">{model.detailsHeading}</h2><DetailsSection {model} /></section>
   </div>
 {:else if model.record}
-  <div class="sl-card sl-record"><WorkRecordView view={model.record} timeline="bubbles" /></div>
+  <div class="sl-card sl-record"><WorkRecordView view={model.record} timeline="bubbles" hasSpec={model.hasSpec} /></div>
 {:else}
   <RecordFailed {model} />
 {/if}

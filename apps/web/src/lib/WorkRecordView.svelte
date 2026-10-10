@@ -6,8 +6,9 @@
   import RecordLine from '$lib/sections/RecordLine.svelte';
   import SpecRows from '$lib/sections/SpecRows.svelte';
   import Timeline from '$lib/sections/Timeline.svelte';
-  let { view, timeline = 'bubbles' }: { view: WorkRecordView; timeline?: 'bubbles' } = $props();
-  const hasSpec = $derived(specRows(view.record.spec).length > 0);
+  let { view, timeline = 'bubbles', hasSpec: given }: { view: WorkRecordView; timeline?: 'bubbles'; hasSpec?: boolean } = $props();
+  // The item layout passes model.hasSpec; standalone use falls back to the rows themselves.
+  const hasSpec = $derived(given ?? specRows(view.record.spec).length > 0);
 </script>
 
 <section class="record" aria-labelledby="timeline-h">
