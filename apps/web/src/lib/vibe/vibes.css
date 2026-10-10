@@ -1,0 +1,40 @@
+/* Each vibe's flavour on the shell and the adaptive screens (spec §4.1, §5.5). Structure lives in app.css and
+   kit.css; layouts' own classes in lib/layouts/*.css. Only vibekit and product variables. */
+
+/* Daylight: chips, pills, a little lift. */
+[data-vibe="daylight"] .suite-shell-brand .mark { box-sizing: content-box; padding: 6px; border-radius: var(--vk-radius-sm); background: var(--vk-product-superlibrary-bg); }
+[data-vibe="daylight"] .suite-shell-nav a { border-radius: var(--vk-radius-pill); }
+[data-vibe="daylight"] .suite-shell-nav a[aria-current='page'] { background: var(--vk-color-surface); color: var(--vk-color-text); box-shadow: 0 var(--vk-lift) 0 var(--vk-color-ground); }
+[data-vibe="daylight"] .kit-tabs a { border-radius: var(--vk-radius-pill); }
+
+/* Paper: rules and serif headings; the page takes the tint of the hour. */
+[data-vibe="paper"] .suite-shell { border-bottom: 1px solid var(--vk-color-text); }
+[data-vibe="paper"] .suite-shell-nav a[aria-current='page'] { box-shadow: none; color: var(--vk-color-text); text-decoration: underline; text-underline-offset: 6px; }
+[data-vibe="paper"] .kit-tabs a { border-radius: 0; border-width: 0 0 2px; }
+[data-phase="dawn"] { --sl-tint: var(--vk-sky-dawn-top); }
+[data-phase="morning"] { --sl-tint: var(--vk-sky-morning-top); }
+[data-phase="noon"] { --sl-tint: var(--vk-sky-noon-top); }
+[data-phase="golden"] { --sl-tint: var(--vk-sky-golden-top); }
+[data-phase="dusk"] { --sl-tint: var(--vk-sky-dusk-top); }
+[data-phase="night"] { --sl-tint: var(--vk-sky-night-top); }
+[data-vibe="paper"] body { min-height: 100dvh; }
+[data-vibe="paper"][data-time="strong"] body { background: var(--sl-tint, var(--vk-color-bg)); }
+[data-vibe="paper"][data-time="subtle"] body { background: color-mix(in oklch, var(--sl-tint, var(--vk-color-bg)) 50%, var(--vk-color-bg)); }
+
+/* Studio: a dense instrument; mono labels (CSS only: the words are unchanged). */
+[data-vibe="studio"] .suite-shell { padding: var(--vk-space-1) var(--vk-space-3); border-bottom: 0; border-radius: var(--vk-radius-sm); background: var(--vk-color-raised); }
+[data-vibe="studio"] .suite-shell-nav a { font: 500 var(--vk-text-sm)/1 var(--vk-font-mono); letter-spacing: 0.06em; text-transform: uppercase; }
+[data-vibe="studio"] .suite-shell-nav a[aria-current='page'] { box-shadow: inset 0 -2px 0 var(--vk-color-primary); }
+@media (max-width: 767px) {
+  /* Mono capitals are wide: size the four columns to their words so none overlaps its neighbour. */
+  [data-vibe="studio"] .suite-shell-nav { grid-template-columns: repeat(4, auto); justify-content: space-between; }
+  [data-vibe="studio"] .suite-shell-nav a { font-size: 0.8125rem; letter-spacing: 0.02em; }
+}
+[data-vibe="studio"] h2 { font: 600 var(--vk-text-sm)/1.3 var(--vk-font-mono); letter-spacing: 0.08em; text-transform: uppercase; }
+[data-vibe="studio"] .kit-tabs a { border-radius: var(--vk-radius-sm); font-family: var(--vk-font-mono); }
+
+/* Quiet: plain text, underlined links, no shadow, no motion. */
+[data-vibe="quiet"] .suite-shell-nav a { text-decoration: underline; }
+[data-vibe="quiet"] .suite-shell-nav a[aria-current='page'] { box-shadow: none; color: var(--vk-color-text); font-weight: 700; }
+[data-vibe="quiet"] .kit-button:not(.kit-button--primary):not(.kit-button--danger), [data-vibe="quiet"] button:not([class]) { box-shadow: inset 0 0 0 2px var(--vk-color-text); }
+[data-vibe="quiet"] .kit-tabs a { border-radius: var(--vk-radius-sm); }

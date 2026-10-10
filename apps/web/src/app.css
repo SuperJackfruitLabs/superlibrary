@@ -102,3 +102,7 @@ select { border: 2px solid var(--vk-color-faint); border-radius: var(--vk-radius
 .sl-setting { display: grid; gap: var(--vk-space-2); margin: 0 0 var(--vk-space-4); }
 .sl-setting-label { margin: 0; font-weight: 600; }
 .sl-setting-hint { margin: 0; font-size: var(--vk-text-sm); }
+
+.sl-signin { display: grid; justify-items: center; gap: var(--vk-space-2); padding: var(--vk-space-5) var(--vk-space-4); }
+.sl-signin .mark-hero { box-sizing: content-box; padding: var(--vk-space-3); border-radius: var(--vk-radius-lg); background: var(--vk-product-superlibrary-bg); }
+.sl-notice-panel { max-width: 560px; margin: 0 auto; padding: var(--vk-space-4); }

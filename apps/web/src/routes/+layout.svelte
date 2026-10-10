@@ -5,6 +5,7 @@
   import '$kit/kit.css';
   import '../app.css';
   import '$lib/layouts/daylight.css';
+  import '$lib/vibe/vibes.css';
   import { onDestroy, onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
@@ -78,8 +79,10 @@
   </main>
 {:else if session.notEnabled}
   <main class="notice">
-    <h1>Superlibrary is not enabled for this workspace</h1>
-    {#if enableUrl(session.notEnabled.org)}<p><a href={enableUrl(session.notEnabled.org)}>Enable it</a> (an owner of the workspace can).</p>{/if}
+    <div class="panel sl-needs sl-notice-panel">
+      <h1>Superlibrary is not enabled for this workspace</h1>
+      {#if enableUrl(session.notEnabled.org)}<p><a href={enableUrl(session.notEnabled.org)}>Enable it</a> (an owner of the workspace can).</p>{/if}
+    </div>
   </main>
 {:else if session.me}
   <div class="shell">

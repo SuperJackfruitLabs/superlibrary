@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { Sky } from '@superjackfruit/vibekit';
+  import { look } from '$lib/vibe/appearance.svelte';
   import Mark from '$lib/Mark.svelte';
   import { beginSignIn } from '$lib/auth/org-plane';
   import { currentPlane } from '$lib/session.svelte';
@@ -12,9 +14,13 @@
 
 <svelte:head><title>Sign in · Superlibrary</title></svelte:head>
 <main class="notice">
-  <Mark class="mark-hero" />
-  <h1>Superlibrary</h1>
-  <p>Sign in with your Super Jackfruit Labs account.</p>
-  <button type="button" onclick={signIn}>Sign in</button>
-  {#if error}<p class="error" role="alert">{error}</p>{/if}
+  <Sky phase={look.phase}>
+    <div class="sl-signin">
+      <Mark class="mark-hero" />
+      <h1>Superlibrary</h1>
+      <p>Sign in with your Super Jackfruit Labs account.</p>
+      <button type="button" onclick={signIn}>Sign in</button>
+      {#if error}<p class="error" role="alert">{error}</p>{/if}
+    </div>
+  </Sky>
 </main>
