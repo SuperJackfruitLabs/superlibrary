@@ -3,7 +3,7 @@
   import Mark from './Mark.svelte';
   import SuiteHeader from '$kit/SuiteHeader.svelte';
   import SuiteSwitcher from '$kit/SuiteSwitcher.svelte';
-  import { PRODUCTS } from '$kit/suite.generated';
+  import { PRODUCTS } from '$lib/vibe/suite';
   import { applyTheme, themeState } from '$kit/theme.svelte';
   import type { Me } from './api';
 

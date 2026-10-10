@@ -11,8 +11,7 @@ function files(dir: string): string[] {
 }
 describe('the kit reads tokens only (a working direction: a change must be a token edit)', () => {
   it('no colour or font literal anywhere in the app: lib/vibe/superlibrary.css is the one product source', () => {
-    // Task 5 deletes tokens.css, suite.generated.ts, ParentMark.svelte; Task 5 rewrites SuiteSwitcher.svelte.
-    const exempt = new Set(['superlibrary.css', 'tokens.css', 'suite.generated.ts', 'ParentMark.svelte', 'SuiteSwitcher.svelte']);
+    const exempt = new Set(['superlibrary.css']);
     const scanned = files(src).filter((f) => /\.(css|svelte|ts)$/.test(f) && !/\.test\.ts$/.test(f) && !exempt.has(f.split('/').at(-1)!));
     expect(scanned.some((f) => f.endsWith('kit.css'))).toBe(true);
     const offenders = scanned.flatMap((f) => {
