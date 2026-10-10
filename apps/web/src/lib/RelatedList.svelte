@@ -25,25 +25,22 @@
   });
 </script>
 
-<section aria-labelledby="related-h">
-  <h2 id="related-h">Related</h2>
-  {#if phase === 'loading'}
-    <p class="muted" role="status">Looking for related work…</p>
-  {:else if phase === 'failed'}
-    <p class="muted">Related items could not be loaded.</p>
-  {:else if items.length === 0}
-    <p class="muted">Nothing related found yet.</p>
-  {:else}
-    <ul class="results" aria-label="Related items">
-      {#each items as r (r.itemId)}
-        <li class="result" style:--o={outcomeVar(r.outcome)}>
-          <a class="result-link" href={`/a/${r.itemId}`}>
-            <span class="result-title">{r.title}</span>
-            <span class="result-meta"><OutcomeBadge outcome={r.outcome} /></span>
-            {#if r.snippet}<span class="snippet">{r.snippet}</span>{/if}
-          </a>
-        </li>
-      {/each}
-    </ul>
-  {/if}
-</section>
+{#if phase === 'loading'}
+  <p class="muted" role="status">Looking for related work…</p>
+{:else if phase === 'failed'}
+  <p class="muted">Related items could not be loaded.</p>
+{:else if items.length === 0}
+  <p class="muted">Nothing related found yet.</p>
+{:else}
+  <ul class="results" aria-label="Related items">
+    {#each items as r (r.itemId)}
+      <li class="result" style:--o={outcomeVar(r.outcome)}>
+        <a class="result-link" href={`/a/${r.itemId}`}>
+          <span class="result-title">{r.title}</span>
+          <span class="result-meta"><OutcomeBadge outcome={r.outcome} /></span>
+          {#if r.snippet}<span class="snippet">{r.snippet}</span>{/if}
+        </a>
+      </li>
+    {/each}
+  </ul>
+{/if}

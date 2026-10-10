@@ -17,3 +17,21 @@
 .result-title { display: flex; align-items: center; gap: var(--vk-space-2); }
 .result-face { display: inline-flex; flex: none; }
 .sl-more { margin: 0 0 var(--vk-space-5); }
+
+/* The item band: the product colour, the title and its facts, then the content right under it (130px / 170px budget). */
+.item-header.sl-band { padding: var(--vk-space-2) var(--vk-space-3); border-radius: var(--vk-radius-lg); background: var(--vk-product-superlibrary-bg); color: var(--vk-product-superlibrary-fg); }
+.item-header.sl-band .item-meta, .item-header.sl-band .kit-toolbar-item { color: inherit; }
+/* The outcome word keeps a checked ground (surface), not the product chip. */
+.item-header.sl-band .outcome { padding: 2px var(--vk-space-2); border-radius: var(--vk-radius-pill); background: var(--vk-color-surface); }
+@media (min-width: 768px) {
+  .item-header.sl-band { display: grid; /* the toolbar wrap is size-contained (width 0 when auto), so its column needs a floor */ grid-template-columns: minmax(0, 1fr) minmax(14rem, auto); align-items: start; gap: var(--vk-space-1) var(--vk-space-4); padding: var(--vk-space-4); }
+  .item-header.sl-band .kit-toolbar-wrap { grid-column: 2; grid-row: 1 / span 2; }
+}
+.item-face, .tl-face { display: inline-flex; flex: none; }
+.viewer { margin: var(--vk-space-2) 0 var(--vk-space-4); }
+.sl-brief { position: relative; margin: 0 0 var(--vk-space-4); padding: var(--vk-space-1) var(--vk-space-4) var(--vk-space-3); border-radius: var(--vk-radius-md); background: var(--vk-color-raised); }
+.sl-pin { position: absolute; top: calc(-1 * var(--vk-space-2)); right: var(--vk-space-4); padding: 2px var(--vk-space-2); border-radius: var(--vk-radius-pill); background: var(--vk-color-primary); color: var(--vk-color-primary-fg); font-size: var(--vk-text-sm); }
+.timeline--bubbles { padding-left: 0; border-left: 0; }
+.timeline--bubbles li { display: grid; grid-template-columns: auto 1fr; column-gap: var(--vk-space-2); margin: 0 0 var(--vk-space-3); padding: var(--vk-space-3); border-radius: var(--vk-radius-md); background: var(--vk-color-raised); box-shadow: inset 4px 0 0 var(--o, var(--vk-color-line)); }
+.timeline--bubbles li::before { display: none; }
+.timeline--bubbles li > :not(.tl-face) { grid-column: 2; }

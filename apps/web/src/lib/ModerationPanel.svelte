@@ -8,7 +8,7 @@
   import { readItem, type Ask } from '$lib/item';
   import { askRemove, askSupersede, askWiden, parseItemRef, removeItem, setCaption, supersede, widen } from '$lib/moderation';
 
-  let { item, onchanged, onremoved }: { item: ItemSummary; onchanged: (notice: string) => void; onremoved: () => void } = $props();
+  let { item, onchanged, onremoved, level = 2 }: { item: ItemSummary; onchanged: (notice: string) => void; onremoved: () => void; level?: 2 | 3 } = $props();
 
   let caption = $state(untrack(() => item.caption ?? ''));
   let captionError = $state<string | null>(null);
@@ -65,7 +65,7 @@
 </script>
 
 <section class="panel" aria-labelledby="moderate-h">
-  <h2 id="moderate-h">Moderate</h2>
+  <svelte:element this={`h${level}`} id="moderate-h">Moderate</svelte:element>
   {#if item.kind === 'artifact'}
     <form class="stack" onsubmit={saveCaption}>
       <label class="field">Caption <textarea rows="2" maxlength="2000" bind:value={caption} disabled={savingCaption}></textarea></label>
