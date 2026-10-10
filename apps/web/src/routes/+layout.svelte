@@ -10,11 +10,13 @@
   import { page } from '$app/state';
   import AppHeader from '$lib/AppHeader.svelte';
   import SuiteFooter from '$kit/SuiteFooter.svelte';
-  import { applyTheme, readTheme } from '$kit/theme.svelte';
+  import { initAppearance } from '$lib/vibe/appearance.svelte';
   import { autoSignIn, signOut, watchSession } from '$lib/auth/org-plane';
   import { currentPlane, devMode, enableUrl, initSession, planeSessionLost, session } from '$lib/session.svelte';
 
   let { children } = $props();
+  // Before any child renders: the cookie, the old theme's migration, and the real phase (spec §4.3).
+  const stopAppearance = initAppearance();
   let initializing = $state(true);
   let autoSigningIn = $state(false);
   /** Why the session could not be started; shown with a retry, never as an endless "Connecting…". */
@@ -36,11 +38,10 @@
   }
 
   onMount(async () => {
-    applyTheme(readTheme());
     await start();
     stop = watchSession(currentPlane, { onSignedOut: () => planeSessionLost(null) });
   });
-  onDestroy(() => stop?.());
+  onDestroy(() => { stop?.(); stopAppearance(); });
 
   // Tokens are memory-only: a new tab, a reload or a 401 leaves none. Go straight to a silent
   // authorize (prompt=none); /login only after an explicit sign-out or a failed attempt (SuperJackfruitLabs/agentpod issue 704).
