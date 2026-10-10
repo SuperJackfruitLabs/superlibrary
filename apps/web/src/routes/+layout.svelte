@@ -1,6 +1,7 @@
 <script lang="ts">
   import '@superjackfruit/vibekit/fonts.css';
   import '@superjackfruit/vibekit/vibekit.css';
+  import '$lib/vibe/superlibrary.css';
   import '$kit/tokens.css';
   import '$kit/kit.css';
   import '../app.css';

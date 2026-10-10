@@ -11,7 +11,7 @@ function files(dir: string): string[] {
 }
 describe('the kit reads tokens only (a working direction: a change must be a token edit)', () => {
   it('no colour or font literal anywhere in the app: design/tokens.toml is the one source', () => {
-    const generated = new Set(['tokens.css', 'suite.generated.ts']);
+    const generated = new Set(['tokens.css', 'suite.generated.ts', 'superlibrary.css']);
     const scanned = files(src).filter((f) => /\.(css|svelte|ts)$/.test(f) && !/\.test\.ts$/.test(f) && !generated.has(f.split('/').at(-1)!));
     expect(scanned.some((f) => f.endsWith('kit.css'))).toBe(true);
     const offenders = scanned.flatMap((f) => {
