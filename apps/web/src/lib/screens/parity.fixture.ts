@@ -1,4 +1,7 @@
 /** The inventory (spec §6) as data, and an API that answers with all of it. Used only by tests. */
+import { formatBytes } from '@superlibrary/embed';
+import { day, when } from '$lib/item';
+
 /**
  * One thing a person can see. Every form is checked strictly (parity.svelte.test.ts):
  * - a string: the phrase, as whole words, in the page's text ("Run" is not found in "Running");
@@ -6,7 +9,10 @@
  * - `heading`: a heading with exactly this name (and level, when given);
  * - `role` + `name`: a control with exactly this accessible name (a select also with these options);
  * - `label` + `value`: a label (a <dt>, <th> or label span) and, in the element right after it, its value;
- * - `in` + `together`: one element matching `in` that shows every phrase (a row, an entry).
+ * - `in` + `together`: one element matching `in` that shows every phrase (a row, an entry); only the
+ *   innermost matches count, so a wrapper around several rows is not one row;
+ * - `plain`: the phrase as text that is not a link (a revoked version's name).
+ * Dates are built with the app's own `when()`/`day()`, so they are exact in any time zone or locale.
  */
 export type Need =
   | string
@@ -14,7 +20,8 @@ export type Need =
   | { heading: string; level?: 1 | 2 | 3 | 4 | 5 | 6 }
   | { role: 'button' | 'link' | 'combobox' | 'searchbox' | 'checkbox' | 'group' | 'field'; name: string; options?: readonly string[] }
   | { label: string; value: string }
-  | { in: string; together: readonly string[] };
+  | { in: string; together: readonly string[] }
+  | { plain: string };
 
 const AGENT = 'prn_00000000000000000a9a';
 const BOARD = 'brd_00000000000000b1';
@@ -76,6 +83,8 @@ export const FIX = {
 const OUTCOME_WORDS = ['Approved', 'Completed', 'In progress', 'Superseded', 'Rejected', 'Failed', 'Abandoned'];
 /** A row or entry of a list, whatever shape a vibe gives it (a card, a line, a table row). */
 const ROW = (list: string) => `[aria-label="${list}"] li, [aria-label="${list}"] tr`;
+/** The element holding the h1: the item's header facts (IH2–IH5) belong with the title, wherever a vibe puts it. */
+const HEADER = ':has(> h1)';
 const ITEM_COMMON: Need[] = [
   { heading: 'Provenance' },
   { heading: 'Related' }, { in: ROW('Related items'), together: ['Related note', 'Approved', 'A related snippet'] }, { css: '[aria-label="Related items"]', what: 'the related list' },
@@ -100,47 +109,49 @@ export const PARITY: Record<'library' | 'artifact' | 'record' | 'collections' | 
     { css: '[aria-label="Library"]', what: 'the list named Library' },
     { in: ROW('Library'), together: ['Parity report', 'Completed', 'Artifact', 'Parity board', 'docs', 'out/report', 'Everyone in the workspace', 'A caption for search'] },
     { in: ROW('Library'), together: ['Parity card', 'Rejected', 'Work record', 'Parity board', 'This board', 'Replaced by the report', 'See what replaced it'] },
-    { css: `a[href="/a/${ARTIFACT.id}"]`, what: 'a row links to its item' },
+    { css: `a[href="/a/${ARTIFACT.id}"]`, what: 'a row links to its item' }, { css: `a[href="/a/${RECORD_ITEM.id}"]`, what: 'the record row links to its item' },
     { css: `a[href="/a/${ARTIFACT.id}"].replaced, a.replaced[href="/a/${ARTIFACT.id}"]`, what: 'the replaced-by link' },
     { role: 'button', name: 'More' },
   ],
   artifact: [
     { heading: 'Parity report', level: 1 }, { css: 'h1', what: 'a heading' },
-    'Completed', 'v2 (latest)', 'Everyone in the workspace', 'deleted on', { role: 'link', name: 'Upload a new version' },
+    { in: HEADER, together: ['Parity report', 'Completed', 'v2 (latest)', 'Everyone in the workspace', `deleted on ${day(ARTIFACT.expiresAt)}`] },
+    { role: 'link', name: 'Upload a new version' },
     { css: '.viewer', what: 'the viewer' },
     { heading: 'Versions' },
-    { in: 'li, tr', together: ['v2', '2 files', 'Shown', 'Latest', 'Secret scan overridden', 'Revoke version 2'] },
-    { in: 'li, tr', together: ['v1', '1 file', 'Revoked'] },
+    { in: 'li, tr', together: ['v2', `${when(VERSIONS[0]!.createdAt)} · ${formatBytes(2048)} · 2 files`, 'Shown', 'Latest', 'Secret scan overridden', 'Revoke version 2'] },
+    { in: 'li, tr', together: ['v1', `${when(VERSIONS[1]!.createdAt)} · ${formatBytes(512)} · 1 file`, 'Revoked'] },
+    { role: 'link', name: 'v2' }, { plain: 'v1' },
     { role: 'button', name: 'Revoke version 2' },
     { heading: 'Details · version 2' },
     { label: 'Item', value: 'Artifact' }, { label: 'Kind', value: 'Folder, opens on a Markdown' }, { label: 'Media type', value: 'text/markdown' },
-    { label: 'Size', value: 'bytes)' }, { label: 'Files', value: '2' }, { label: 'Opens on', value: 'index.md' },
+    { label: 'Size', value: `${formatBytes(2048)} (2,048 bytes)` }, { label: 'Files', value: '2' }, { label: 'Opens on', value: 'index.md' },
     { label: 'SHA-256', value: 'b'.repeat(64) }, { label: 'SHA-256', value: "of the folder's file list" }, { role: 'button', name: 'Copy SHA-256' },
-    { label: 'Uploaded', value: '2026' }, { label: 'Secret scan', value: 'Overridden by the uploader, recorded' },
+    { label: 'Uploaded', value: when(VERSIONS[0]!.createdAt) }, { label: 'Secret scan', value: 'Overridden by the uploader, recorded' },
     { label: 'Created by', value: `An agent (${AGENT})` }, { label: 'Station', value: 'stn_00000000000000s1' }, { label: 'Source path', value: 'out/report' },
     { label: 'Board', value: BOARD }, { label: 'Stage', value: 'review' }, { label: 'Card', value: 'card_00000000000000c1' }, { label: 'Run', value: 'run_00000000000000r1' },
-    { label: 'Created', value: '2026' }, { label: 'Visible to', value: 'Everyone in the workspace' }, { label: 'Outcome', value: 'completed' },
+    { label: 'Created', value: when(ARTIFACT.createdAt) }, { label: 'Visible to', value: 'Everyone in the workspace' }, { label: 'Outcome', value: 'completed' },
     { role: 'field', name: 'Caption' }, 'Shown with the item and used by search. Most useful for images.', { role: 'button', name: 'Save caption' },
     { role: 'field', name: 'Replaced by' }, { role: 'button', name: 'Mark as superseded' },
-    'To be deleted on', { role: 'button', name: 'Keep it (no delete date)' },
+    { heading: `To be deleted on ${day(ARTIFACT.expiresAt)}` }, { role: 'button', name: 'Keep it (no delete date)' },
     ...ITEM_COMMON,
   ],
   record: [
-    { heading: 'Parity card', level: 1 }, 'Rejected', 'This board',
+    { heading: 'Parity card', level: 1 }, { in: HEADER, together: ['Parity card', 'Rejected', 'This board'] },
     'Parity board', 'Now at review', { role: 'link', name: 'Open the card in Superpipeline' },
     { css: 'a[target="_blank"][rel="noopener noreferrer"]', what: 'the card link opens safely' },
     'Some text was hidden because it looked like a secret.', 'This record is long: its oldest comments and handoffs were shortened.',
     { heading: 'Spec' }, { label: 'goal', value: 'Ship the parity check' },
     { heading: 'Timeline' }, { css: 'ol.timeline', what: 'the timeline list' },
-    { in: 'ol.timeline > li', together: ['Card created'] },
-    { in: 'ol.timeline > li', together: ['draft · attempt 1 · completed', AGENT, 'Draft ready'] },
+    { in: 'ol.timeline > li', together: ['Card created', when(RECORD_VIEW.record.createdAt)] },
+    { in: 'ol.timeline > li', together: ['draft · attempt 1 · completed', `${when(RECORD_VIEW.record.handoffs[0]!.startedAt!)} · ${AGENT}`, 'Draft ready'] },
     { in: 'ol.timeline > li', together: ['review · attempt 2 · failed', 'Time not recorded', 'Failed: tests failed'] },
-    { in: 'ol.timeline > li', together: ['Comment', 'A reviewer', 'Needs work'] },
-    { in: 'ol.timeline > li', together: ['Gate at review: approved'] },
-    { in: 'ol.timeline > li', together: ['Archived'] },
+    { in: 'ol.timeline > li', together: ['Comment', `${when(RECORD_VIEW.record.comments[0]!.createdAt)} · A reviewer`, 'Needs work'] },
+    { in: 'ol.timeline > li', together: ['Gate at review: approved', when(RECORD_VIEW.record.gates[0]!.resolvedAt)] },
+    { in: 'ol.timeline > li', together: ['Archived', when(RECORD_VIEW.record.archivedAt)] },
     { heading: 'Artifacts' }, { in: 'li, tr', together: ['Parity report', 'v2'] }, { role: 'link', name: 'Parity report v2' },
     { label: 'Created by', value: 'A person (source:superpipeline)' }, { label: 'Board', value: BOARD }, { label: 'Stage', value: 'review' },
-    { label: 'Card', value: 'card_00000000000000c2' }, { label: 'Created', value: '2026' }, { label: 'Visible to', value: 'This board' }, { label: 'Outcome', value: 'rejected' },
+    { label: 'Card', value: 'card_00000000000000c2' }, { label: 'Created', value: when(RECORD_ITEM.createdAt) }, { label: 'Visible to', value: 'This board' }, { label: 'Outcome', value: 'rejected' },
     { role: 'button', name: 'Show to everyone in the workspace' }, { heading: 'Delete on a date' },
     'Superseded by', { role: 'link', name: 'the item that replaced it' }, { role: 'button', name: 'Undo superseded' },
     ...ITEM_COMMON,
@@ -153,11 +164,11 @@ export const PARITY: Record<'library' | 'artifact' | 'record' | 'collections' | 
     { css: `a[href="/collections/${COLLECTION.id}"]`, what: 'a collection links to itself' },
   ],
   collection: [
-    { heading: 'Parity set', level: 1 }, 'Things to keep', '2 items · created', { role: 'button', name: 'Rename or describe' }, { role: 'button', name: 'Delete collection' },
+    { heading: 'Parity set', level: 1 }, 'Things to keep', `2 items · created ${when(COLLECTION.createdAt)}`, { role: 'button', name: 'Rename or describe' }, { role: 'button', name: 'Delete collection' },
     { css: '[aria-label="Items in this collection"]', what: 'the list named Items in this collection' },
-    { in: ROW('Items in this collection'), together: ['Parity report', 'Completed', 'added', 'Keep this one', 'Remove “Parity report” from collection'] },
-    { in: ROW('Items in this collection'), together: ['Parity card', 'Rejected', 'added', 'Remove “Parity card” from collection'] },
+    { in: ROW('Items in this collection'), together: ['Parity report', 'Completed', `added ${when(DETAIL.entries[0]!.addedAt)}`, 'Keep this one', 'Remove “Parity report” from collection'] },
+    { in: ROW('Items in this collection'), together: ['Parity card', 'Rejected', `added ${when(DETAIL.entries[1]!.addedAt)}`, 'Remove “Parity card” from collection'] },
     { role: 'button', name: 'Remove “Parity report” from collection' },
-    { css: `a[href="/a/${ARTIFACT.id}"]`, what: 'an entry links to its item' },
+    { css: `a[href="/a/${ARTIFACT.id}"]`, what: 'an entry links to its item' }, { css: `a[href="/a/${RECORD_ITEM.id}"]`, what: 'the record entry links to its item' },
   ],
 };

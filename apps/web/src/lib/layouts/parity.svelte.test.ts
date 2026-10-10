@@ -106,8 +106,15 @@ function missing(needs: readonly Need[]): string[] {
       const ok = [...document.body.querySelectorAll('*')].some((el) => shown(el) && textOf(el) === norm(n.label) && el.nextElementSibling !== null && shown(el.nextElementSibling) && has(textOf(el.nextElementSibling), n.value));
       return ok ? [] : [`row: ${n.label} → ${n.value}`];
     }
-    // Phrases that belong together: one element matching `in` shows every one of them.
-    const ok = [...document.querySelectorAll(n.in)].some((el) => shown(el) && n.together.every((p) => has(textOf(el), p)));
+    if ('plain' in n) {
+      // There as text, and not a link: the element whose whole text it is has no link around it.
+      const ok = [...document.body.querySelectorAll('*')].some((el) => shown(el) && textOf(el) === norm(n.plain) && !el.closest('a[href], [role="link"]'));
+      return ok && !byRole('link', n.plain).length ? [] : [`plain text (not a link): ${n.plain}`];
+    }
+    // Phrases that belong together: one element matching `in` shows every one of them. Only the
+    // innermost matches count: a wrapper holding several rows is not one row.
+    const rows = [...document.querySelectorAll(n.in)].filter((el) => !el.querySelector(n.in));
+    const ok = rows.some((el) => shown(el) && n.together.every((p) => has(textOf(el), p)));
     return ok ? [] : [`together in ${n.in}: ${n.together.join(' | ')}`];
   });
 }
@@ -206,6 +213,50 @@ describe('the parity check fails when something is dropped', () => {
     await openScreen(2);
     const detail = [...document.querySelectorAll('ol.timeline p')].find((p) => p.textContent === 'Draft ready')!;
     document.querySelector('ol.timeline > li')!.append(detail);
-    expect(missing(PARITY.record)).toEqual([`together in ol.timeline > li: draft · attempt 1 · completed | prn_00000000000000000a9a | Draft ready`]);
+    expect(missing(PARITY.record)).toEqual([expect.stringMatching(/^together in ol\.timeline > li: draft · attempt 1 · completed \| /)]);
+  });
+
+  it('header facts dropped from the header are named, though Provenance and the delete-date panel still say them', async () => {
+    await openScreen(1);
+    const meta = document.querySelector('h1')!.parentElement!;
+    for (const s of [...meta.querySelectorAll('span')].filter((e) => e.textContent === 'Everyone in the workspace' || e.textContent?.startsWith('deleted on'))) s.remove();
+    expect(missing(PARITY.artifact)).toEqual([expect.stringMatching(/^together in :has\(> h1\): Parity report \| Completed \| v2 \(latest\) \| Everyone in the workspace \| deleted on /)]);
+  });
+
+  it('a wrapper around several rows is not one row: "Revoked" moved to v2 is named', async () => {
+    await openScreen(1);
+    const list = document.querySelector('ul.versions')!;
+    const wrap = document.createElement('ol');
+    const outer = document.createElement('li');
+    list.replaceWith(wrap);
+    wrap.append(outer);
+    outer.append(list);
+    const [v2, v1] = [...list.querySelectorAll(':scope > li')];
+    v2!.append(els('span', 'Revoked')[0]!);
+    expect(v1!.textContent).not.toContain('Revoked');
+    expect(missing(PARITY.artifact)).toEqual([expect.stringMatching(/^together in li, tr: v1 \| /)]);
+  });
+
+  it('a wrong size and a revoked version shown as a link are named', async () => {
+    await openScreen(1);
+    const size = els('dt', 'Size')[0]!.nextElementSibling!;
+    size.textContent = size.textContent!.replace('2,048', '2048');
+    const v1 = els('span', 'v1')[0]!;
+    const a = document.createElement('a');
+    a.href = '/a/x?v=1';
+    v1.replaceWith(a);
+    a.append(v1);
+    expect(missing(PARITY.artifact)).toEqual(['plain text (not a link): v1', expect.stringMatching(/^row: Size → /)]);
+  });
+
+  it('a collection entry with the wrong added date, or without its record link, is named', async () => {
+    await openScreen(4);
+    const small = [...document.querySelectorAll('small')].find((e) => e.textContent?.startsWith('added'))!;
+    small.textContent = 'added Oct 3, 2026';
+    document.querySelector(`a[href="/a/${FIX.recordId}"]`)!.removeAttribute('href');
+    const out = missing(PARITY.collection);
+    expect(out).toHaveLength(2);
+    expect(out[0]).toMatch(/^together in .*: Parity report \| Completed \| added /);
+    expect(out[1]).toBe(`element: the record entry links to its item (a[href="/a/${FIX.recordId}"])`);
   });
 });
