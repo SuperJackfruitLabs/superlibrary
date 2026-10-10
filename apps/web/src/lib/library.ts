@@ -2,7 +2,7 @@
 /** The library page's state (the address), its requests, and its rows. */
 import { BOARD_ID, OUTCOMES, PRN_ID, type BrowsePage, type Facets, type ItemSource, type ItemSummary, type Outcome, type SearchResult } from '@superlibrary/contract';
 import { visibilityWords } from '@superlibrary/embed';
-import { explain } from './item';
+import { explain, ITEM_KIND_WORD, UNREACHABLE } from './item';
 import { OUTCOME_WORDS } from './kit/outcome';
 import { makerOf, type Maker } from './vibe/faces';
 
@@ -93,9 +93,8 @@ export const browseBody = (f: Filters, cursor: string | null, now = new Date(), 
 
 /** One row of any list: a search hit or a browsed item, said the same way. */
 export interface Row { id: string; title: string; kind: Kind; outcome: Outcome; line: string; snippet: string | null; supersededBy: string | null; visibility: string | null; kindWord: string; board: string | null; station: string | null; path: string | null; maker: Maker | null }
-const KIND_WORD: Record<Kind, string> = { artifact: 'Artifact', 'work-record': 'Work record' };
 function partsOf(kind: Kind, s: ItemSource | undefined, boards: Map<string, string>) {
-  return { kindWord: KIND_WORD[kind], board: s?.board ? (boards.get(s.board) ?? s.board) : null, station: s?.stationName || s?.station || null, path: s?.path ?? null };
+  return { kindWord: ITEM_KIND_WORD[kind], board: s?.board ? (boards.get(s.board) ?? s.board) : null, station: s?.stationName || s?.station || null, path: s?.path ?? null };
 }
 const lineOf = (p: ReturnType<typeof partsOf>) => [p.kindWord, p.board, p.station, p.path].filter(Boolean).join(' · ');
 const WORKSPACE_WORDS = 'Everyone in the workspace';
@@ -119,7 +118,6 @@ export const rowOfItem = (i: ItemSummary, boards: Map<string, string>): Row => {
 export const boardNames = (f: Facets | null) => new Map((f?.boards ?? []).map((b) => [b.id, b.name]));
 
 export type Loaded<T> = { ok: true; value: T } | { ok: false; message: string };
-const UNREACHABLE = 'The library could not be reached. Check your connection and try again.';
 /** GET, or POST with a JSON body. A refusal comes back as a sentence (`explain`). */
 export async function loadJson<T>(api: Api, path: string, body?: unknown): Promise<Loaded<T>> {
   try {
