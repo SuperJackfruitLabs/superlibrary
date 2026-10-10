@@ -7,15 +7,16 @@ h2 { font-size: var(--vk-text-md); }
 a { color: var(--vk-color-primary); }
 .shell { max-width: 1100px; margin: 0 auto; padding: var(--vk-space-4); }
 .status, .notice { padding: var(--vk-space-6) var(--vk-space-4); text-align: center; color: var(--vk-color-muted); }
-button:not([class*="vk-"]), input, select, textarea { font: inherit; }
+:where(button:not([class*="vk-"])), input, select, textarea { font: inherit; }
 /* iOS Safari zooms into any field under 16px when it is focused. */
 input, select, textarea { font-size: max(16px, 1rem); }
 /* Every control is at least var(--vk-target-min) tall: Apple's minimum tap target (iOS is the primary platform). */
 button, .button, input:not([type=checkbox]):not([type=radio]), select { min-height: var(--vk-target-min); box-sizing: border-box; }
+/* :where() keeps these at zero specificity, so every product class (.suite-shell-account, .kit-more, …) still wins over them. */
 /* Phase-1 markup and unclassed buttons look like the kit's until each page moves to <Button> (lib/kit/kit.css). */
-button:not([class*="vk-"]), .button { display: inline-flex; align-items: center; justify-content: center; gap: var(--vk-space-2); padding: 0 var(--vk-space-4); border: 0; border-radius: var(--vk-radius-md); background: var(--vk-color-surface); color: var(--vk-color-text); box-shadow: inset 0 0 0 2px var(--vk-color-line), 0 var(--vk-lift) 0 var(--vk-color-ground); font: 600 var(--vk-text-md)/1 var(--vk-font-body); text-decoration: none; cursor: pointer; transition: transform var(--vk-motion-fast) var(--vk-motion-easing); }
-button:not([class*="vk-"]):hover, .button:hover { background: var(--vk-color-raised); }
-button:not([class*="vk-"]):disabled { opacity: 0.55; cursor: default; }
+:where(button:not([class*="vk-"])), .button { display: inline-flex; align-items: center; justify-content: center; gap: var(--vk-space-2); padding: 0 var(--vk-space-4); border: 0; border-radius: var(--vk-radius-md); background: var(--vk-color-surface); color: var(--vk-color-text); box-shadow: inset 0 0 0 2px var(--vk-color-line), 0 var(--vk-lift) 0 var(--vk-color-ground); font: 600 var(--vk-text-md)/1 var(--vk-font-body); text-decoration: none; cursor: pointer; transition: transform var(--vk-motion-fast) var(--vk-motion-easing); }
+:where(button:not([class*="vk-"])):hover, .button:hover { background: var(--vk-color-raised); }
+:where(button:not([class*="vk-"])):disabled { opacity: 0.55; cursor: default; }
 .primary, .primary:hover { background: var(--vk-color-primary); color: var(--vk-color-primary-fg); box-shadow: 0 var(--vk-lift) 0 var(--vk-color-ground); }
 input:not([type=checkbox]):not([type=radio]):not([type=file]) { width: 100%; padding: var(--vk-space-2) 10px; border: 2px solid var(--vk-color-faint); border-radius: var(--vk-radius-sm); background: var(--vk-color-surface); color: inherit; }
 input[type=file] { width: 100%; padding: var(--vk-space-1) 0; }
