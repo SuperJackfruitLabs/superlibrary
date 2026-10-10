@@ -12,8 +12,7 @@
     "e2e": "node ../../scripts/dev-keys.mjs && playwright test"
   },
   "dependencies": {
-    "@fontsource/ibm-plex-mono": "^5.2.5",
-    "@fontsource/ibm-plex-sans": "^5.2.5",
+    "@superjackfruit/vibekit": "file:./vendor/vibekit-0.0.1.tgz",
     "@superlibrary/contract": "workspace:*",
     "@superlibrary/embed": "workspace:*",
     "fflate": "^0.8.2"

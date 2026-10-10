@@ -1,9 +1,6 @@
 <script lang="ts">
-  // IBM Plex only (operator decision): Sans for words, Mono for code and data. Self-hosted ('self').
-  import '@fontsource/ibm-plex-sans/400.css';
-  import '@fontsource/ibm-plex-sans/500.css';
-  import '@fontsource/ibm-plex-sans/600.css';
-  import '@fontsource/ibm-plex-mono/400.css';
+  import '@superjackfruit/vibekit/fonts.css';
+  import '@superjackfruit/vibekit/vibekit.css';
   import '$kit/tokens.css';
   import '$kit/kit.css';
   import '../app.css';
