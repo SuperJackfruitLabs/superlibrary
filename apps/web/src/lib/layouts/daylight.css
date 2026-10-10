@@ -39,3 +39,12 @@
 .timeline--bubbles li { display: grid; grid-template-columns: auto 1fr; column-gap: var(--vk-space-2); margin: 0 0 var(--vk-space-3); padding: var(--vk-space-3); border-radius: var(--vk-radius-md); background: var(--vk-color-raised); box-shadow: inset 4px 0 0 var(--o, var(--vk-color-line)); }
 .timeline--bubbles li::before { display: none; }
 .timeline--bubbles li > :not(.tl-face) { grid-column: 2; }
+
+.sl-create { padding-top: var(--vk-space-3); }
+.sl-collection-cards { display: grid; gap: var(--vk-space-3); grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 768px) { .sl-collection-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1024px) { .sl-collection-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.sl-collection-cards li { border-bottom: 0; }
+.sl-collection-cards a { height: 100%; box-sizing: border-box; padding: var(--vk-space-3) var(--vk-space-4); border-radius: var(--vk-radius-md); background: var(--vk-color-surface); box-shadow: inset 0 0 0 1px var(--vk-color-line), 0 var(--vk-lift) 0 var(--vk-color-ground); }
+.sl-collection-head { padding-top: var(--vk-space-2); }
+.sl-collection-head h1 { margin-bottom: var(--vk-space-1); }
