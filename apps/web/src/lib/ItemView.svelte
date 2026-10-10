@@ -14,7 +14,7 @@
   import RelatedList from '$lib/RelatedList.svelte';
   import AddToCollection from '$lib/AddToCollection.svelte';
   import ModerationPanel from '$lib/ModerationPanel.svelte';
-  import { themeState } from '$kit/theme.svelte';
+  import { look } from '$lib/vibe/appearance.svelte';
   import {
     ItemError, askRevokeItem, askRevokeVersion, change, day, embedUrlGetter, explain, mayManage, provenanceRows, readItem,
     scopeSetter, shareInfoGetter, shownVersion, versionRows, versionsGetter, when, type Ask,
@@ -32,7 +32,7 @@
   let frameError = $state<string | null>(null);
   let mounted: Mounted | null = null;
   // A change in the account menu reaches the open viewer.
-  $effect(() => { const t = themeState.value; mounted?.setTheme(t); });
+  $effect(() => { const t = look.theme; mounted?.setTheme(t); });
   /** Bumped to mount the viewer again (after a version is revoked, or on Try again). */
   let mountKey = $state(0);
   let removed = $state(false);
@@ -109,7 +109,7 @@
     let mine: Mounted | null = null;
     frameError = null;
     mountArtifact(el, {
-      itemId: id, ...(v !== undefined ? { version: v } : {}), ...(title ? { title } : {}), appUrl: window.location.origin, theme: untrack(() => themeState.value),
+      itemId: id, ...(v !== undefined ? { version: v } : {}), ...(title ? { title } : {}), appUrl: window.location.origin, theme: untrack(() => look.theme),
       getEmbedUrl: embedUrlGetter(api), getVersions: versionsGetter(api), getShareInfo: shareInfoGetter(api, () => session.me), setScope: scopeSetter(api),
       onVersionChange: (n) => followVersion(n),
       onScopeChange: () => { notice = 'Everyone in the workspace can now see it.'; void load(); },

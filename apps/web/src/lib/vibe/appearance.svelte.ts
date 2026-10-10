@@ -111,8 +111,14 @@ export const chooseVibe = (vibe: Vibe) => setAppearance({ ...look.appearance, vi
 export const chooseTheme = (theme: ThemePreference) => setAppearance({ ...look.appearance, theme });
 export const chooseStrength = (timeStrength: TimeStrength) => setAppearance({ ...look.appearance, timeStrength });
 
-/** Turn the location on (asks the browser once) or off. Resolves whether it is on afterwards. */
+let locationAsk = 0;
+/**
+ * Turn the location on (asks the browser once) or off. Resolves whether it is on afterwards. A later
+ * choice wins: an answer that arrives after the person chose again is dropped, so unchecking while
+ * the prompt is open cannot be undone by a late "allow".
+ */
 export async function chooseLocation(on: boolean): Promise<boolean> {
+  const ask = ++locationAsk;
   if (!on) {
     write(PLACE_KEY, null);
     setAppearance({ ...look.appearance, useLocation: false });
@@ -127,6 +133,7 @@ export async function chooseLocation(on: boolean): Promise<boolean> {
       );
     } catch { resolve(null); }
   });
+  if (ask !== locationAsk) return false;
   if (got) write(PLACE_KEY, JSON.stringify(got));
   setAppearance({ ...look.appearance, useLocation: got !== null });
   return got !== null;

@@ -11,14 +11,14 @@ const suite = createRawSnippet(() => ({ render: () => '<button>Products</button>
 
 function open(extra: Record<string, unknown> = {}) {
   const onsignout = vi.fn();
-  const ontheme = vi.fn();
+  const onappearance = vi.fn();
   c = mount(SuiteHeader, { target: document.body, props: {
-    product: 'Superlibrary', home: '/', mark, onsignout, ontheme, theme: 'system',
+    product: 'Superlibrary', home: '/', mark, onsignout, onappearance,
     nav: [{ href: '/', label: 'Library', current: true }, { href: '/outcomes', label: 'Outcomes', current: false }],
     account: { label: 'Account', detail: 'An owner of this workspace' }, ...extra,
   } });
   flushSync();
-  return { onsignout, ontheme };
+  return { onsignout, onappearance };
 }
 
 describe('the suite shell (operator direction A)', () => {
@@ -31,17 +31,21 @@ describe('the suite shell (operator direction A)', () => {
     expect(header.querySelector('[data-testid="mark"]')).not.toBeNull();
     expect(header.querySelector('nav[aria-label="Superlibrary"] [aria-current="page"]')!.textContent).toBe('Library');
   });
-  it('the account menu holds the theme and Sign out, and Escape closes it back to its button', () => {
-    const { onsignout, ontheme } = open();
+  it('the account menu holds Appearance and Sign out, and Escape closes it back to its button', () => {
+    const { onsignout, onappearance } = open();
     const btn = document.querySelector<HTMLButtonElement>('.suite-shell-account')!;
     expect(btn.getAttribute('aria-expanded')).toBe('false');
     btn.click(); flushSync();
     const menu = document.getElementById(btn.getAttribute('aria-controls')!)!;
     expect(menu.hidden).toBe(false);
     expect(menu.textContent).toContain('An owner of this workspace');
-    const dark = [...menu.querySelectorAll<HTMLInputElement>('input[type=radio]')].find((r) => r.value === 'dark')!;
-    dark.click(); flushSync();
-    expect(ontheme).toHaveBeenCalledWith('dark');
+    expect(menu.querySelectorAll('input[type=radio]')).toHaveLength(0);
+    const items = [...menu.querySelectorAll('button')].map((b) => b.textContent!.trim());
+    expect(items).toEqual(['Appearance', 'Sign out']);
+    menu.querySelector<HTMLButtonElement>('button.suite-shell-appearance')!.click(); flushSync();
+    expect(onappearance).toHaveBeenCalledWith(btn);
+    expect(menu.hidden).toBe(true);
+    btn.click(); flushSync();
     menu.querySelector<HTMLButtonElement>('button.suite-shell-signout')!.click();
     expect(onsignout).toHaveBeenCalled();
     btn.click(); flushSync();

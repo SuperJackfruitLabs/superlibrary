@@ -82,3 +82,23 @@ select { border: 2px solid var(--vk-color-faint); border-radius: var(--vk-radius
 .collection-actions { margin-bottom: var(--vk-space-4); }
 .sl-needs { box-shadow: inset 0 0 0 2px var(--vk-color-signal); background: var(--vk-color-signal-wash); }
 .notice h1 { font-size: var(--vk-text-lg); }
+
+/* The Appearance dialog (spec §4.2). A full-height sheet on phones, a 480px panel wider. */
+.sl-appearance { width: min(480px, 100%); }
+@media (max-width: 599px) { .sl-appearance { width: 100%; max-height: 100dvh; min-height: 100dvh; border-radius: 0; } .modal-backdrop:has(.sl-appearance) { padding: 0; } }
+.sl-vibes { display: grid; gap: var(--vk-space-2); margin: 0 0 var(--vk-space-4); padding: 0; border: 0; }
+.sl-vibes legend { margin-bottom: var(--vk-space-2); font-weight: 600; }
+.sl-vibe-card { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: var(--vk-space-3); min-height: var(--vk-target-min); padding: var(--vk-space-2) var(--vk-space-3); border-radius: var(--vk-radius-md); box-shadow: inset 0 0 0 2px var(--vk-color-line); cursor: pointer; }
+.sl-vibe-card:has(input:checked) { box-shadow: inset 0 0 0 2px var(--vk-color-text); }
+.sl-vibe-card input { width: 22px; height: 22px; margin: 0; }
+.sl-vibe-text { display: grid; gap: 2px; }
+.sl-vibe-name { font-weight: 650; }
+.sl-vibe-feel { color: var(--vk-color-muted); font-size: var(--vk-text-sm); }
+.sl-vibe-sample { display: inline-flex; gap: 3px; padding: 4px; border-radius: var(--vk-radius-sm); background: var(--vk-color-bg); box-shadow: inset 0 0 0 1px var(--vk-color-line); }
+.sl-vibe-sample span { width: 14px; height: 22px; border-radius: 3px; }
+.sl-vibe-sample span:nth-child(1) { background: var(--vk-color-surface); }
+.sl-vibe-sample span:nth-child(2) { background: var(--vk-color-primary); }
+.sl-vibe-sample span:nth-child(3) { background: var(--vk-color-signal); }
+.sl-setting { display: grid; gap: var(--vk-space-2); margin: 0 0 var(--vk-space-4); }
+.sl-setting-label { margin: 0; font-weight: 600; }
+.sl-setting-hint { margin: 0; font-size: var(--vk-text-sm); }
