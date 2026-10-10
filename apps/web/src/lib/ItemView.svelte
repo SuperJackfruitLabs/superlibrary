@@ -31,7 +31,7 @@
   let frame = $state<HTMLElement | null>(null);
   let frameError = $state<string | null>(null);
   let mounted: Mounted | null = null;
-  // A change in the account menu reaches the open viewer.
+  // A change in the Appearance dialog reaches the open viewer.
   $effect(() => { const t = look.theme; mounted?.setTheme(t); });
   /** Bumped to mount the viewer again (after a version is revoked, or on Try again). */
   let mountKey = $state(0);

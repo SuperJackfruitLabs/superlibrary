@@ -114,5 +114,22 @@ describe('the appearance dialog', () => {
     expect(look.appearance.useLocation).toBe(false);
     expect(locationBox().checked).toBe(false);
     expect(localStorage.getItem(PLACE_KEY)).toBeNull();
+    expect(document.querySelector('[role="status"]')!.textContent).not.toContain('Location was not shared');
+  });
+
+  it('check, uncheck, check: the first answer leaves the box alone while the third ask is pending', async () => {
+    const asks: Array<{ ok: PositionCallback; fail: PositionErrorCallback }> = [];
+    geo((ok, fail) => { asks.push({ ok, fail }); });
+    open();
+    locationBox().click(); // A pending
+    locationBox().click(); await settle(); // off
+    locationBox().click(); // C pending
+    expect(asks).toHaveLength(2);
+    asks[0]!.fail({ code: 1 } as GeolocationPositionError); await settle(); flushSync();
+    expect(locationBox().checked).toBe(true);
+    expect(document.querySelector('[role="status"]')!.textContent).not.toContain('Location was not shared');
+    asks[1]!.ok({ coords: { latitude: 1, longitude: 2 } } as GeolocationPosition); await settle(); flushSync();
+    expect(look.appearance.useLocation).toBe(true);
+    expect(locationBox().checked).toBe(true);
   });
 });

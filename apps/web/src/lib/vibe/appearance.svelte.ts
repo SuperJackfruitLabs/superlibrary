@@ -81,7 +81,6 @@ export function initAppearance(doc: Document = document, now: () => Date = () =>
     if (old === 'light' || old === 'dark') {
       appearance = { ...appearance, theme: old };
       saveCookie(doc, appearance);
-      write(OLD_THEME_KEY, null);
     }
   }
   draw(doc, decide(appearance, now()));
@@ -95,8 +94,6 @@ export function initAppearance(doc: Document = document, now: () => Date = () =>
 
 export function setAppearance(next: Appearance, doc: Document = document): void {
   saveCookie(doc, next);
-  // The viewer follows the page again: drop a per-device theme left by the old app or the toolbar.
-  write(OLD_THEME_KEY, null);
   // The model and the cookie change at once; only the paint waits for a view transition, so a quick
   // second choice cannot be undone by the first one's pending paint.
   const attrs = decide(next, new Date());
@@ -113,11 +110,12 @@ export const chooseStrength = (timeStrength: TimeStrength) => setAppearance({ ..
 
 let locationAsk = 0;
 /**
- * Turn the location on (asks the browser once) or off. Resolves whether it is on afterwards. A later
+ * Turn the location on (asks the browser once) or off. Resolves whether it is on afterwards, or null when a later
+ * choice superseded this one (the caller must then leave the screen alone). A later
  * choice wins: an answer that arrives after the person chose again is dropped, so unchecking while
  * the prompt is open cannot be undone by a late "allow".
  */
-export async function chooseLocation(on: boolean): Promise<boolean> {
+export async function chooseLocation(on: boolean): Promise<boolean | null> {
   const ask = ++locationAsk;
   if (!on) {
     write(PLACE_KEY, null);
@@ -133,7 +131,7 @@ export async function chooseLocation(on: boolean): Promise<boolean> {
       );
     } catch { resolve(null); }
   });
-  if (ask !== locationAsk) return false;
+  if (ask !== locationAsk) return null;
   if (got) write(PLACE_KEY, JSON.stringify(got));
   setAppearance({ ...look.appearance, useLocation: got !== null });
   return got !== null;

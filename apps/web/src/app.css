@@ -98,7 +98,7 @@ select { border: 2px solid var(--vk-color-faint); border-radius: var(--vk-radius
 .sl-vibe-sample span { width: 14px; height: 22px; border-radius: 3px; }
 .sl-vibe-sample span:nth-child(1) { background: var(--vk-color-surface); }
 .sl-vibe-sample span:nth-child(2) { background: var(--vk-color-primary); }
-.sl-vibe-sample span:nth-child(3) { background: var(--vk-color-signal); }
+.sl-vibe-sample span:nth-child(3) { background: var(--vk-color-raised); }
 .sl-setting { display: grid; gap: var(--vk-space-2); margin: 0 0 var(--vk-space-4); }
 .sl-setting-label { margin: 0; font-weight: 600; }
 .sl-setting-hint { margin: 0; font-size: var(--vk-text-sm); }

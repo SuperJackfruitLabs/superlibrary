@@ -15,6 +15,7 @@
     const box = e.currentTarget as HTMLInputElement;
     const on = box.checked;
     const ok = await chooseLocation(on);
+    if (ok === null) return; // a later choice owns the box and the note
     // Svelte will not rewrite `checked` when the model stays false, so the box follows the outcome.
     box.checked = look.appearance.useLocation;
     locationNote = on && !ok && !look.appearance.useLocation ? 'Location was not shared, so your time zone is used.' : null;

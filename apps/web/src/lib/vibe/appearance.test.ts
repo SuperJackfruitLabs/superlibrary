@@ -45,12 +45,16 @@ describe('the appearance setting', () => {
     expect(attrs()).toEqual({ vibe: 'daylight', theme: 'light', phase: 'noon', time: 'strong' });
   });
 
-  it('an old Light or Dark choice carries over once, and the old key goes', () => {
+  it('an old Light or Dark choice carries over once, and the old key stays for the embed', () => {
     localStorage.setItem(OLD_THEME_KEY, 'dark');
     stop = initAppearance(document, noon);
     expect(attrs().theme).toBe('dark');
     expect(document.cookie).toContain('vk_appearance=daylight.dark.strong.0');
-    expect(localStorage.getItem(OLD_THEME_KEY)).toBeNull();
+    expect(localStorage.getItem(OLD_THEME_KEY)).toBe('dark');
+    stop(); // a second start reads the cookie and does not migrate again
+    localStorage.setItem(OLD_THEME_KEY, 'light');
+    stop = initAppearance(document, noon);
+    expect(attrs().theme).toBe('dark');
   });
 
   it('the cookie wins over the old key', () => {
@@ -74,7 +78,7 @@ describe('the appearance setting', () => {
     expect(last).toMatch(/^vk_appearance=paper\.dark\.strong\.0; /);
     expect(last).not.toContain('Domain=');
     expect(last).not.toContain('Secure');   // jsdom is http; on https it is Secure
-    expect(localStorage.getItem(OLD_THEME_KEY)).toBeNull();
+    expect(localStorage.getItem(OLD_THEME_KEY)).toBe('light'); // the embed's own per-device choice is never touched
   });
 
   it('the cookie is Secure on https and not on http', () => {
