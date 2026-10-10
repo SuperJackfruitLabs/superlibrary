@@ -25,7 +25,8 @@ export function tomorrowLocal(now: Date = new Date()): string {
   d.setDate(d.getDate() + 1);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
-const anchor = (set: (el: HTMLElement | null) => void): Attachment<HTMLElement> => (el) => { set(el); return () => set(null); };
+/** An attachment that records its element; a new element attached before the old one detaches is not cleared by it. */
+const anchor = (get: () => HTMLElement | null, set: (el: HTMLElement | null) => void): Attachment<HTMLElement> => (el) => { set(el); return () => { if (get() === el) set(null); }; };
 
 /** The item page's data and actions (spec §5.2): what ItemView.svelte held, so every vibe's layout can draw it. */
 export class ItemModel {
@@ -86,8 +87,8 @@ export class ItemModel {
 
   /** Where the viewer mounts. Any layout attaches it: `<div class="viewer" {@attach model.viewer}></div>`. */
   readonly viewer: Attachment<HTMLElement> = (el) => { this.#frame = el; return () => { if (this.#frame === el) this.#frame = null; }; };
-  readonly refusalAnchor = anchor((el) => { this.#refusalEl = el; });
-  readonly removedAnchor = anchor((el) => { this.#removedEl = el; });
+  readonly refusalAnchor = anchor(() => this.#refusalEl, (el) => { this.#refusalEl = el; });
+  readonly removedAnchor = anchor(() => this.#removedEl, (el) => { this.#removedEl = el; });
 
   constructor(props: () => { itemId: string; version?: number }, api: Api = sessionApi) {
     this.#props = props;

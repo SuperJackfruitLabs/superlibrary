@@ -177,34 +177,71 @@ describe('the viewer is mounted once at a time', () => {
 });
 
 describe('focus after the dialogs', () => {
+  const focusable = (tag: string) => { const e = document.createElement(tag); e.tabIndex = -1; document.body.append(e); return e; };
+
   it('a revoked item has no control to return to: focus goes to the refusal', async () => {
     let revoked = false;
     reply = (p, init) => {
       if (init?.method === 'POST') { revoked = true; return Response.json({}); }
-      if (p.endsWith('/revoke')) return Response.json({});
       return revoked ? Response.json({ error: 'revoked' }, { status: 410 }) : Response.json({ item, versions: [v(1)] });
     };
     const m = make({ itemId: ID });
     await settle();
+    const p = focusable('p');
+    m.refusalAnchor(p);
+    (document.activeElement as HTMLElement | null)?.blur();
     m.revokeItem(new MouseEvent('click'));
     await m.confirmPending('');
     await settle();
     expect(m.pending).toBeNull();
     expect(m.phase).not.toBe('ok');
+    expect(document.activeElement).toBe(p);
+    p.remove();
   });
 
-  it('removal puts focus on the heading the layout anchors', async () => {
+  it('a revoked version has no Revoke button: focus goes to the notice', async () => {
+    reply = (p, init) => (init?.method === 'POST' ? Response.json({}) : Response.json({ item, versions: [v(2), v(1)] }));
+    const m = make({ itemId: ID });
+    await settle();
+    const n = focusable('div');
+    m.noticeEl = n;
+    (document.activeElement as HTMLElement | null)?.blur();
+    m.revokeVersion(new MouseEvent('click'), 1);
+    await m.confirmPending('');
+    await settle();
+    expect(m.pending).toBeNull();
+    expect(document.activeElement).toBe(n);
+    n.remove();
+  });
+
+  it('removal puts focus on the heading the layout anchors, and releases it on detach', async () => {
     reply = () => Response.json({ item, versions: [v(1)] });
     const m = make({ itemId: ID });
     await settle();
-    const h = document.createElement('h1');
-    h.tabIndex = -1;
-    document.body.append(h);
-    m.removedAnchor(h);
+    const h = focusable('h1');
+    const detach = m.removedAnchor(h) as () => void;
     await m.removedNow();
     expect(m.removed).toBe(true);
     expect(document.activeElement).toBe(h);
+    detach();
+    (document.activeElement as HTMLElement | null)?.blur();
+    await m.removedNow();
+    expect(document.activeElement).not.toBe(h);
     h.remove();
+  });
+
+  it('an anchor attached before the old one detaches keeps the new element', async () => {
+    reply = () => Response.json({ item, versions: [v(1)] });
+    const m = make({ itemId: ID });
+    await settle();
+    const a = focusable('h1');
+    const b = focusable('h1');
+    const detachA = m.removedAnchor(a) as () => void;
+    m.removedAnchor(b);
+    detachA();
+    await m.removedNow();
+    expect(document.activeElement).toBe(b);
+    a.remove(); b.remove();
   });
 
   it('a failed confirmation keeps the dialog open with its sentence', async () => {
