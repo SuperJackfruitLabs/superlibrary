@@ -3,11 +3,14 @@
   import OutcomeBadge from '$kit/OutcomeBadge.svelte';
   import { outcomeVar } from '$kit/outcome';
   import type { Row } from '$lib/library';
+  import { look } from '$lib/vibe/appearance.svelte';
+  import { rowShapeFor } from '$lib/layouts/registry';
 
   let { rows, label }: { rows: Row[]; label: string } = $props();
+  const shape = $derived(rowShapeFor(look.appearance.vibe));
 </script>
 
-<ul class="results" aria-label={label}>
+<ul class="results" aria-label={label} data-rows={shape}>
   {#each rows as r (r.id)}
     <li class="result" style:--o={outcomeVar(r.outcome)}>
       <a class="result-link" href={`/a/${r.id}`}>
