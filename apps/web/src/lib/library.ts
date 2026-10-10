@@ -95,7 +95,7 @@ export const browseBody = (f: Filters, cursor: string | null, now = new Date(), 
 export interface Row { id: string; title: string; kind: Kind; outcome: Outcome; line: string; snippet: string | null; supersededBy: string | null; visibility: string | null; kindWord: string; board: string | null; station: string | null; path: string | null; maker: Maker | null }
 const KIND_WORD: Record<Kind, string> = { artifact: 'Artifact', 'work-record': 'Work record' };
 function partsOf(kind: Kind, s: ItemSource | undefined, boards: Map<string, string>) {
-  return { kindWord: KIND_WORD[kind], board: s?.board ? (boards.get(s.board) ?? s.board) : null, station: s?.stationName ?? s?.station ?? null, path: s?.path ?? null };
+  return { kindWord: KIND_WORD[kind], board: s?.board ? (boards.get(s.board) ?? s.board) : null, station: s?.stationName || s?.station || null, path: s?.path ?? null };
 }
 const lineOf = (p: ReturnType<typeof partsOf>) => [p.kindWord, p.board, p.station, p.path].filter(Boolean).join(' · ');
 const WORKSPACE_WORDS = 'Everyone in the workspace';

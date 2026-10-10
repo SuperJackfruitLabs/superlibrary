@@ -4,6 +4,7 @@
   import '$lib/vibe/superlibrary.css';
   import '$kit/kit.css';
   import '../app.css';
+  import '$lib/layouts/daylight.css';
   import { onDestroy, onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';

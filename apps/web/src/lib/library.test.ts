@@ -64,6 +64,11 @@ describe('rows', () => {
     expect(rowOfResult(r, boards).line).toBe('Artifact · Marketing & Community · docs · out/report.md');
     expect(rowOfItem(i, boards)).toMatchObject({ line: 'Work record · Marketing & Community', snippet: null });
   });
+  it('an empty station name falls back to the station id, and an empty one to nothing', () => {
+    const p = (stationName: string, station?: string) => rowOfResult({ ...r, provenance: { ...r.provenance, stationName, station } } as SearchResult, boards).station;
+    expect(p('', 'stn_1')).toBe('stn_1');
+    expect(p('', undefined)).toBeNull();
+  });
   it('a row carries its parts as well as its line, and an agent maker', () => {
     const row = rowOfResult({ ...r, provenance: { ...r.provenance, agent: true, agentPrincipal: 'prn_00000000000000000a9a' } }, boards);
     expect(row).toMatchObject({ kindWord: 'Artifact', board: 'Marketing & Community', station: 'docs', path: 'out/report.md', maker: { id: 'prn_00000000000000000a9a' } });
