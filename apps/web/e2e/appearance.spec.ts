@@ -16,7 +16,8 @@ test.describe('the person’s appearance', () => {
   });
 
   test('with the app running, Paper dark paints its own background', async ({ page, context }) => {
-    await useAppearance(context, 'paper', 'dark');
+    // Time of day off: Paper's strong time tints the page by the hour, so only `off` is the plain `bg`.
+    await useAppearance(context, 'paper', 'dark', 'off');
     await page.goto('/');
     await expect(page.locator('h1').first()).toBeVisible();
     // Paper dark's `--vk-color-bg` is #1a1916.

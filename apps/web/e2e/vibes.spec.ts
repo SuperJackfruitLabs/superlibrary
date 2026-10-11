@@ -21,17 +21,20 @@ test.beforeAll(async ({ request }) => {
 
 for (const vibe of VIBES_E2E) {
   for (const theme of THEMES) {
-    test(`${vibe} ${theme}`, async ({ page, context }) => {
-      await useAppearance(context, vibe, theme);
-      await page.clock.setFixedTime(new Date('2026-10-11T12:00:00'));
-      for (const [name, path] of paths) {
-        for (const width of [390, 1280]) {
-          await page.setViewportSize({ width, height: 900 });
+    test(`${vibe} ${theme}`, async ({ browser }) => {
+      for (const width of [390, 1280]) {
+        // A phone is a touch device: the embed's 44px targets answer to `pointer: coarse`, so the 390px leg is touch.
+        const context = await browser.newContext({ viewport: { width, height: 900 }, ...(width === 390 ? { hasTouch: true, isMobile: true } : {}) });
+        const page = await context.newPage();
+        await useAppearance(context, vibe, theme);
+        await page.clock.setFixedTime(new Date('2026-10-11T12:00:00'));
+        for (const [name, path] of paths) {
           await page.goto(path);
           await expect(page.locator('h1').first()).toBeVisible();
           await expect(page.locator('html')).toHaveAttribute('data-vibe', vibe);
           await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
-          await page.waitForLoadState('networkidle');
+          // The app polls, so the network never idles: wait until nothing says it is still loading.
+          await expect(page.locator('[role="status"]', { hasText: /^(Loading…|Connecting…|Looking for related work…)$/ })).toHaveCount(0);
           const where = `${vibe}/${theme} ${name} ${width}px`;
           await expectNoSideways(page, where);
           if (width === 390) expect(await shortControls(page, 3), where).toEqual([]);
@@ -47,6 +50,7 @@ for (const vibe of VIBES_E2E) {
             await expect(page).toHaveScreenshot(`${vibe}-${theme}-${name}-${width}.png`, { fullPage: true, mask: [page.locator('iframe.sl-frame'), page.locator('.sl-readout, .sl-dateline, .sl-greeting')] });
           }
         }
+        await context.close();
       }
     });
   }

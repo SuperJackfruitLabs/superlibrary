@@ -60,7 +60,7 @@
 .timeline { list-style: none; margin: 0 0 var(--vk-space-5); padding: 0 0 0 var(--vk-space-4); border-left: 2px solid var(--vk-color-line); }
 .timeline li { position: relative; padding: 0 0 var(--vk-space-4) var(--vk-space-3); overflow-wrap: anywhere; }
 .timeline li::before { content: ''; position: absolute; left: calc(-1 * var(--vk-space-4) - 7px); top: 6px; width: 12px; height: 12px; box-sizing: border-box; border: 2px solid var(--o, var(--vk-color-faint)); border-radius: var(--vk-radius-pill); background: var(--vk-color-bg); }
-.timeline .when { color: var(--vk-color-faint); font-size: var(--vk-text-sm); }
+.timeline .when { color: var(--vk-color-muted); font-size: var(--vk-text-sm); }
 .body { margin: var(--vk-space-1) 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .inline-form { display: flex; flex-wrap: wrap; align-items: end; gap: var(--vk-space-2); }
 .inline-form .field, .inline-form .kit-field { flex: 1 1 220px; }
