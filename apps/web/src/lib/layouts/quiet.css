@@ -20,3 +20,15 @@
 [data-vibe="quiet"] .filters summary { gap: var(--vk-space-2); cursor: pointer; }
 [data-vibe="quiet"] .filters summary::before { content: '\25B8' / ''; }
 [data-vibe="quiet"] .filters[open] summary::before { content: '\25BE' / ''; }
+/* The item page. */
+.sl-facts .outcome { font: inherit; font-weight: 700; }
+.sl-facts .outcome::before { display: none; }
+.versions--plain li { align-items: flex-start; }
+.versions--plain .vline { margin: 0; }
+.sl-quiet .panel { box-shadow: none; padding: 0; background: transparent; }
+.sl-quiet-manage { display: grid; gap: var(--vk-space-3); }
+.timeline--plain li::before { display: none; }
+.timeline--plain { padding-left: var(--vk-space-5); border-left: 0; list-style: decimal; }
+/* Headings step down in order: section h2 larger than the h3 inside Manage. */
+.sl-quiet section > h2 { font-size: 1.25em; margin: var(--vk-space-5) 0 var(--vk-space-2); }
+.sl-quiet-manage h3 { font-size: 1.05em; margin: var(--vk-space-3) 0 0; }

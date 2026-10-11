@@ -2,7 +2,7 @@
   import { formatBytes } from '@superlibrary/embed';
   import { when } from '$lib/item';
   import type { ItemModel } from '$lib/screens/item.svelte';
-  let { model, variant = 'list' }: { model: ItemModel; variant?: 'list' | 'table' } = $props();
+  let { model, variant = 'list' }: { model: ItemModel; variant?: 'list' | 'table' | 'plain' } = $props();
   const files = (n: number) => `${n} file${n === 1 ? '' : 's'}`;
 </script>
 
@@ -59,4 +59,17 @@
       {/each}
     </tbody>
   </table>
+{:else if variant === 'plain'}
+  <ul class="versions versions--plain">
+    {#each model.versions as v (v.version)}
+      <li class:current={model.current?.version === v.version}>
+        <p class="vline">
+          {#if v.revokedAt}<span class="vname">v{v.version}</span>{:else}<a class="vname" href={model.showUrl(v.version)} aria-current={model.current?.version === v.version ? 'true' : undefined} onclick={(e) => model.pick(v.version, e)}>v{v.version}</a>{/if}
+          <span>{when(v.createdAt)} · {formatBytes(v.totalBytes)} · {files(v.fileCount)}</span>
+          <span class="badges">{[model.current?.version === v.version ? 'Shown' : '', v.version === model.latestLive ? 'Latest' : '', v.revokedAt ? 'Revoked' : '', v.scanOverride ? 'Secret scan overridden' : ''].filter(Boolean).join(', ')}</span>
+        </p>
+        {#if model.manage && !v.revokedAt}<button type="button" class="danger-outline" onclick={(e) => model.revokeVersion(e, v.version)}>Revoke<span class="visually-hidden"> version {v.version}</span></button>{/if}
+      </li>
+    {/each}
+  </ul>
 {/if}

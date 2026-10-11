@@ -15,6 +15,7 @@ import CollectionsPaper from './collections/CollectionsPaper.svelte';
 import CollectionsStudio from './collections/CollectionsStudio.svelte';
 import ItemDaylight from './item/ItemDaylight.svelte';
 import ItemPaper from './item/ItemPaper.svelte';
+import ItemQuiet from './item/ItemQuiet.svelte';
 import ItemStudio from './item/ItemStudio.svelte';
 import LibraryDaylight from './library/LibraryDaylight.svelte';
 import LibraryPaper from './library/LibraryPaper.svelte';
@@ -26,6 +27,6 @@ type Of<M> = Layouts<Component<{ model: M }>>;
 export const LAYOUTS = {
   collection: { daylight: CollectionDaylight, paper: CollectionPaper, studio: CollectionStudio } satisfies Of<CollectionModel>,
   collections: { daylight: CollectionsDaylight, paper: CollectionsPaper, studio: CollectionsStudio } satisfies Of<CollectionsModel>,
-  item: { daylight: ItemDaylight, paper: ItemPaper, studio: ItemStudio } satisfies Of<ItemModel>,
+  item: { daylight: ItemDaylight, paper: ItemPaper, studio: ItemStudio, quiet: ItemQuiet } satisfies Of<ItemModel>,
   library: { daylight: LibraryDaylight, paper: LibraryPaper, studio: LibraryStudio, quiet: LibraryQuiet } satisfies Of<LibraryModel>,
 };
