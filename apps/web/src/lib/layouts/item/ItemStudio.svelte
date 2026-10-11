@@ -2,7 +2,7 @@
 <script lang="ts">
   import OutcomeBadge from '$kit/OutcomeBadge.svelte';
   import Toolbar from '$kit/Toolbar.svelte';
-  import { outcomeVar } from '$kit/outcome';
+  import { formatBytes } from '@superlibrary/embed';
   import AddToCollection from '$lib/AddToCollection.svelte';
   import RelatedList from '$lib/RelatedList.svelte';
   import { when } from '$lib/item';
@@ -26,7 +26,7 @@
   const tiles = $derived(item.kind === 'artifact'
     ? [
         { key: 'Version', value: model.current ? `v${model.current.version} of ${model.versions.length}${model.current.version === model.latestLive ? ', latest' : ''}` : '—' },
-        { key: 'Size', value: row('Size').replace(/ \(.*\)$/, '') || '—' },
+        { key: 'Size', value: model.current ? formatBytes(model.current.totalBytes) : '—' },
         { key: 'Files', value: model.current ? String(model.current.fileCount) : '—' },
         { key: 'Kind', value: row('Kind') || '—' },
         { key: 'Uploaded', value: model.current ? when(model.current.createdAt) : '—' },
@@ -42,7 +42,7 @@
 <header class="item-header sl-studio-item">
   <div class="sl-readout-bar">
     <span class="sl-k">{model.kindLabel}</span><code>{item.id}</code>
-    <span class="sl-led" style:--o={outcomeVar(item.outcome)} class:sl-led--live={item.outcome === 'in-progress'} aria-hidden="true"></span><OutcomeBadge outcome={item.outcome} />
+    <OutcomeBadge outcome={item.outcome} />
     {#if look.appearance.timeStrength !== 'off'}<span class="sl-readout" aria-hidden="true"><span class="sl-led sl-led--sun"></span>{readout(look.now, look.phase)}</span>{/if}
   </div>
   <h1>{item.title}</h1>
@@ -61,8 +61,8 @@
     <section class="sl-panel sl-panel--wide" aria-labelledby="versions-h"><h2 id="versions-h">Versions</h2><VersionsSection {model} variant="table" /></section>
     <section class="sl-panel" aria-labelledby="details-h"><h2 id="details-h">{model.detailsHeading}</h2><DetailsSection {model} /></section>
   {:else if model.record}
-    <section class="sl-panel" aria-labelledby="record-h"><h2 id="record-h" class="visually-hidden">Record</h2><RecordLine view={model.record} />{#if model.hasSpec}<h2>Spec</h2><SpecRows view={model.record} />{/if}</section>
     <section class="sl-panel sl-panel--wide" aria-labelledby="timeline-h"><h2 id="timeline-h">Timeline</h2><Timeline view={model.record} variant="log" /></section>
+    <section class="sl-panel" aria-labelledby="record-h"><h2 id="record-h" class="visually-hidden">Record</h2><RecordLine view={model.record} />{#if model.hasSpec}<h2>Spec</h2><SpecRows view={model.record} />{/if}</section>
     <section class="sl-panel" aria-labelledby="artifacts-h"><h2 id="artifacts-h">Artifacts</h2><LinkedArtifacts view={model.record} /></section>
   {:else}
     <RecordFailed {model} />

@@ -62,7 +62,7 @@
 .sl-readout-bar .sl-readout { margin: 0 0 0 auto; }
 .sl-k { text-transform: uppercase; letter-spacing: 0.08em; color: var(--vk-color-muted); }
 .sl-studio-item { display: grid; gap: var(--vk-space-1) var(--vk-space-4); }
-@media (min-width: 768px) { .sl-studio-item { grid-template-columns: minmax(0, 1fr) minmax(14rem, auto); } .sl-studio-item .kit-toolbar-wrap { grid-column: 2; grid-row: 2 / span 2; } }
+@media (min-width: 768px) { .sl-studio-item:has(.kit-toolbar-wrap) { grid-template-columns: minmax(0, 1fr) minmax(14rem, auto); } .sl-studio-item .kit-toolbar-wrap { grid-column: 2; grid-row: 2 / span 2; } }
 .sl-studio-item h1 { margin: 0; }
 .sl-chip { padding: 2px var(--vk-space-2); border-radius: var(--vk-radius-sm); box-shadow: inset 0 0 0 1px var(--vk-color-line); font-family: var(--vk-font-mono); font-size: var(--vk-text-sm); }
 .sl-panels { display: grid; gap: var(--vk-space-3); grid-template-columns: minmax(0, 1fr); margin: var(--vk-space-3) 0; }
@@ -70,8 +70,12 @@
 @media (min-width: 1280px) { .sl-panels { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 .sl-panel { min-width: 0; padding: 0 var(--vk-space-3) var(--vk-space-3); border-radius: var(--vk-radius-sm); background: var(--vk-color-surface); box-shadow: inset 0 0 0 1px var(--vk-color-line); }
 .sl-panel--wide { grid-column: 1 / -1; }
+.sl-panel .rows { grid-template-columns: minmax(0, 1fr); gap: 0; }
+.sl-panel .rows dd { margin: 0 0 var(--vk-space-2); }
+.sl-panel .rows code, .sl-panel .rows dd { font-size: var(--vk-text-sm); }
 .sl-panel .rows dt { font: 500 var(--vk-text-sm)/1.4 var(--vk-font-mono); text-transform: uppercase; letter-spacing: 0.04em; }
-.sl-command .danger, .sl-command .kit-button--danger { justify-self: end; }
+.sl-command .danger, .sl-command .kit-button--danger { display: flex; margin-inline-start: auto; }
+@media (max-width: 480px) { .sl-command .danger, .sl-command .kit-button--danger { width: 100%; justify-content: center; } }
 .timeline--log { padding-left: 0; border-left: 0; }
 .timeline--log li { display: grid; grid-template-columns: 12px minmax(0, 1fr); column-gap: var(--vk-space-2); padding: var(--vk-space-2) 0; border-bottom: 1px solid var(--vk-color-line); }
 .timeline--log li::before { position: static; grid-row: 1 / span 3; width: 10px; height: 10px; margin-top: 5px; border: 0; background: var(--o, var(--vk-color-faint)); }
@@ -84,4 +88,6 @@
 .sl-studio-item > h1, .sl-studio-item > .item-meta { grid-column: 1; }
 /* Item tiles carry words ("Markdown", a date), so they are wider than the library's counts. */
 .sl-studio-item ~ .sl-tiles { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+.sl-studio-item ~ .sl-tiles .sl-tile { align-content: start; }
+.sl-studio-item ~ .sl-tiles dd { font-size: var(--vk-text-md); }
 @media (min-width: 1024px) { .sl-studio-item ~ .sl-tiles { grid-template-columns: none; } }
