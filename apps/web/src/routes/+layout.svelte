@@ -90,7 +90,7 @@
 {:else if session.me}
   <div class="shell">
     <AppHeader me={session.me} onsignout={logOut} />
-    {@render children()}
+    <main>{@render children()}</main>
     <SuiteFooter />
   </div>
 {:else}

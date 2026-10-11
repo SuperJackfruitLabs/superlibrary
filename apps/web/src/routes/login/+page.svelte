@@ -15,7 +15,7 @@
 <svelte:head><title>Sign in · Superlibrary</title></svelte:head>
 <main class="notice">
   <Sky phase={look.phase}>
-    <div class="sl-signin">
+    <div class="sl-signin sl-sky-surface">
       <Mark class="mark-hero" />
       <h1>Superlibrary</h1>
       <p>Sign in with your Super Jackfruit Labs account.</p>

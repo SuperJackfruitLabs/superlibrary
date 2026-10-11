@@ -14,7 +14,7 @@
 .results--cards .result { padding: var(--vk-space-3) var(--vk-space-4); border-bottom: 0; border-left: 4px solid var(--o); border-radius: var(--vk-radius-md); background: var(--vk-color-surface); box-shadow: inset 0 0 0 1px var(--vk-color-line), 0 var(--vk-lift) 0 var(--vk-color-ground); transition: transform var(--vk-motion-fast) var(--vk-motion-easing); }
 .results--cards .result:hover { transform: translateY(-1px); }
 .results--cards .outcome { padding: 2px var(--vk-space-2); border-radius: var(--vk-radius-pill); box-shadow: inset 0 0 0 1px var(--o); }
-.result-title { display: flex; align-items: center; gap: var(--vk-space-2); }
+.results--cards .result-title { display: flex; align-items: center; gap: var(--vk-space-2); }
 .result-face { display: inline-flex; flex: none; }
 .sl-more { margin: 0 0 var(--vk-space-5); }
 
