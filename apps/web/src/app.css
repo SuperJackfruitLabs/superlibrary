@@ -27,7 +27,9 @@ input[type=checkbox] { width: 22px; height: 22px; margin: 0; flex: none; }
 .heading { display: flex; justify-content: space-between; align-items: center; gap: var(--vk-space-3); }
 .muted { color: var(--vk-color-muted); }
 .stack { display: grid; gap: 14px; max-width: 560px; }
-.field { display: grid; gap: var(--vk-space-1); }
+.field { display: grid; gap: var(--vk-space-1); min-width: 0; }
+/* A select is as wide as its longest option (a long collection name): it may not widen the page past the viewport. */
+.field > select { min-width: 0; max-width: 100%; }
 .check { display: flex; align-items: center; gap: 10px; min-height: var(--vk-target-min); }
 .pickers { display: grid; gap: 14px; }
 .hint { margin: -10px 0 0; font-size: 0.9em; }
