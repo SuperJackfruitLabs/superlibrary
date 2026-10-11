@@ -4,7 +4,6 @@
 .sl-quiet .searchbar { flex-wrap: wrap; }
 .sl-quiet .searchbar-label { flex-basis: 100%; }
 .results--plain .result { padding: var(--vk-space-3) 0; border-left: 0; border-bottom: 1px solid var(--vk-color-line); }
-.results--plain .result-link { text-decoration: underline; }
 .results--plain .snippet { display: block; -webkit-line-clamp: unset; }
 .sl-facts-line { margin: var(--vk-space-1) 0; }
 .sl-back { display: inline-flex; align-items: center; min-height: var(--vk-target-min); }
@@ -15,7 +14,7 @@
 .sl-facts-line .outcome, .sl-facts .outcome { font: inherit; font-weight: 700; }
 .sl-quiet .outcome::before { display: none; }
 /* Title and facts read as one entry: the link keeps its 44px target without floating the title. */
-.results--plain .result-link { padding-block: 0; align-content: center; }
+.results--plain .result-link { padding-block: 0; align-content: center; text-decoration: underline; }
 /* A plain disclosure marker for the filters (the flex summary has none); no transition. */
 [data-vibe="quiet"] .filters summary { gap: var(--vk-space-2); cursor: pointer; }
 [data-vibe="quiet"] .filters summary::before { content: '\25B8' / ''; }

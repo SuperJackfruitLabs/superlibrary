@@ -23,7 +23,7 @@ import LibraryDaylight from './library/LibraryDaylight.svelte';
 import LibraryPaper from './library/LibraryPaper.svelte';
 import LibraryQuiet from './library/LibraryQuiet.svelte';
 import LibraryStudio from './library/LibraryStudio.svelte';
-export { ROWS, rowShapeFor, type RowVariant } from './rows';
+export { ROWS, type RowVariant } from './rows';
 
 type Of<M> = Layouts<Component<{ model: M }>>;
 export const LAYOUTS = {

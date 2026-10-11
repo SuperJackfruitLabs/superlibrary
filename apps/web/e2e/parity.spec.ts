@@ -54,6 +54,13 @@ for (const vibe of VIBES_E2E) {
     await expect(mark).toBeEnabled();
     await page.getByLabel('Replaced by').fill('');
     await expect(mark).toBeDisabled();
+    // A valid replacement asks first (ModerationPanel's askReplace → ConfirmDialog); Escape returns focus to the button.
+    await page.getByLabel('Replaced by').fill(`http://localhost:5173/a/${other.itemId}`);
+    await mark.click();
+    await expect(page.getByRole('alertdialog')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('alertdialog')).toHaveCount(0);
+    await expect(mark).toBeFocused();
 
     const revoke = page.getByRole('button', { name: 'Revoke this item' });
     await revoke.click();

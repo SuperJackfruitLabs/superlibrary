@@ -1,7 +1,7 @@
 // apps/web/e2e/responsive.spec.ts
 import { expect, test } from '@playwright/test';
 import { devWorkspace, expectNoSideways, seedWorkRecordLocal, shortControls, uploadViaApi } from './helpers';
-import { seedCollection } from './vibes';
+import { openEnclosures, seedCollection, useAppearance } from './vibes';
 
 /** The operator reads on a phone first; the app must hold at every width it is used at. */
 const WIDTHS = [390, 768, 1024, 1280, 1920];
@@ -66,3 +66,29 @@ for (const width of WIDTHS) {
   });
   });
 }
+
+// WebKit is every iOS browser: the phone-width checks above run in Daylight (the default); here the other vibes,
+// each with its own layout. Chromium measures every vibe and theme in vibes.spec.ts.
+test.describe('390px in each vibe (WebKit)', () => {
+  test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 900 } });
+  for (const vibe of ['paper', 'studio', 'quiet'] as const) {
+    test(`${vibe}: nothing scrolls sideways and every control is at least 44px tall`, async ({ page, context, request, browserName }) => {
+      test.skip(browserName !== 'webkit', 'Chromium runs this in vibes.spec.ts');
+      test.setTimeout(120_000);
+      await useAppearance(context, vibe, 'light');
+      const ws = await devWorkspace(request);
+      const record = seedWorkRecordLocal({ ws, title: `A long title that has to wrap at phone width ${'word '.repeat(12)}`, text: 'responsive check', outcome: 'in-progress' });
+      const art = await uploadViaApi(request, [{ path: 'r.md', body: '# r' }], { title: `Responsive ${vibe}` });
+      const col = await seedCollection(request, `Pipeline reviews, a collection name longer than a phone is wide ${vibe} ${Date.now()}`, art.itemId);
+      for (const path of ['/', '/outcomes', '/upload', '/collections', `/collections/${col}`, `/a/${record}`, `/a/${art.itemId}`]) {
+        await page.goto(path);
+        await expect(page.locator('html')).toHaveAttribute('data-vibe', vibe);
+        await expect(page.locator('h1').first()).toBeVisible();
+        await openEnclosures(page);
+        if (path.startsWith('/a/')) await expect(page.getByRole('region', { name: 'Collections' }).getByRole('combobox')).toBeVisible();
+        await expectNoSideways(page, `${vibe} ${path} at 390px`);
+        expect(await shortControls(page, 3), `${vibe} ${path} at 390px`).toEqual([]);
+      }
+    });
+  }
+});
