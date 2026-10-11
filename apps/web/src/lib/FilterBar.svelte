@@ -5,10 +5,10 @@
   import { OUTCOME_ORDER, OUTCOME_WORDS, outcomeVar } from '$kit/outcome';
   import { EMPTY_FILTERS, activeFilters, rangeProblem, type Filters } from '$lib/library';
 
-  let { filters, facets, onchange, hideOutcomes = false }: { filters: Filters; facets: Facets | null; onchange: (f: Filters) => void; hideOutcomes?: boolean } = $props();
-  // Folded on phones, open from 768px (the operator reads on a phone first).
+  let { filters, facets, onchange, hideOutcomes = false, openFrom = 768 }: { filters: Filters; facets: Facets | null; onchange: (f: Filters) => void; hideOutcomes?: boolean; openFrom?: number } = $props();
+  // Folded on phones, open from `openFrom` px (768 by default; 0 = open at every width).
   let open = $state(false);
-  onMount(() => { open = window.matchMedia('(min-width: 768px)').matches; });
+  onMount(() => { open = openFrom === 0 || window.matchMedia(`(min-width: ${openFrom}px)`).matches; });
 
   const set = (patch: Partial<Filters>) => onchange({ ...filters, ...patch });
   const toggle = (o: Outcome, on: boolean) => set({ outcomes: on ? [...filters.outcomes, o] : filters.outcomes.filter((x) => x !== o) });
