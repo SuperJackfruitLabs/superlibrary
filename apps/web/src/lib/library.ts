@@ -2,8 +2,9 @@
 /** The library page's state (the address), its requests, and its rows. */
 import { BOARD_ID, OUTCOMES, PRN_ID, type BrowsePage, type Facets, type ItemSource, type ItemSummary, type Outcome, type SearchResult } from '@superlibrary/contract';
 import { visibilityWords } from '@superlibrary/embed';
-import { explain } from './item';
+import { explain, ITEM_KIND_WORD, UNREACHABLE } from './item';
 import { OUTCOME_WORDS } from './kit/outcome';
+import { makerOf, type Maker } from './vibe/faces';
 
 type Api = (path: string, init?: RequestInit) => Promise<Response>;
 export type Kind = 'artifact' | 'work-record';
@@ -91,31 +92,32 @@ export const searchBody = (f: Filters, now = new Date()) => ({ query: f.q.trim()
 export const browseBody = (f: Filters, cursor: string | null, now = new Date(), limit = 50) => ({ ...filterBody(f, now), limit, ...(cursor ? { cursor } : {}) });
 
 /** One row of any list: a search hit or a browsed item, said the same way. */
-export interface Row { id: string; title: string; kind: Kind; outcome: Outcome; line: string; snippet: string | null; supersededBy: string | null; visibility: string | null }
-const KIND_WORD: Record<Kind, string> = { artifact: 'Artifact', 'work-record': 'Work record' };
-function lineOf(kind: Kind, s: ItemSource | undefined, boards: Map<string, string>): string {
-  const parts = [KIND_WORD[kind]];
-  if (s?.board) parts.push(boards.get(s.board) ?? s.board);
-  const station = s?.stationName ?? s?.station;
-  if (station) parts.push(station);
-  if (s?.path) parts.push(s.path);
-  return parts.join(' · ');
+export interface Row { id: string; title: string; kind: Kind; outcome: Outcome; line: string; snippet: string | null; supersededBy: string | null; visibility: string | null; kindWord: string; board: string | null; station: string | null; path: string | null; maker: Maker | null }
+function partsOf(kind: Kind, s: ItemSource | undefined, boards: Map<string, string>) {
+  return { kindWord: ITEM_KIND_WORD[kind], board: s?.board ? (boards.get(s.board) ?? s.board) : null, station: s?.stationName || s?.station || null, path: s?.path ?? null };
 }
+const lineOf = (p: ReturnType<typeof partsOf>) => [p.kindWord, p.board, p.station, p.path].filter(Boolean).join(' · ');
 const WORKSPACE_WORDS = 'Everyone in the workspace';
-export const rowOfResult = (r: SearchResult, boards: Map<string, string>): Row => ({
-  id: r.itemId, title: r.title, kind: r.kind, outcome: r.outcome, line: lineOf(r.kind, r.provenance, boards), snippet: r.snippet || null, supersededBy: r.supersededBy,
-  visibility: r.scope === 'workspace' ? WORKSPACE_WORDS : null,
-});
-export const rowOfItem = (i: ItemSummary, boards: Map<string, string>): Row => ({
-  id: i.id, title: i.title, kind: i.kind, outcome: i.outcome,
-  line: lineOf(i.kind, i.source ?? (i.scope.startsWith('board:') ? { board: i.scope.slice(6) } : undefined), boards),
-  snippet: i.caption ?? null, supersededBy: i.supersededBy ?? null,
-  visibility: visibilityWords({ scope: i.scope, canWiden: false, boardVisible: i.audience === 'board' }),
-});
+export const rowOfResult = (r: SearchResult, boards: Map<string, string>): Row => {
+  const parts = partsOf(r.kind, r.provenance, boards);
+  return {
+    id: r.itemId, title: r.title, kind: r.kind, outcome: r.outcome, line: lineOf(parts), snippet: r.snippet || null, supersededBy: r.supersededBy,
+    visibility: r.scope === 'workspace' ? WORKSPACE_WORDS : null, ...parts, maker: makerOf(r.provenance),
+  };
+};
+export const rowOfItem = (i: ItemSummary, boards: Map<string, string>): Row => {
+  const src = i.source ?? (i.scope.startsWith('board:') ? { board: i.scope.slice(6) } : undefined);
+  const parts = partsOf(i.kind, src, boards);
+  return {
+    id: i.id, title: i.title, kind: i.kind, outcome: i.outcome, line: lineOf(parts),
+    snippet: i.caption ?? null, supersededBy: i.supersededBy ?? null,
+    visibility: visibilityWords({ scope: i.scope, canWiden: false, boardVisible: i.audience === 'board' }),
+    ...parts, maker: makerOf(i.source, i.createdBy),
+  };
+};
 export const boardNames = (f: Facets | null) => new Map((f?.boards ?? []).map((b) => [b.id, b.name]));
 
 export type Loaded<T> = { ok: true; value: T } | { ok: false; message: string };
-const UNREACHABLE = 'The library could not be reached. Check your connection and try again.';
 /** GET, or POST with a JSON body. A refusal comes back as a sentence (`explain`). */
 export async function loadJson<T>(api: Api, path: string, body?: unknown): Promise<Loaded<T>> {
   try {

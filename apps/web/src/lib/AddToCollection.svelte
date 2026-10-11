@@ -31,8 +31,7 @@
   }
 </script>
 
-<section class="panel" aria-labelledby="collect-h">
-  <h2 id="collect-h">Collections</h2>
+<div class="sl-collect">
   {#if loadError}
     <p class="error" role="alert">{loadError}</p>
     <button type="button" onclick={load}>Try again</button>
@@ -47,4 +46,4 @@
     </form>
   {/if}
   {#if message}<p class={failed ? 'error' : 'muted'} role={failed ? 'alert' : 'status'}>{message}</p>{/if}
-</section>
+</div>

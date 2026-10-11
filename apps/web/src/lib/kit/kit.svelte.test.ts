@@ -21,6 +21,10 @@ describe('the kit', () => {
     put(Button, { variant: 'danger', onclick: vi.fn(), children: text('Remove') });
     expect(document.querySelector('a.kit-button')!.getAttribute('href')).toBe('/upload');
     expect(document.querySelector('button.kit-button--danger')!.getAttribute('type')).toBe('button');
+    expect(document.querySelector('a.kit-button')!.classList.contains('vk-button')).toBe(true);
+    expect(document.querySelector('a.kit-button--secondary.vk-button--secondary')).not.toBeNull();
+    expect(document.querySelector('button.kit-button--danger')!.classList.contains('sl-danger')).toBe(true);
+    expect(document.querySelector('button.kit-button--danger')!.classList.contains('vk-button')).toBe(true);
   });
   it('Tabs mark the current one and show counts', () => {
     put(Tabs, { label: 'Outcome', items: [{ href: '/o', label: 'Everything', count: 3, current: false }, { href: '/o?outcome=rejected', label: 'Rejected', count: 1, current: true, tone: 'rejected' }] });

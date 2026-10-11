@@ -12,13 +12,13 @@
     "e2e": "node ../../scripts/dev-keys.mjs && playwright test"
   },
   "dependencies": {
-    "@fontsource/ibm-plex-mono": "^5.2.5",
-    "@fontsource/ibm-plex-sans": "^5.2.5",
+    "@superjackfruit/vibekit": "file:./vendor/vibekit-0.0.1.tgz",
     "@superlibrary/contract": "workspace:*",
     "@superlibrary/embed": "workspace:*",
     "fflate": "^0.8.2"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.13.0",
     "@playwright/test": "^1.61.0",
     "@sveltejs/adapter-static": "^3.0.10",
     "@sveltejs/kit": "^2.66.0",

@@ -48,6 +48,14 @@ jobs:
           name: e2e-results
           path: apps/web/test-results/
           retention-days: 7
+      # Every vibe x theme x key screen, for a person to look at (spec D10). Pixel comparison is PW_VISUAL=1, later.
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vibe-screens
+          path: apps/web/vibe-screens/
+          if-no-files-found: ignore
+          retention-days: 14
 
   # CLOUDFLARE_API_TOKEN is a repository-level secret: the three environments below (production,
   # content, web) have different names and must not hold it.

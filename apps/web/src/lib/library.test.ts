@@ -57,12 +57,22 @@ describe('request bodies', () => {
 
 describe('rows', () => {
   const boards = new Map([['brd_00000000000000b1', 'Marketing & Community']]);
+  const r = { itemId: 'itm_0123456789abcdef', kind: 'artifact', title: 'T', outcome: 'completed', scope: 'board:brd_00000000000000b1', snippet: 's', url: 'u', score: 1, supersededBy: null,
+    provenance: { board: 'brd_00000000000000b1', station: 'stn_1', stationName: 'docs', path: 'out/report.md' } } as SearchResult;
+  const i = { id: 'itm_0123456789abcde0', kind: 'work-record', title: 'W', outcome: 'rejected', scope: 'board:brd_00000000000000b1', createdBy: 'source:superpipeline', createdAt: '2026-10-01T00:00:00.000Z', latestVersion: 0, expiresAt: null, revokedAt: null } as ItemSummary;
   it('say kind, board, station and path', () => {
-    const r = { itemId: 'itm_0123456789abcdef', kind: 'artifact', title: 'T', outcome: 'completed', scope: 'board:brd_00000000000000b1', snippet: 's', url: 'u', score: 1, supersededBy: null,
-      provenance: { board: 'brd_00000000000000b1', station: 'stn_1', stationName: 'docs', path: 'out/report.md' } } as SearchResult;
     expect(rowOfResult(r, boards).line).toBe('Artifact · Marketing & Community · docs · out/report.md');
-    const i = { id: 'itm_0123456789abcde0', kind: 'work-record', title: 'W', outcome: 'rejected', scope: 'board:brd_00000000000000b1', createdBy: 'source:superpipeline', createdAt: '2026-10-01T00:00:00.000Z', latestVersion: 0, expiresAt: null, revokedAt: null } as ItemSummary;
     expect(rowOfItem(i, boards)).toMatchObject({ line: 'Work record · Marketing & Community', snippet: null });
+  });
+  it('an empty station name falls back to the station id, and an empty one to nothing', () => {
+    const p = (stationName: string, station?: string) => rowOfResult({ ...r, provenance: { ...r.provenance, stationName, station } } as SearchResult, boards).station;
+    expect(p('', 'stn_1')).toBe('stn_1');
+    expect(p('', undefined)).toBeNull();
+  });
+  it('a row carries its parts as well as its line, and an agent maker', () => {
+    const row = rowOfResult({ ...r, provenance: { ...r.provenance, agent: true, agentPrincipal: 'prn_00000000000000000a9a' } }, boards);
+    expect(row).toMatchObject({ kindWord: 'Artifact', board: 'Marketing & Community', station: 'docs', path: 'out/report.md', maker: { id: 'prn_00000000000000000a9a' } });
+    expect(rowOfItem(i, boards)).toMatchObject({ kindWord: 'Work record', board: 'Marketing & Community', station: null, path: null, maker: null });
   });
 });
 

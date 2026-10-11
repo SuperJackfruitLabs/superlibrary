@@ -86,6 +86,11 @@ const KIND_WORDS: Record<View, string> = {
 };
 export const kindWords = (view: View) => KIND_WORDS[view];
 
+/** What an item is, in words (the library's rows and the item page's Details say the same). */
+export const ITEM_KIND_WORD = { artifact: 'Artifact', 'work-record': 'Work record' } as const;
+/** The sentence for a library that could not be asked. */
+export const UNREACHABLE = 'The library could not be reached. Check your connection and try again.';
+
 export interface Row { label: string; value: string; note?: string; mono?: boolean; copy?: boolean }
 
 export const when = (iso: string) => new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
@@ -164,6 +169,6 @@ export async function change(api: Api, path: string, method: 'POST' | 'PATCH' | 
     const b = (await res.json().catch(() => ({}))) as { error?: string; detail?: string };
     return explain(b.error ?? `http_${res.status}`, b.detail);
   } catch {
-    return 'The library could not be reached. Check your connection and try again.';
+    return UNREACHABLE;
   }
 }

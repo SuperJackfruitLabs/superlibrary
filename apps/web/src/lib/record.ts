@@ -41,7 +41,7 @@ export function timelineOf(r: WorkRecord): TimelineEntry[] {
     .map((x) => x.e);
 }
 
-export const toneVar = (t: Tone) => (t === 'good' ? 'var(--outcome-approved)' : t === 'bad' ? 'var(--outcome-rejected)' : 'var(--color-content-faint)');
+export const toneVar = (t: Tone) => (t === 'good' ? 'var(--sl-outcome-approved)' : t === 'bad' ? 'var(--sl-outcome-rejected)' : 'var(--vk-color-faint)');
 
 export function specRows(spec: unknown): Array<{ label: string; value: string }> {
   if (spec === null || spec === undefined) return [];

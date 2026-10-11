@@ -8,4 +8,4 @@ export const OUTCOME_WORDS: Record<Outcome, string> = {
 };
 /** In ranking order (spec §7): what ranks first, first. */
 export const OUTCOME_ORDER: Outcome[] = ['approved', 'completed', 'in-progress', 'superseded', 'rejected', 'failed', 'abandoned'];
-export const outcomeVar = (o: Outcome) => `var(--outcome-${o})`;
+export const outcomeVar = (o: Outcome) => `var(--sl-outcome-${o})`;

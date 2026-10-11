@@ -42,4 +42,20 @@ describe('the library page', () => {
     expect(browses.map((b) => b.body.cursor)).toEqual([undefined, 'c1', 'c1']);
     expect(document.body.textContent).toContain('Item 2');
   });
+  it('mounts the Daylight layout through VibeLayout with every parity item', async () => {
+    browse = () => Response.json({ items: [{ ...item(1), source: { agent: 'prn_00000000000000a1', board: 'brd_x', path: 'a/b.md' }, supersededBy: 'itm_00000000000000a2', caption: 'A caption' }], next: 'c1', counts: {} });
+    c = mount(Page, { target: document.body });
+    await settle();
+    const text = document.body.textContent!;
+    expect(document.querySelector('.sl-day-hero .vk-sky')).not.toBeNull();
+    expect(document.querySelector('.sl-day-hero h1')!.textContent).toBe('Library');
+    expect(document.querySelector('.sl-day-hero form[role="search"] label[for="q"]')!.textContent).toBe('Search the library');
+    expect(document.querySelector('.sl-day-filters')!.textContent).toContain('Filters');
+    expect(document.querySelector('[role="status"]')!.textContent).toBe('1+ item, most recent activity first');
+    expect(document.querySelector('ul.results[aria-label="Library"] li .result-link')!.getAttribute('href')).toBe('/a/itm_00000000000000a1');
+    expect(text).toContain('A caption');
+    expect(document.querySelector('.replaced')!.textContent).toBe('See what replaced it');
+    expect(document.querySelector('.result-face')).not.toBeNull();
+    expect(button('More')).toBeDefined();
+  });
 });

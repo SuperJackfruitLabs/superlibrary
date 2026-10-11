@@ -21,6 +21,8 @@ export default defineConfig({
   test: {
     include: ['src/**/*.{test,spec}.{js,ts}'],
     environment: 'node',
+    // vibekit ships .svelte files and bits-ui; Vitest must compile them, not externalise them.
+    server: { deps: { inline: ['@superjackfruit/vibekit', 'bits-ui'] } },
     // Node 25+ ships its own `localStorage`, which shadows jsdom's (and is undefined without
     // --localstorage-file); the copied sign-in tests need jsdom's. A no-op on Node 22.
     execArgv: ['--no-experimental-webstorage'],

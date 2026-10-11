@@ -1,0 +1,33 @@
+/* Superlibrary's own meanings, built on vibekit. The only file in the app with colour literals:
+   product-tokens.test.ts checks each against every vibe's bg, surface and raised, in both themes.
+   An outcome is always shown as a word plus its colour. Danger is not vibekit's signal (that means
+   "a person is needed" and nothing else). */
+:root, [data-theme="light"] {
+  --sl-outcome-approved: #13663b;
+  --sl-outcome-completed: #0b625c;
+  --sl-outcome-in-progress: #2356c2;
+  --sl-outcome-superseded: #6d4fb3;
+  --sl-outcome-rejected: #b42318;
+  --sl-outcome-failed: #a14306;
+  --sl-outcome-abandoned: #5a5a5f;
+  --sl-danger: #ad2e1f;
+  --sl-scrim: rgb(20 18 30 / 0.45);
+  --sl-shadow-overlay: 0 12px 32px rgb(20 18 30 / 0.18);
+}
+
+[data-theme="dark"] {
+  --sl-outcome-approved: #4cc38a;
+  --sl-outcome-completed: #2dd4bf;
+  --sl-outcome-in-progress: #8ab4ff;
+  --sl-outcome-superseded: #b39cf0;
+  --sl-outcome-rejected: #ff6b5b;
+  --sl-outcome-failed: #f79009;
+  --sl-outcome-abandoned: #98989d;
+  --sl-danger: #ff6b5b;
+  --sl-scrim: rgb(0 0 0 / 0.6);
+  --sl-shadow-overlay: 0 12px 32px rgb(0 0 0 / 0.5);
+}
+
+:root {
+  --sl-mark: var(--vk-product-superlibrary-fg);
+}

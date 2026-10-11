@@ -2,6 +2,9 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
+    <!-- First, before any stylesheet: vibekit paints data-vibe/theme/phase/time from the vk_appearance
+         cookie, so the first frame is already in the person's vibe. Generated: scripts/sync-head-script.mjs. -->
+    <!-- vk:head --><script>(function(){try{var d=document,m=/(?:^|; )vk_appearance=([^;]*)/.exec(d.cookie||""),p=(m?m[1]:"").split("."),V=["daylight","paper","studio","quiet"],v=V.indexOf(p[0])>-1?p[0]:"daylight",t=["sun","light","dark"].indexOf(p[1])>-1?p[1]:"sun",s=["strong","subtle","off"].indexOf(p[2])>-1?p[2]:(v==="quiet"?"off":"strong"),n=new Date(),x=n.getHours()*60+n.getMinutes(),h=x<330||x>=1140?"night":x<420?"dawn":x>=1065?"dusk":x>=990?"golden":x<648?"morning":"noon",e=d.documentElement;e.setAttribute("data-vibe",v);e.setAttribute("data-theme",t==="sun"?(h==="night"?"dark":"light"):t);e.setAttribute("data-phase",h);e.setAttribute("data-time",s)}catch(_){}})();</script><!-- /vk:head -->
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Superlibrary</title>
     <link rel="icon" href="/favicon.ico" sizes="any" />
@@ -9,14 +12,13 @@
     <!-- Installable to a home screen. No service worker: nothing is cached offline, because a
          stale app shell would fight the sign-in. -->
     <link rel="manifest" href="/manifest.webmanifest" />
-    <meta name="theme-color" content="#161618" media="(prefers-color-scheme: dark)" />
-    <meta name="theme-color" content="#fbfbfd" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#17162a" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#fff8ee" media="(prefers-color-scheme: light)" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Superlibrary" />
-    <script>try{var t=localStorage.getItem('superlibrary:theme');if(t==='light'||t==='dark')document.documentElement.dataset.theme=t}catch(e){}</script>
     %sveltekit.head%
   </head>
   <body data-sveltekit-preload-data="hover">

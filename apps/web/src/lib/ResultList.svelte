@@ -1,21 +1,15 @@
-<!-- apps/web/src/lib/ResultList.svelte -->
+<!-- apps/web/src/lib/ResultList.svelte: one list of results, drawn the way the vibe draws rows (registry ROWS). -->
 <script lang="ts">
-  import OutcomeBadge from '$kit/OutcomeBadge.svelte';
-  import { outcomeVar } from '$kit/outcome';
+  import type { Component } from 'svelte';
   import type { Row } from '$lib/library';
+  import { ROWS, type RowVariant } from '$lib/layouts/rows';
+  import { look } from '$lib/vibe/appearance.svelte';
+  import ResultsCards from '$lib/sections/results/ResultsCards.svelte';
 
-  let { rows, label }: { rows: Row[]; label: string } = $props();
+  let { rows, label, variant }: { rows: Row[]; label: string; variant?: RowVariant } = $props();
+  // Phases 2 to 4 add index, table and plain. Until then a vibe's rows fall back to cards.
+  const SHAPES: Partial<Record<RowVariant, Component<{ rows: Row[]; label: string }>>> = { cards: ResultsCards };
+  const Shape = $derived(SHAPES[variant ?? ROWS[look.appearance.vibe]] ?? ResultsCards);
 </script>
 
-<ul class="results" aria-label={label}>
-  {#each rows as r (r.id)}
-    <li class="result" style:--o={outcomeVar(r.outcome)}>
-      <a class="result-link" href={`/a/${r.id}`}>
-        <span class="result-title">{r.title}</span>
-        <span class="result-meta"><OutcomeBadge outcome={r.outcome} /><small>{r.line}</small>{#if r.visibility}<small>{r.visibility}</small>{/if}</span>
-        {#if r.snippet}<span class="snippet">{r.snippet}</span>{/if}
-      </a>
-      {#if r.supersededBy}<a class="replaced" href={`/a/${r.supersededBy}`}>See what replaced it</a>{/if}
-    </li>
-  {/each}
-</ul>
+<Shape {rows} {label} />

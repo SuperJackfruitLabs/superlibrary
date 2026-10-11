@@ -1,22 +1,23 @@
 <script lang="ts">
-  // IBM Plex only (operator decision): Sans for words, Mono for code and data. Self-hosted ('self').
-  import '@fontsource/ibm-plex-sans/400.css';
-  import '@fontsource/ibm-plex-sans/500.css';
-  import '@fontsource/ibm-plex-sans/600.css';
-  import '@fontsource/ibm-plex-mono/400.css';
-  import '$kit/tokens.css';
+  import '@superjackfruit/vibekit/fonts.css';
+  import '@superjackfruit/vibekit/vibekit.css';
+  import '$lib/vibe/superlibrary.css';
   import '$kit/kit.css';
   import '../app.css';
+  import '$lib/layouts/daylight.css';
+  import '$lib/vibe/vibes.css';
   import { onDestroy, onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import AppHeader from '$lib/AppHeader.svelte';
   import SuiteFooter from '$kit/SuiteFooter.svelte';
-  import { applyTheme, readTheme } from '$kit/theme.svelte';
+  import { initAppearance } from '$lib/vibe/appearance.svelte';
   import { autoSignIn, signOut, watchSession } from '$lib/auth/org-plane';
   import { currentPlane, devMode, enableUrl, initSession, planeSessionLost, session } from '$lib/session.svelte';
 
   let { children } = $props();
+  // Before any child renders: the cookie, the old theme's migration, and the real phase (spec §4.3).
+  const stopAppearance = initAppearance();
   let initializing = $state(true);
   let autoSigningIn = $state(false);
   /** Why the session could not be started; shown with a retry, never as an endless "Connecting…". */
@@ -38,11 +39,10 @@
   }
 
   onMount(async () => {
-    applyTheme(readTheme());
     await start();
     stop = watchSession(currentPlane, { onSignedOut: () => planeSessionLost(null) });
   });
-  onDestroy(() => stop?.());
+  onDestroy(() => { stop?.(); stopAppearance(); });
 
   // Tokens are memory-only: a new tab, a reload or a 401 leaves none. Go straight to a silent
   // authorize (prompt=none); /login only after an explicit sign-out or a failed attempt (SuperJackfruitLabs/agentpod issue 704).
@@ -79,8 +79,10 @@
   </main>
 {:else if session.notEnabled}
   <main class="notice">
-    <h1>Superlibrary is not enabled for this workspace</h1>
-    {#if enableUrl(session.notEnabled.org)}<p><a href={enableUrl(session.notEnabled.org)}>Enable it</a> (an owner of the workspace can).</p>{/if}
+    <div class="panel sl-needs sl-notice-panel">
+      <h1>Superlibrary is not enabled for this workspace</h1>
+      {#if enableUrl(session.notEnabled.org)}<p><a href={enableUrl(session.notEnabled.org)}>Enable it</a> (an owner of the workspace can).</p>{/if}
+    </div>
   </main>
 {:else if session.me}
   <div class="shell">
