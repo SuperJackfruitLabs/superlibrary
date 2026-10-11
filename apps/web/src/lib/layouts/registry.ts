@@ -10,6 +10,7 @@ import type { ItemModel } from '$lib/screens/item.svelte';
 import CollectionDaylight from './collections/CollectionDaylight.svelte';
 import CollectionsDaylight from './collections/CollectionsDaylight.svelte';
 import ItemDaylight from './item/ItemDaylight.svelte';
+import ItemPaper from './item/ItemPaper.svelte';
 import LibraryDaylight from './library/LibraryDaylight.svelte';
 import LibraryPaper from './library/LibraryPaper.svelte';
 export { ROWS, rowShapeFor, type RowVariant } from './rows';
@@ -18,6 +19,6 @@ type Of<M> = Layouts<Component<{ model: M }>>;
 export const LAYOUTS = {
   collection: { daylight: CollectionDaylight } satisfies Of<CollectionModel>,
   collections: { daylight: CollectionsDaylight } satisfies Of<CollectionsModel>,
-  item: { daylight: ItemDaylight } satisfies Of<ItemModel>,
+  item: { daylight: ItemDaylight, paper: ItemPaper } satisfies Of<ItemModel>,
   library: { daylight: LibraryDaylight, paper: LibraryPaper } satisfies Of<LibraryModel>,
 };
