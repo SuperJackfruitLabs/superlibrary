@@ -1,4 +1,4 @@
-import type { APIRequestContext, BrowserContext, Page } from '@playwright/test';
+import { expect, type APIRequestContext, type BrowserContext, type Page } from '@playwright/test';
 import { APP, DEV } from './helpers';
 
 export const VIBES_E2E = ['daylight', 'paper', 'studio', 'quiet'] as const;
@@ -15,8 +15,13 @@ export async function useAppearance(context: BrowserContext, vibe: VibeName, the
 
 /** Open every Paper enclosure and every <details>: what a person can open, the test opens. */
 export async function openEnclosures(page: Page) {
-  for (const b of await page.locator('button.sl-enclosure-toggle[aria-expanded="false"]').all()) await b.click();
+  // The locator is live: each click takes one out of the set, so always click the first (`.all()` would index past the end).
+  const closed = page.locator('button.sl-enclosure-toggle[aria-expanded="false"]');
+  for (let n = await closed.count(); n > 0; n--) await closed.first().click();
+  await expect(closed).toHaveCount(0);
   await page.evaluate(() => { for (const d of document.querySelectorAll('details')) d.open = true; });
+  // Paper fades an opened enclosure in: measure what a person reads once it has settled, not a half-faded frame.
+  await page.evaluate(() => Promise.all(document.getAnimations().filter((a) => a.effect?.getComputedTiming().iterations !== Infinity).map((a) => a.finished.catch(() => undefined))));
 }
 
 export async function seedCollection(request: APIRequestContext, name: string, itemId: string): Promise<string> {

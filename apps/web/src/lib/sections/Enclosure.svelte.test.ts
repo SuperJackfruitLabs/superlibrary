@@ -28,6 +28,12 @@ describe('an enclosure', () => {
     b.click(); flushSync();
     expect(panel.hidden).toBe(true);
   });
+  it('takes the heading level it sits at', () => {
+    c = mount(Enclosure, { target: document.body, props: { id: 'v', title: 'Versions', level: 3, children: body } });
+    flushSync();
+    expect(document.querySelector('h2')).toBeNull();
+    expect(document.querySelector('h3 > button.sl-enclosure-toggle')!.textContent).toBe('Versions');
+  });
   it('opens by itself from a width, when asked', () => {
     c = mount(Enclosure, { target: document.body, props: { id: 'd', title: 'Details', openFrom: 1024, children: body } });
     flushSync();

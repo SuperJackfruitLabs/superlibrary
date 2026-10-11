@@ -5,7 +5,8 @@
   import { api } from '$lib/session.svelte';
   import { addToCollection, listCollections } from '$lib/collections';
 
-  let { itemId }: { itemId: string } = $props();
+  /** `onlisted` hears how many collections there are to add to, or null when the list could not be loaded. */
+  let { itemId, onlisted }: { itemId: string; onlisted?: (count: number | null) => void } = $props();
   let list = $state<CollectionSummary[]>([]);
   let chosen = $state('');
   let message = $state<string | null>(null);
@@ -18,6 +19,7 @@
     const r = await listCollections(api);
     loaded = true;
     if (r.ok) { list = r.value.collections; chosen = chosen || (list[0]?.id ?? ''); loadError = null; } else loadError = r.message;
+    onlisted?.(r.ok ? list.length : null);
   }
   onMount(load);
   async function add(e: SubmitEvent) {

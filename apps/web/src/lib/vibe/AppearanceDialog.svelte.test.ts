@@ -84,6 +84,23 @@ describe('the appearance dialog', () => {
     expect(document.activeElement).not.toBe(done);
   });
 
+  it('Tab stops once per group, in order: the checked vibe, each segmented control once, the location box, Done', () => {
+    open();
+    const dialog = document.querySelector('[role="dialog"]')!;
+    const stops: Element[] = [];
+    for (let n = 0; n < 6; n++) {
+      stops.push(document.activeElement!);
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true }));
+    }
+    const name = (el: Element) => el instanceof HTMLInputElement ? `${el.type}:${el.value || el.name}` : el.textContent!.trim();
+    expect(stops.map(name)).toEqual(['radio:daylight', 'Follow the sun', 'Strong', 'checkbox:on', 'Done', 'radio:daylight']);
+    expect(dialog.contains(document.activeElement)).toBe(true);
+    // Shift+Tab from the first stop wraps to Done.
+    radio('Daylight').focus();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true, cancelable: true }));
+    expect(document.activeElement!.textContent!.trim()).toBe('Done');
+  });
+
   it('use my location: allowed, the place is kept and the box stays checked', async () => {
     geo((ok) => ok({ coords: { latitude: 12.34, longitude: 56.78 } } as GeolocationPosition));
     open();

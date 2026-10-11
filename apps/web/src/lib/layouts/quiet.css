@@ -1,0 +1,54 @@
+/* Quiet layouts (spec §5): one column, everything open, visible labels, no decoration, no motion. */
+.sl-quiet { max-width: 720px; }
+.searchbar-label { display: block; margin: 0 0 var(--vk-space-1); font-weight: 700; }
+.sl-quiet .searchbar { flex-wrap: wrap; }
+.sl-quiet .searchbar-label { flex-basis: 100%; }
+.results--plain .result { padding: var(--vk-space-3) 0; border-left: 0; border-bottom: 1px solid var(--vk-color-line); }
+.results--plain .snippet { display: block; -webkit-line-clamp: unset; }
+.sl-facts-line { margin: var(--vk-space-1) 0; }
+.sl-back { display: inline-flex; align-items: center; min-height: var(--vk-target-min); }
+.sl-facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 2px var(--vk-space-3); margin: var(--vk-space-2) 0; }
+.sl-facts dt { font-weight: 700; }
+.sl-facts dd { margin: 0; }
+/* The outcome word reads at the sentence's size and weight, without the dot. */
+.sl-facts-line .outcome, .sl-facts .outcome { font: inherit; font-weight: 700; }
+.sl-quiet .outcome::before { display: none; }
+/* Title and facts read as one entry: the link keeps its 44px target without floating the title. */
+.results--plain .result-link { padding-block: 0; align-content: center; text-decoration: underline; }
+/* A plain disclosure marker for the filters (the flex summary has none); no transition. */
+[data-vibe="quiet"] .filters summary { gap: var(--vk-space-2); cursor: pointer; }
+[data-vibe="quiet"] .filters summary::before { content: '\25B8' / ''; }
+[data-vibe="quiet"] .filters[open] summary::before { content: '\25BE' / ''; }
+/* The item page. */
+.versions--plain li { align-items: flex-start; }
+.versions--plain .vline { margin: 0; }
+.sl-quiet .panel { box-shadow: none; padding: 0; background: transparent; }
+.sl-quiet-manage { display: grid; gap: var(--vk-space-3); }
+.timeline--plain li::before { display: none; }
+.timeline--plain { padding-left: var(--vk-space-5); border-left: 0; list-style: decimal; }
+/* Headings step down in order: section h2 larger than the h3 inside Manage. */
+.sl-quiet section > h2 { font-size: 1.25em; margin: var(--vk-space-5) 0 var(--vk-space-2); }
+.sl-quiet-manage h3 { font-size: 1.05em; margin: var(--vk-space-3) 0 0; }
+/* Facts: stacked on a phone, one wrapping line from 768px so the content stays under the title. */
+.sl-facts > div { display: contents; }
+@media (min-width: 768px) {
+  .sl-facts { display: flex; flex-wrap: wrap; gap: 0 var(--vk-space-5); }
+  .sl-facts > div { display: flex; gap: var(--vk-space-2); }
+}
+/* Related items read as plain lines; a printed page has no coloured edge. */
+.sl-quiet .result { border-left: 0; padding-left: 0; }
+.sl-quiet .versions--plain li.current { border-left: 0; padding-left: 0; }
+/* Badges: their own line on a phone, after a decorative dot beside the file count when there is room. */
+.versions--plain .badges { display: block; }
+@media (min-width: 640px) {
+  .versions--plain .badges { display: inline; }
+  .versions--plain .badges:not(:empty)::before { content: ' \00B7 ' / ''; }
+}
+/* Collections: the form's labels sit above full-width fields; lists are plain lines without a coloured edge. */
+.sl-quiet .inline-form { display: flex; flex-wrap: wrap; align-items: center; gap: var(--vk-space-3); max-width: 32rem; }
+.sl-quiet .inline-form .field { flex: 1 1 100%; font-weight: 700; }
+.sl-quiet .inline-form .field input { font-weight: 400; }
+.items--plain a .title { text-decoration: underline; }
+.items--plain small { font-size: inherit; }
+.results--plain .entry { display: block; }
+.results--plain .entry > button { margin-top: var(--vk-space-2); }

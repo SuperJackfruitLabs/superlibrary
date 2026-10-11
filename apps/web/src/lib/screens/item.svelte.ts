@@ -88,6 +88,12 @@ export class ItemModel {
   readonly detailsSummary = $derived(this.current ? `${kindWords(this.current.view)} · ${formatBytes(this.current.totalBytes)}` : '');
   readonly artifactsSummary = $derived(this.record ? `${this.record.artifacts.length} linked` : '');
   readonly entryCount = $derived(this.record ? timelineOf(this.record.record).length : 0);
+  readonly timelineSummary = $derived(`${this.entryCount} ${this.entryCount === 1 ? 'entry' : 'entries'}`);
+  /** How many related items and collections their sections found (null: still looking, or it failed). */
+  relatedCount = $state<number | null>(null);
+  collectionCount = $state<number | null>(null);
+  readonly relatedSummary = $derived(this.relatedCount === null ? '' : `${this.relatedCount} item${this.relatedCount === 1 ? '' : 's'}`);
+  readonly collectionsSummary = $derived(this.collectionCount === null ? '' : `${this.collectionCount} collection${this.collectionCount === 1 ? '' : 's'}`);
 
   /** Where the viewer mounts. Any layout attaches it: `<div class="viewer" {@attach model.viewer}></div>`. */
   readonly viewer: Attachment<HTMLElement> = (el) => { this.#frame = el; return () => { if (this.#frame === el) this.#frame = null; }; };
@@ -101,7 +107,7 @@ export class ItemModel {
     $effect(() => {
       const { itemId, version } = this.#props();
       void itemId;
-      untrack(() => { this.shown = version; this.phase = 'loading'; this.notice = null; this.removed = false; void this.load(); });
+      untrack(() => { this.shown = version; this.phase = 'loading'; this.notice = null; this.removed = false; this.relatedCount = null; this.collectionCount = null; void this.load(); });
     });
     // A change of theme reaches the open viewer.
     $effect(() => { const t = look.theme; this.#mounted?.setTheme(t); });

@@ -178,15 +178,26 @@ export function seedWorkRecordLocal(o: { ws: string; title: string; text: string
   };
   const sql = [
     `INSERT OR REPLACE INTO source_boards (workspace_id, board_id, name, last_seen_at) VALUES (${sq(o.ws)}, ${sq(board)}, ${sq(o.boardName ?? 'Marketing & Community')}, ${sq(now)});`,
-    `INSERT INTO items (id, workspace_id, kind, title, scope, outcome, created_by) VALUES (${sq(id)}, ${sq(o.ws)}, 'work-record', ${sq(o.title)}, ${sq(`board:${board}`)}, ${sq(o.outcome)}, 'source:superpipeline');`,
-    `INSERT INTO work_records (item_id, workspace_id, board_id, card_id, digest, body, text, source_updated_at) VALUES (${sq(id)}, ${sq(o.ws)}, ${sq(board)}, ${sq(card)}, 'e2e', ${sq(JSON.stringify(body))}, ${sq(text)}, ${sq(now)});`,
-    `INSERT INTO item_sources (item_id, source, board_id, card_id, stage, source_id, source_url) VALUES (${sq(id)}, 'superpipeline', ${sq(board)}, ${sq(card)}, 'review', ${sq(card)}, ${sq(`https://app.superpipeline.dev/b/${board}/c/${card}`)});`,
-    `INSERT INTO chunks (id, item_id, version, position, text, tokens) VALUES (${sq(`${id}:0:0`)}, ${sq(id)}, 0, 0, ${sq(text)}, 20);`,
+    `INSERT OR IGNORE INTO items (id, workspace_id, kind, title, scope, outcome, created_by) VALUES (${sq(id)}, ${sq(o.ws)}, 'work-record', ${sq(o.title)}, ${sq(`board:${board}`)}, ${sq(o.outcome)}, 'source:superpipeline');`,
+    `INSERT OR IGNORE INTO work_records (item_id, workspace_id, board_id, card_id, digest, body, text, source_updated_at) VALUES (${sq(id)}, ${sq(o.ws)}, ${sq(board)}, ${sq(card)}, 'e2e', ${sq(JSON.stringify(body))}, ${sq(text)}, ${sq(now)});`,
+    `INSERT OR IGNORE INTO item_sources (item_id, source, board_id, card_id, stage, source_id, source_url) VALUES (${sq(id)}, 'superpipeline', ${sq(board)}, ${sq(card)}, 'review', ${sq(card)}, ${sq(`https://app.superpipeline.dev/b/${board}/c/${card}`)});`,
+    `INSERT OR IGNORE INTO chunks (id, item_id, version, position, text, tokens) VALUES (${sq(`${id}:0:0`)}, ${sq(id)}, 0, 0, ${sq(text)}, 20);`,
+    `DELETE FROM chunks_fts WHERE item_id = ${sq(id)};`,
     `INSERT INTO chunks_fts (text, chunk_id, item_id) VALUES (${sq(text)}, ${sq(`${id}:0:0`)}, ${sq(id)});`,
   ].join('\n');
   const file = join(mkdtempSync(join(tmpdir(), 'sl-e2e-')), 'seed.sql');
   writeFileSync(file, sql);
   // The same persist directory the webServer's API uses (playwright.config.ts PERSIST), relative to apps/api.
-  execFileSync('pnpm', ['--filter', '@superlibrary/api', 'exec', 'wrangler', 'd1', 'execute', 'superlibrary-catalog', '--local', '--persist-to', '../../.wrangler-e2e', '--file', file], { cwd: REPO, stdio: 'pipe' });
-  return id;
+  // The API writes to the same SQLite file, so the seed can meet SQLITE_BUSY: try again with a backoff. Every statement
+  // above is idempotent (OR IGNORE, and the FTS row deleted first), so a retry after a partial run leaves one copy.
+  for (let attempt = 0; ; attempt++) {
+    try {
+      execFileSync('pnpm', ['--filter', '@superlibrary/api', 'exec', 'wrangler', 'd1', 'execute', 'superlibrary-catalog', '--local', '--persist-to', '../../.wrangler-e2e', '--file', file], { cwd: REPO, stdio: 'pipe' });
+      return id;
+    } catch (e) {
+      const out = `${(e as { stdout?: Buffer }).stdout ?? ''}${(e as { stderr?: Buffer }).stderr ?? ''}${e instanceof Error ? e.message : ''}`;
+      if (attempt >= 5 || !/SQLITE_BUSY|database is locked/i.test(out)) throw e;
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 250 * 2 ** attempt);
+    }
+  }
 }

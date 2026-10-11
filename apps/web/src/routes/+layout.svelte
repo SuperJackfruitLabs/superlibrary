@@ -7,6 +7,7 @@
   import '$lib/layouts/daylight.css';
   import '$lib/layouts/paper.css';
   import '$lib/layouts/studio.css';
+  import '$lib/layouts/quiet.css';
   import '$lib/vibe/vibes.css';
   import { onDestroy, onMount } from 'svelte';
   import { goto } from '$app/navigation';
@@ -89,7 +90,7 @@
 {:else if session.me}
   <div class="shell">
     <AppHeader me={session.me} onsignout={logOut} />
-    {@render children()}
+    <main>{@render children()}</main>
     <SuiteFooter />
   </div>
 {:else}

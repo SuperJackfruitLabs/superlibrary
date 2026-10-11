@@ -30,7 +30,8 @@
   <h1>{item.title}</h1>
   <p class="item-meta sl-byline">
     {#if model.maker}<span class="item-face" aria-hidden="true"><Face id={model.maker.id} label={model.maker.label} mood={moodOf(item.outcome)} size={24} /></span>{/if}
-    <span>From {model.createdByWords}</span>
+    <!-- Provenance's own label, not "From": the words of createdByWords read as a value ("You (a person)"). One text run, so it is not a label/value pair. -->
+    <span><span class="sl-byline-label">Created by</span> {model.createdByWords}</span>
     <OutcomeBadge outcome={item.outcome} />
     {#if model.versionWords}<span>{model.versionWords}</span>{/if}
     <span>{model.visibility}</span>
@@ -53,16 +54,16 @@
 <div class="sl-letter-col">
   <h2 class="sl-enclosed-h">Enclosed</h2>
   {#if item.kind === 'work-record' && model.record}
-    <Enclosure id="timeline" title="Timeline" summary={`${model.entryCount} entries`} open><Timeline view={model.record} variant="letters" /></Enclosure>
-    <Enclosure id="artifacts" title="Artifacts" summary={model.artifactsSummary} open><LinkedArtifacts view={model.record} /></Enclosure>
+    <Enclosure level={3} id="timeline" title="Timeline" summary={model.timelineSummary} open><Timeline view={model.record} variant="letters" /></Enclosure>
+    <Enclosure level={3} id="artifacts" title="Artifacts" summary={model.artifactsSummary} open><LinkedArtifacts view={model.record} /></Enclosure>
   {/if}
   {#if item.kind === 'artifact'}
-    <Enclosure id="versions" title="Versions" summary={model.versionsSummary} open><VersionsSection {model} /></Enclosure>
-    <Enclosure id="details" title={model.detailsHeading} summary={model.detailsSummary} openFrom={1024}><DetailsSection {model} /></Enclosure>
+    <Enclosure level={3} id="versions" title="Versions" summary={model.versionsSummary} open><VersionsSection {model} /></Enclosure>
+    <Enclosure level={3} id="details" title={model.detailsHeading} summary={model.detailsSummary} openFrom={1024}><DetailsSection {model} /></Enclosure>
   {/if}
-  <Enclosure id="provenance" title="Provenance" summary={model.createdByWords} openFrom={1024}><ProvenanceSection {model} /></Enclosure>
-  <Enclosure id="related" title="Related" openFrom={1024}><RelatedList itemId={item.id} /></Enclosure>
-  <Enclosure id="collect" title="Collections" openFrom={1024}><AddToCollection itemId={item.id} /></Enclosure>
+  <Enclosure level={3} id="provenance" title="Provenance" summary={model.createdByWords} openFrom={1024}><ProvenanceSection {model} /></Enclosure>
+  <Enclosure level={3} id="related" title="Related" summary={model.relatedSummary} openFrom={1024}><RelatedList itemId={item.id} onfound={(n) => (model.relatedCount = n)} /></Enclosure>
+  <Enclosure level={3} id="collect" title="Collections" summary={model.collectionsSummary} openFrom={1024}><AddToCollection itemId={item.id} onlisted={(n) => (model.collectionCount = n)} /></Enclosure>
   {#if model.manage}
     <section class="manage sl-postscript" aria-labelledby="manage-h"><h2 id="manage-h">Manage</h2><ManageSection {model} level={3} /></section>
   {/if}

@@ -5,7 +5,8 @@
   import { outcomeVar } from '$kit/outcome';
   import { api } from '$lib/session.svelte';
 
-  let { itemId }: { itemId: string } = $props();
+  /** `onfound` hears how many were found (a closed enclosure's summary); it is not called while looking or when it failed. */
+  let { itemId, onfound }: { itemId: string; onfound?: (count: number) => void } = $props();
   let items = $state<RelatedItem[]>([]);
   let phase = $state<'loading' | 'ok' | 'failed'>('loading');
 
@@ -17,8 +18,11 @@
       .then(async (res) => {
         if (!live) return;
         if (!res.ok) { phase = 'failed'; return; }
-        items = ((await res.json()) as { items: RelatedItem[] }).items;
+        const found = ((await res.json()) as { items: RelatedItem[] }).items;
+        if (!live) return;
+        items = found;
         phase = 'ok';
+        onfound?.(found.length);
       })
       .catch(() => { if (live) phase = 'failed'; });
     return () => { live = false; };

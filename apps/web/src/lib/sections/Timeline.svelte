@@ -3,7 +3,7 @@
   import type { WorkRecordView } from '@superlibrary/contract';
   import { when } from '$lib/item';
   import { timelineOf, toneVar } from '$lib/record';
-  let { view, variant = 'bubbles' }: { view: WorkRecordView; variant?: 'bubbles' | 'letters' | 'log' } = $props();
+  let { view, variant = 'bubbles' }: { view: WorkRecordView; variant?: 'bubbles' | 'letters' | 'log' | 'plain' } = $props();
   const entries = $derived(timelineOf(view.record));
 </script>
 

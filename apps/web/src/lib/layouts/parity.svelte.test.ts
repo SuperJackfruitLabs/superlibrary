@@ -148,7 +148,7 @@ describe.each([...VIBES])('%s keeps everything visible today (spec §6)', (vibe)
 });
 
 // The by-parts fixture rows (Studio's table) must not hide a regression of the joined wording the list variant promises.
-describe.each(['daylight', 'paper'] as const)('%s: a version row reads uploaded, size and files as one line', (vibe) => {
+describe.each(['daylight', 'paper', 'quiet'] as const)('%s: a version row reads uploaded, size and files as one line', (vibe) => {
   let c: ReturnType<typeof mount> | null = null;
   beforeEach(() => { look.appearance = { ...look.appearance, vibe }; });
   afterEach(() => { if (c) unmount(c); c = null; document.body.innerHTML = ''; });
@@ -158,6 +158,43 @@ describe.each(['daylight', 'paper'] as const)('%s: a version row reads uploaded,
     const text = document.body.textContent?.replace(/\s+/g, ' ') ?? '';
     expect(text).toContain(`${when(VERSIONS[0]!.createdAt)} · ${formatBytes(2048)} · 2 files`);
     expect(text).toContain(`${when(VERSIONS[1]!.createdAt)} · ${formatBytes(512)} · 1 file`);
+  });
+});
+
+// Paper's enclosures sit under "Enclosed" (h2), so each is an h3; closed, each says what is inside.
+describe('paper: the enclosures', () => {
+  let c: ReturnType<typeof mount> | null = null;
+  beforeEach(() => { look.appearance = { ...look.appearance, vibe: 'paper' }; });
+  afterEach(() => { if (c) unmount(c); c = null; document.body.innerHTML = ''; });
+  const sum = (id: string) => document.querySelector(`#${id}-h .sl-enclosure-sum`)?.textContent ?? null;
+  it('an artifact: h3s under Enclosed, with closed-state summaries from data', async () => {
+    c = mount(ItemView, { target: document.body, props: { itemId: FIX.artifactId } });
+    await settle();
+    expect([...document.querySelectorAll('h2')].map((h) => h.textContent)).toContain('Enclosed');
+    expect([...document.querySelectorAll('.sl-enclosure > :is(h2, h3)')].map((h) => h.tagName)).toEqual(['H3', 'H3', 'H3', 'H3', 'H3']);
+    expect(document.querySelector('#related-h > button')!.getAttribute('aria-expanded')).toBe('false');
+    expect([sum('related'), sum('collect')]).toEqual(['1 item', '1 collection']);
+    expect(sum('provenance')).toBeTruthy();
+  });
+  it('a work record: the timeline summary counts its entries', async () => {
+    c = mount(ItemView, { target: document.body, props: { itemId: FIX.recordId } });
+    await settle();
+    const n = document.querySelectorAll('ol.timeline > li').length;
+    expect(n).toBeGreaterThan(0);
+    expect(sum('timeline')).toBe(`${n} ${n === 1 ? 'entry' : 'entries'}`);
+  });
+});
+
+describe('studio: a work record names no heading the spec does not', () => {
+  let c: ReturnType<typeof mount> | null = null;
+  beforeEach(() => { look.appearance = { ...look.appearance, vibe: 'studio' }; });
+  afterEach(() => { if (c) unmount(c); c = null; document.body.innerHTML = ''; });
+  it('the record panel is headed by Spec alone', async () => {
+    c = mount(ItemView, { target: document.body, props: { itemId: FIX.recordId } });
+    await settle();
+    const names = [...document.querySelectorAll('h2')].map((h) => h.textContent);
+    expect(names).not.toContain('Record');
+    expect(names).toContain('Spec');
   });
 });
 

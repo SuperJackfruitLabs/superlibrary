@@ -13,7 +13,7 @@
 
 <div class="sl-day-hero">
   <Sky phase={look.phase}>
-    {#if look.appearance.timeStrength !== 'off'}<p class="sl-greeting">{greeting(look.phase, look.appearance.vibe)}</p>{/if}
+    {#if look.appearance.timeStrength !== 'off'}<p class="sl-greeting">{greeting(look.phase, 'daylight')}</p>{/if}
     <div class="heading"><h1>Library</h1><Button variant="primary" href="/upload">Upload</Button></div>
     <SearchForm {model} />
   </Sky>

@@ -22,3 +22,17 @@ describe('CollectionEntries, table variant', () => {
     expect(rows[0]!.querySelector('td[data-label="Action"]')!.textContent).toContain('“First”');
   });
 });
+
+describe('CollectionEntries, plain variant', () => {
+  it('reads title, outcome and date in words, the note, then Remove with its hidden title', () => {
+    c = mount(CollectionEntries, { target: document.body, props: { model, variant: 'plain' } });
+    flushSync();
+    const first = document.querySelector('ul.results--plain[aria-label="Items in this collection"] > li')!;
+    expect([...first.children].map((e) => e.tagName + '.' + (e.className.split(' ')[0] ?? ''))).toEqual(['A.result-link', 'P.sl-facts-line', 'P.snippet', 'BUTTON.']);
+    expect(first.querySelector('.result-title')!.textContent).toBe('First');
+    expect(first.querySelector('.sl-facts-line')!.textContent!.replace(/\s+/g, ' ')).toMatch(/^Outcome: Completed\. added /);
+    expect(first.querySelector('.snippet')!.textContent).toBe('Keep this one');
+    expect(first.querySelector('button')!.textContent!).toMatch(/^Remove\s*“First” from collection$/);
+    expect(first.querySelector('button .visually-hidden')).not.toBeNull();
+  });
+});

@@ -17,7 +17,7 @@
 @media (min-width: 1024px) { .sl-tiles { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(0, 12rem); } }
 .sl-tile { display: grid; align-content: space-between; gap: var(--vk-space-1); margin: 0; padding: var(--vk-space-2); border-radius: var(--vk-radius-sm); background: var(--vk-color-surface); box-shadow: inset 0 0 0 1px var(--vk-color-line), inset 3px 0 0 var(--o, var(--vk-color-line)); }
 .sl-tile dt { font: 500 0.75rem/1.2 var(--vk-font-mono); letter-spacing: 0.02em; text-transform: uppercase; color: var(--vk-color-muted); overflow-wrap: anywhere; }
-.sl-tile dd { margin: 0; font: 600 var(--vk-text-lg)/1 var(--vk-font-mono); }
+.sl-tile dd { margin: 0; font: 600 var(--vk-text-lg)/1.2 var(--vk-font-mono); overflow-wrap: anywhere; }
 .sl-studio-bar { display: grid; gap: var(--vk-space-2); margin: 0 0 var(--vk-space-3); }
 @media (min-width: 1024px) { .sl-studio-bar .filter-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 .sl-table { width: 100%; table-layout: fixed; border-collapse: collapse; margin: 0 0 var(--vk-space-4); font-size: var(--vk-text-sm); }
@@ -38,24 +38,37 @@
 .sl-table .result-link { display: inline; font-weight: 600; text-decoration: underline; text-decoration-color: var(--vk-color-line); text-underline-offset: 3px; }
 .sl-table .result-link:hover, .sl-table .result-link:focus-visible { text-decoration-color: currentColor; }
 .sl-table .sl-led { margin-top: 0.4em; }
-/* Stacked below the width the table needs (ten columns: 1024px; others: 768px). Roles in the markup keep the semantics. */
+/*
+ * Stacked tables: each row a block of "LABEL value" lines; roles in the markup keep the semantics. The ten-column
+ * table (--wide) stacks below the 1024px it needs, the others (--stack) below 768px. One rule list per breakpoint
+ * (CSS gives a rule one media query); what differs between the two is a variable: the label column, the row inset.
+ */
+.sl-table--wide { --sl-label-col: 6.5rem; --sl-row-inset: var(--vk-space-3); }
+.sl-table--stack { --sl-label-col: 7rem; --sl-row-inset: 0; }
+.sl-table--entries { --sl-row-inset: var(--vk-space-3); }
 @media (max-width: 1023px) {
-  .sl-table--wide, .sl-table--wide tbody, .sl-table--wide tr, .sl-table--wide td { display: block; }
+  .sl-table--wide, .sl-table--wide :is(tbody, tr, td) { display: block; }
   .sl-table--wide thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
-  .sl-table--wide tr { padding: var(--vk-space-2) 0 var(--vk-space-2) var(--vk-space-3); border-bottom: 1px solid var(--vk-color-line); }
-  .sl-table--wide td { display: grid; grid-template-columns: 6.5rem minmax(0, 1fr); gap: var(--vk-space-2); padding: 2px 0; border: 0; }
+  .sl-table--wide tr { padding: var(--vk-space-2) 0 var(--vk-space-2) var(--sl-row-inset); border-bottom: 1px solid var(--vk-color-line); }
+  .sl-table--wide td { display: grid; grid-template-columns: var(--sl-label-col) minmax(0, 1fr); gap: var(--vk-space-2); padding: 2px 0; border: 0; }
+  .sl-table--wide td::before { content: attr(data-label) / ""; color: var(--vk-color-muted); font: 500 var(--vk-text-sm)/1.4 var(--vk-font-mono); text-transform: uppercase; }
+  /* A cell with nothing in it does not print its label alone; the status light goes; the title leads its row. */
   .sl-table--wide td:empty, .sl-table--wide td:first-child { display: none; }
   .sl-table--wide td[data-label="Title"] { display: block; padding-bottom: var(--vk-space-1); }
   .sl-table--wide td[data-label="Title"]::before { content: none; }
   .sl-table--wide .result-link { display: inline-flex; align-items: center; min-height: var(--vk-target-min); }
-  .sl-table--wide td::before { content: attr(data-label) / ""; color: var(--vk-color-muted); font: 500 var(--vk-text-sm)/1.4 var(--vk-font-mono); text-transform: uppercase; }
 }
 @media (max-width: 767px) {
-  .sl-table--stack, .sl-table--stack tbody, .sl-table--stack tr, .sl-table--stack td { display: block; }
+  .sl-table--stack, .sl-table--stack :is(tbody, tr, td) { display: block; }
   .sl-table--stack thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
-  .sl-table--stack tr { padding: var(--vk-space-2) 0; border-bottom: 1px solid var(--vk-color-line); }
-  .sl-table--stack td { display: grid; grid-template-columns: 7rem minmax(0, 1fr); gap: var(--vk-space-2); padding: 2px 0; border: 0; }
+  .sl-table--stack tr { padding: var(--vk-space-2) 0 var(--vk-space-2) var(--sl-row-inset); border-bottom: 1px solid var(--vk-color-line); }
+  .sl-table--stack td { display: grid; grid-template-columns: var(--sl-label-col) minmax(0, 1fr); gap: var(--vk-space-2); align-items: baseline; padding: 2px 0; border: 0; }
   .sl-table--stack td::before { content: attr(data-label) / ""; color: var(--vk-color-muted); font: 500 var(--vk-text-sm)/1.4 var(--vk-font-mono); text-transform: uppercase; }
+  /* A cell with nothing in it does not print its label alone; the name or title leads its row; the action needs no label. */
+  .sl-table--stack td:empty { display: none; }
+  .sl-table--stack td:is([data-label="Name"], [data-label="Title"], [data-label="Action"]) { display: block; padding-bottom: 0; }
+  .sl-table--stack td:is([data-label="Name"], [data-label="Title"], [data-label="Action"])::before { content: none; }
+  .sl-table--stack .result-link { display: inline-flex; align-items: center; min-height: var(--vk-target-min); }
 }
 [data-vibe="studio"] .sl-more { display: flex; margin-left: auto; }
 .sl-readout-bar { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: var(--vk-space-2); margin: 0 0 var(--vk-space-2); padding: var(--vk-space-1) var(--vk-space-3); border-radius: var(--vk-radius-sm); background: var(--vk-color-raised); font: 500 var(--vk-text-sm)/1.4 var(--vk-font-mono); }
@@ -80,7 +93,6 @@
 .timeline--log li { display: grid; grid-template-columns: 12px minmax(0, 1fr); column-gap: var(--vk-space-2); padding: var(--vk-space-2) 0; border-bottom: 1px solid var(--vk-color-line); }
 .timeline--log li::before { position: static; grid-row: 1 / span 3; width: 10px; height: 10px; margin-top: 5px; border: 0; background: var(--o, var(--vk-color-faint)); }
 .timeline--log .when { font-family: var(--vk-font-mono); }
-.sl-tile dd { line-height: 1.2; overflow-wrap: anywhere; }
 @media (min-width: 768px) {
   .sl-table--stack th:nth-child(1) { width: 11%; } .sl-table--stack th:nth-child(2) { width: 27%; } .sl-table--stack th:nth-child(3) { width: 12%; }
   .sl-table--stack th:nth-child(4) { width: 10%; } .sl-table--stack th:nth-child(6) { width: 15%; }
@@ -98,8 +110,6 @@
   /* The leading wide panel takes a row of its own, so the rest are counted from after it. */
   .sl-panels > .sl-panel--wide:first-child ~ :last-child:nth-child(even) { grid-column: 1 / -1; }
 }
-/* A row with nothing in a cell does not print the label alone when stacked. */
-@media (max-width: 767px) { .sl-table--stack td:empty { display: none; } }
 @media (min-width: 768px) {
   .sl-table--entries .entry { display: table-row; }
   .sl-table--entries td { overflow-wrap: break-word; }
@@ -114,12 +124,3 @@
 .sl-tiles--facts .sl-tile { align-content: start; }
 .sl-tiles--facts dd { font-size: var(--vk-text-sm); }
 @media (min-width: 1024px) { .sl-tiles--facts { grid-template-columns: none; grid-auto-columns: minmax(0, 14rem); } }
-@media (max-width: 767px) { .sl-table--stack td { align-items: baseline; } }
-@media (max-width: 767px) {
-  .sl-table--entries .entry { padding-left: var(--vk-space-3); }
-  /* The name or title leads its stacked row, as in the library; the action needs no label. */
-  .sl-table--stack td[data-label="Name"], .sl-table--stack td[data-label="Title"] { display: block; padding-bottom: 0; }
-  .sl-table--stack td[data-label="Name"]::before, .sl-table--stack td[data-label="Title"]::before, .sl-table--stack td[data-label="Action"]::before { content: none; }
-  .sl-table--stack td[data-label="Action"] { display: block; }
-  .sl-table--stack .result-link { display: inline-flex; align-items: center; min-height: var(--vk-target-min); }
-}
