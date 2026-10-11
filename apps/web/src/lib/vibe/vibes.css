@@ -30,6 +30,11 @@
   [data-vibe="studio"] .suite-shell-nav { grid-template-columns: repeat(4, auto); justify-content: space-between; }
   [data-vibe="studio"] .suite-shell-nav a { font-size: 0.8125rem; letter-spacing: 0.02em; }
 }
+@media (min-width: 768px) and (max-width: 1023px) {
+  /* One row at tablet width: the capitals need a tighter gap and tracking to fit beside the brand and Account. */
+  [data-vibe="studio"] .suite-shell { column-gap: var(--vk-space-2); }
+  [data-vibe="studio"] .suite-shell-nav a { padding: 0 var(--vk-space-2); letter-spacing: 0.02em; }
+}
 [data-vibe="studio"] h2 { font: 600 var(--vk-text-sm)/1.3 var(--vk-font-mono); letter-spacing: 0.08em; text-transform: uppercase; }
 [data-vibe="studio"] .kit-tabs a { border-radius: var(--vk-radius-sm); font-family: var(--vk-font-mono); }
 

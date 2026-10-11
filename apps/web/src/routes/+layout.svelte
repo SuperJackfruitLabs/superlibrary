@@ -6,6 +6,7 @@
   import '../app.css';
   import '$lib/layouts/daylight.css';
   import '$lib/layouts/paper.css';
+  import '$lib/layouts/studio.css';
   import '$lib/vibe/vibes.css';
   import { onDestroy, onMount } from 'svelte';
   import { goto } from '$app/navigation';

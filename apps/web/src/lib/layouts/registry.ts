@@ -15,6 +15,7 @@ import ItemDaylight from './item/ItemDaylight.svelte';
 import ItemPaper from './item/ItemPaper.svelte';
 import LibraryDaylight from './library/LibraryDaylight.svelte';
 import LibraryPaper from './library/LibraryPaper.svelte';
+import LibraryStudio from './library/LibraryStudio.svelte';
 export { ROWS, rowShapeFor, type RowVariant } from './rows';
 
 type Of<M> = Layouts<Component<{ model: M }>>;
@@ -22,5 +23,5 @@ export const LAYOUTS = {
   collection: { daylight: CollectionDaylight, paper: CollectionPaper } satisfies Of<CollectionModel>,
   collections: { daylight: CollectionsDaylight, paper: CollectionsPaper } satisfies Of<CollectionsModel>,
   item: { daylight: ItemDaylight, paper: ItemPaper } satisfies Of<ItemModel>,
-  library: { daylight: LibraryDaylight, paper: LibraryPaper } satisfies Of<LibraryModel>,
+  library: { daylight: LibraryDaylight, paper: LibraryPaper, studio: LibraryStudio } satisfies Of<LibraryModel>,
 };

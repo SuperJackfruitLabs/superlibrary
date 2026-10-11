@@ -1,0 +1,58 @@
+/* Studio layouts (spec §5): dense, mono labels, status lights. The words are unchanged; capitals are CSS. */
+.sl-studio-head { flex-wrap: wrap; }
+.sl-studio-head h1 { margin: 0; }
+.sl-readout { display: inline-flex; align-items: center; gap: var(--vk-space-2); margin: 0 auto 0 0; font: 500 var(--vk-text-sm)/1 var(--vk-font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--vk-color-muted); }
+.sl-led { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--o, var(--vk-color-faint)); }
+.sl-led--sun { background: var(--vk-sky-noon-sun); }
+[data-phase="dawn"] .sl-led--sun { background: var(--vk-sky-dawn-sun); }
+[data-phase="morning"] .sl-led--sun { background: var(--vk-sky-morning-sun); }
+[data-phase="golden"] .sl-led--sun { background: var(--vk-sky-golden-sun); }
+[data-phase="dusk"] .sl-led--sun { background: var(--vk-sky-dusk-sun); }
+[data-phase="night"] .sl-led--sun { background: var(--vk-sky-night-sun); }
+[data-time="subtle"] .sl-led--sun { display: none; }
+.sl-led--live { animation: sl-blink 1.6s ease-in-out infinite; }
+@keyframes sl-blink { 50% { opacity: 0.4; } }
+.sl-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: var(--vk-space-2); margin: var(--vk-space-3) 0; }
+.sl-tile { margin: 0; padding: var(--vk-space-2) var(--vk-space-3); border-radius: var(--vk-radius-sm); background: var(--vk-color-surface); box-shadow: inset 0 0 0 1px var(--vk-color-line), inset 3px 0 0 var(--o, var(--vk-color-line)); }
+.sl-tile dt { font: 500 var(--vk-text-sm)/1.2 var(--vk-font-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--vk-color-muted); }
+.sl-tile dd { margin: var(--vk-space-1) 0 0; font: 600 var(--vk-text-lg)/1 var(--vk-font-mono); }
+.sl-studio-bar { display: grid; gap: var(--vk-space-2); margin: 0 0 var(--vk-space-3); }
+@media (min-width: 1024px) { .sl-studio-bar .filter-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.sl-table { width: 100%; table-layout: fixed; border-collapse: collapse; margin: 0 0 var(--vk-space-4); font-size: var(--vk-text-sm); }
+.sl-table th { padding: var(--vk-space-2); text-align: left; font: 500 var(--vk-text-sm)/1.2 var(--vk-font-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--vk-color-muted); border-bottom: 1px solid var(--vk-color-line); }
+.sl-table td { padding: var(--vk-space-2); vertical-align: top; border-bottom: 1px solid var(--vk-color-line); overflow-wrap: anywhere; }
+.sl-table--wide th:first-child, .sl-table--wide td:first-child { width: 24px; padding-inline: var(--vk-space-1); }
+/* Column widths for the ten-column table (fixed layout): the title and the excerpt get the room, the short facts the least. */
+.sl-table--wide th:nth-child(2) { width: 16%; }
+.sl-table--wide th:nth-child(3) { width: 9%; }
+.sl-table--wide th:nth-child(4) { width: 7%; }
+.sl-table--wide th:nth-child(5) { width: 9%; }
+.sl-table--wide th:nth-child(6) { width: 8%; }
+.sl-table--wide th:nth-child(7) { width: 9%; }
+.sl-table--wide th:nth-child(8) { width: 10%; }
+.sl-table--wide th:nth-child(9) { width: 17%; }
+.sl-table--wide th:nth-child(10) { width: 9%; }
+.sl-table .snippet { -webkit-line-clamp: 2; line-clamp: 2; }
+.sl-table .result-link { display: inline; }
+.sl-table .sl-led { margin-top: 0.4em; }
+/* Stacked below the width the table needs (ten columns: 1024px; others: 768px). Roles in the markup keep the semantics. */
+@media (max-width: 1023px) {
+  .sl-table--wide, .sl-table--wide tbody, .sl-table--wide tr, .sl-table--wide td { display: block; }
+  .sl-table--wide thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .sl-table--wide tr { padding: var(--vk-space-2) 0; border-bottom: 1px solid var(--vk-color-line); }
+  .sl-table--wide td { display: grid; grid-template-columns: 6.5rem minmax(0, 1fr); gap: var(--vk-space-2); padding: 2px 0; border: 0; }
+  .sl-table--wide td:empty, .sl-table--wide td:first-child { display: none; }
+  .sl-table--wide td[data-label="Title"] { display: block; padding-bottom: var(--vk-space-1); font-weight: 600; }
+  .sl-table--wide td[data-label="Title"]::before { content: none; }
+  .sl-table--wide .result-link { display: inline-flex; align-items: center; min-height: var(--vk-target-min); }
+  .sl-table--wide td::before { content: attr(data-label) / ""; color: var(--vk-color-muted); font: 500 var(--vk-text-sm)/1.4 var(--vk-font-mono); text-transform: uppercase; }
+  .sl-table--wide td:first-child { width: auto; }
+}
+@media (max-width: 767px) {
+  .sl-table--stack, .sl-table--stack tbody, .sl-table--stack tr, .sl-table--stack td { display: block; }
+  .sl-table--stack thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .sl-table--stack tr { padding: var(--vk-space-2) 0; border-bottom: 1px solid var(--vk-color-line); }
+  .sl-table--stack td { display: grid; grid-template-columns: 7rem minmax(0, 1fr); gap: var(--vk-space-2); padding: 2px 0; border: 0; }
+  .sl-table--stack td::before { content: attr(data-label) / ""; color: var(--vk-color-muted); font: 500 var(--vk-text-sm)/1.4 var(--vk-font-mono); text-transform: uppercase; }
+}
+[data-vibe="studio"] .sl-more { display: flex; margin-left: auto; }
