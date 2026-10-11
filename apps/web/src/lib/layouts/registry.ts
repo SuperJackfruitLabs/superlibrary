@@ -9,9 +9,11 @@ import type { CollectionModel, CollectionsModel } from '$lib/screens/collections
 import type { ItemModel } from '$lib/screens/item.svelte';
 import CollectionDaylight from './collections/CollectionDaylight.svelte';
 import CollectionPaper from './collections/CollectionPaper.svelte';
+import CollectionQuiet from './collections/CollectionQuiet.svelte';
 import CollectionStudio from './collections/CollectionStudio.svelte';
 import CollectionsDaylight from './collections/CollectionsDaylight.svelte';
 import CollectionsPaper from './collections/CollectionsPaper.svelte';
+import CollectionsQuiet from './collections/CollectionsQuiet.svelte';
 import CollectionsStudio from './collections/CollectionsStudio.svelte';
 import ItemDaylight from './item/ItemDaylight.svelte';
 import ItemPaper from './item/ItemPaper.svelte';
@@ -25,8 +27,8 @@ export { ROWS, rowShapeFor, type RowVariant } from './rows';
 
 type Of<M> = Layouts<Component<{ model: M }>>;
 export const LAYOUTS = {
-  collection: { daylight: CollectionDaylight, paper: CollectionPaper, studio: CollectionStudio } satisfies Of<CollectionModel>,
-  collections: { daylight: CollectionsDaylight, paper: CollectionsPaper, studio: CollectionsStudio } satisfies Of<CollectionsModel>,
+  collection: { daylight: CollectionDaylight, paper: CollectionPaper, studio: CollectionStudio, quiet: CollectionQuiet } satisfies Of<CollectionModel>,
+  collections: { daylight: CollectionsDaylight, paper: CollectionsPaper, studio: CollectionsStudio, quiet: CollectionsQuiet } satisfies Of<CollectionsModel>,
   item: { daylight: ItemDaylight, paper: ItemPaper, studio: ItemStudio, quiet: ItemQuiet } satisfies Of<ItemModel>,
   library: { daylight: LibraryDaylight, paper: LibraryPaper, studio: LibraryStudio, quiet: LibraryQuiet } satisfies Of<LibraryModel>,
 };

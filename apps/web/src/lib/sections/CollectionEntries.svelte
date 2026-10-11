@@ -3,7 +3,7 @@
   import { outcomeVar } from '$kit/outcome';
   import { when } from '$lib/item';
   import type { CollectionModel } from '$lib/screens/collections.svelte';
-  let { model, variant = 'cards' }: { model: CollectionModel; variant?: 'cards' | 'numbered' | 'table' } = $props();
+  let { model, variant = 'cards' }: { model: CollectionModel; variant?: 'cards' | 'numbered' | 'table' | 'plain' } = $props();
 </script>
 
 {#if model.c}
@@ -33,6 +33,17 @@
         </li>
       {/each}
     </ol>
+  {:else if variant === 'plain'}
+    <ul class="results results--plain" role="list" aria-label="Items in this collection">
+      {#each model.c.entries as e (e.item.id)}
+        <li class="result entry" style:--o={outcomeVar(e.item.outcome)}>
+          <a class="result-link" href={`/a/${e.item.id}`}><span class="result-title">{e.item.title}</span></a>
+          <p class="sl-facts-line">Outcome: <OutcomeBadge outcome={e.item.outcome} />. <span>added {when(e.addedAt)}</span></p>
+          {#if e.note}<p class="snippet">{e.note}</p>{/if}
+          <button type="button" onclick={() => model.remove(e.item.id, e.item.title)}><span>Remove<span class="visually-hidden"> “{e.item.title}”</span> from collection</span></button>
+        </li>
+      {/each}
+    </ul>
   {:else if variant === 'table'}
     <!-- Explicit roles are deliberate: stacked by CSS, Safari would otherwise drop the table semantics. -->
     <!-- svelte-ignore a11y_no_redundant_roles -->

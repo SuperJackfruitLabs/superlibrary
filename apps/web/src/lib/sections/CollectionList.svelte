@@ -1,6 +1,6 @@
 <script lang="ts">
   import { countWords, type CollectionsModel } from '$lib/screens/collections.svelte';
-  let { model, variant = 'cards' }: { model: CollectionsModel; variant?: 'cards' | 'toc' | 'table' } = $props();
+  let { model, variant = 'cards' }: { model: CollectionsModel; variant?: 'cards' | 'toc' | 'table' | 'plain' } = $props();
 </script>
 
 {#if model.loading}
@@ -25,6 +25,12 @@
       </li>
     {/each}
   </ol>
+{:else if variant === 'plain'}
+  <ul class="items items--plain" role="list" aria-label="Collections">
+    {#each model.list as c (c.id)}
+      <li><a href={`/collections/${c.id}`}><span class="title">{c.name}</span><small>{countWords(c.itemCount)}{c.description ? ` · ${c.description}` : ''}</small></a></li>
+    {/each}
+  </ul>
 {:else if variant === 'table'}
   <!-- Explicit roles are deliberate: stacked by CSS, Safari would otherwise drop the table semantics. -->
   <!-- svelte-ignore a11y_no_redundant_roles -->

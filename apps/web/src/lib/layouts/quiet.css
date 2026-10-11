@@ -45,3 +45,11 @@
   .versions--plain .badges { display: inline; }
   .versions--plain .badges:not(:empty)::before { content: ' \00B7 ' / ''; }
 }
+/* Collections: the form's labels sit above full-width fields; lists are plain lines without a coloured edge. */
+.sl-quiet .inline-form { display: flex; flex-wrap: wrap; align-items: center; gap: var(--vk-space-3); max-width: 32rem; }
+.sl-quiet .inline-form .field { flex: 1 1 100%; }
+.sl-quiet .inline-form .field { font-weight: 700; }
+.sl-quiet .inline-form .field input { font-weight: 400; }
+.items--plain a .title { text-decoration: underline; }
+.items--plain small { font-size: inherit; }
+.results--plain .entry > button { margin-top: var(--vk-space-1); }
