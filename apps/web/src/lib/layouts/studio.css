@@ -91,3 +91,22 @@
 .sl-studio-item ~ .sl-tiles .sl-tile { align-content: start; }
 .sl-studio-item ~ .sl-tiles dd { font-size: var(--vk-text-md); }
 @media (min-width: 1024px) { .sl-studio-item ~ .sl-tiles { grid-template-columns: none; } }
+.sl-command-bar { padding-top: var(--vk-space-3); margin: 0 0 var(--vk-space-3); }
+/* An odd last panel takes the row, so the two-column grid never ends half empty. */
+@media (min-width: 800px) and (max-width: 1279px) { .sl-panels > :last-child:nth-child(odd) { grid-column: 1 / -1; } }
+/* A row with nothing in a cell does not print the label alone when stacked. */
+@media (max-width: 767px) { .sl-table--stack td:empty { display: none; } }
+@media (min-width: 768px) {
+  .sl-table--entries .entry { display: table-row; }
+  .sl-table--entries th:nth-child(1) { width: 30%; } .sl-table--entries th:nth-child(2) { width: 14%; } .sl-table--entries th:nth-child(3) { width: 16%; }
+  .sl-table--entries th:nth-child(4) { width: auto; } .sl-table--entries th:nth-child(6) { width: auto; }
+  .sl-table--entries th:nth-child(5) { width: 15rem; }
+  .sl-table--collections th:nth-child(1) { width: 32%; } .sl-table--collections th:nth-child(2) { width: 14%; } .sl-table--collections th:nth-child(3) { width: auto; }
+}
+.sl-table--entries td[data-label="Action"] button { width: 100%; }
+/* A collection's tiles hold a date and a count in words, wider than the library's counts. */
+.sl-readout-bar ~ .sl-tiles { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+.sl-readout-bar ~ .sl-tiles .sl-tile { align-content: start; }
+.sl-readout-bar ~ .sl-tiles dd { font-size: var(--vk-text-sm); }
+@media (min-width: 1024px) { .sl-readout-bar ~ .sl-tiles { grid-template-columns: none; grid-auto-columns: minmax(0, 14rem); } }
+@media (max-width: 767px) { .sl-table--stack td { align-items: baseline; } }

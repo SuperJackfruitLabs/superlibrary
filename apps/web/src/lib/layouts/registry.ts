@@ -9,8 +9,10 @@ import type { CollectionModel, CollectionsModel } from '$lib/screens/collections
 import type { ItemModel } from '$lib/screens/item.svelte';
 import CollectionDaylight from './collections/CollectionDaylight.svelte';
 import CollectionPaper from './collections/CollectionPaper.svelte';
+import CollectionStudio from './collections/CollectionStudio.svelte';
 import CollectionsDaylight from './collections/CollectionsDaylight.svelte';
 import CollectionsPaper from './collections/CollectionsPaper.svelte';
+import CollectionsStudio from './collections/CollectionsStudio.svelte';
 import ItemDaylight from './item/ItemDaylight.svelte';
 import ItemPaper from './item/ItemPaper.svelte';
 import ItemStudio from './item/ItemStudio.svelte';
@@ -21,8 +23,8 @@ export { ROWS, rowShapeFor, type RowVariant } from './rows';
 
 type Of<M> = Layouts<Component<{ model: M }>>;
 export const LAYOUTS = {
-  collection: { daylight: CollectionDaylight, paper: CollectionPaper } satisfies Of<CollectionModel>,
-  collections: { daylight: CollectionsDaylight, paper: CollectionsPaper } satisfies Of<CollectionsModel>,
+  collection: { daylight: CollectionDaylight, paper: CollectionPaper, studio: CollectionStudio } satisfies Of<CollectionModel>,
+  collections: { daylight: CollectionsDaylight, paper: CollectionsPaper, studio: CollectionsStudio } satisfies Of<CollectionsModel>,
   item: { daylight: ItemDaylight, paper: ItemPaper, studio: ItemStudio } satisfies Of<ItemModel>,
   library: { daylight: LibraryDaylight, paper: LibraryPaper, studio: LibraryStudio } satisfies Of<LibraryModel>,
 };
