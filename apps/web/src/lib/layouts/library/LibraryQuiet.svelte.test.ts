@@ -28,4 +28,18 @@ describe('Quiet: the library as a printed page', () => {
     expect(first.querySelector('.sl-facts-line')!.textContent!.replace(/\s+/g, ' ').trim()).toBe('Outcome: Completed. Artifact · Parity board · docs · out/report. Visible to: Everyone in the workspace.');
     expect(document.querySelector('.vk-face, .vk-sky')).toBeNull();
   });
+
+  it('the time line shows when time of day is on, and is absent when it is off', async () => {
+    look.phase = 'golden';
+    look.appearance = { ...look.appearance, timeStrength: 'subtle' };
+    c = mount(Page, { target: document.body });
+    await settle();
+    expect([...document.querySelectorAll('.sl-quiet > p')].some((p) => p.textContent === 'Time of day: golden hour')).toBe(true);
+    unmount(c);
+    document.body.innerHTML = '';
+    look.appearance = { ...look.appearance, timeStrength: 'off' };
+    c = mount(Page, { target: document.body });
+    await settle();
+    expect(document.body.textContent).not.toContain('Time of day');
+  });
 });

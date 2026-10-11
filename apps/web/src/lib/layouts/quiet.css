@@ -12,3 +12,11 @@
 .sl-facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 2px var(--vk-space-3); margin: var(--vk-space-2) 0; }
 .sl-facts dt { font-weight: 700; }
 .sl-facts dd { margin: 0; }
+/* The outcome word reads at the sentence's size and weight. */
+.sl-facts-line .outcome { font: inherit; font-weight: 700; }
+/* Title and facts read as one entry: the link keeps its 44px target without floating the title. */
+.results--plain .result-link { padding-block: 0; align-content: center; }
+/* A plain disclosure marker for the filters (the flex summary has none); no transition. */
+[data-vibe="quiet"] .filters summary { gap: var(--vk-space-2); cursor: pointer; }
+[data-vibe="quiet"] .filters summary::before { content: '\25B8' / ''; }
+[data-vibe="quiet"] .filters[open] summary::before { content: '\25BE' / ''; }
