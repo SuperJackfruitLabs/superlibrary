@@ -10,7 +10,7 @@
   {#if model.c.entries.length === 0}
     <p>Nothing in it yet. Open an item and choose <strong>Add to collection</strong>.</p>
   {:else if variant === 'cards'}
-    <ul class="results results--cards" aria-label="Items in this collection">
+    <ul class="results results--cards" role="list" aria-label="Items in this collection">
       {#each model.c.entries as e (e.item.id)}
         <li class="result entry" style:--o={outcomeVar(e.item.outcome)}>
           <a class="result-link" href={`/a/${e.item.id}`}>
@@ -23,12 +23,12 @@
       {/each}
     </ul>
   {:else if variant === 'numbered'}
-    <ol class="results sl-numbered" aria-label="Items in this collection">
+    <ol class="results sl-numbered" role="list" aria-label="Items in this collection">
       {#each model.c.entries as e (e.item.id)}
         <li class="result entry" style:--o={outcomeVar(e.item.outcome)}>
           <a class="result-link" href={`/a/${e.item.id}`}><span class="result-title">{e.item.title}</span></a>
           <p class="sl-byline"><OutcomeBadge outcome={e.item.outcome} /><em>added {when(e.addedAt)}</em></p>
-          {#if e.note}<blockquote class="snippet">{e.note}</blockquote>{/if}
+          {#if e.note}<p class="snippet">{e.note}</p>{/if}
           <button type="button" onclick={() => model.remove(e.item.id, e.item.title)}><span>Remove<span class="visually-hidden"> “{e.item.title}”</span> from collection</span></button>
         </li>
       {/each}

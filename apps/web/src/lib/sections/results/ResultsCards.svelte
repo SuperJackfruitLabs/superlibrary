@@ -7,7 +7,7 @@
   let { rows, label }: { rows: Row[]; label: string } = $props();
 </script>
 
-<ul class="results results--cards" aria-label={label}>
+<ul class="results results--cards" role="list" aria-label={label}>
   {#each rows as r (r.id)}
     <li class="result" style:--o={outcomeVar(r.outcome)}>
       <a class="result-link" href={`/a/${r.id}`}>

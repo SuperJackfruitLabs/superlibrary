@@ -11,13 +11,13 @@
 {:else if model.list.length === 0}
   <p>No collections yet. Create the first one above.</p>
 {:else if variant === 'cards'}
-  <ul class="items sl-collection-cards" aria-label="Collections">
+  <ul class="items sl-collection-cards" role="list" aria-label="Collections">
     {#each model.list as c (c.id)}
       <li><a href={`/collections/${c.id}`}><span class="title">{c.name}</span><small>{countWords(c.itemCount)}{c.description ? ` · ${c.description}` : ''}</small></a></li>
     {/each}
   </ul>
 {:else if variant === 'toc'}
-  <ol class="items sl-toc" aria-label="Collections">
+  <ol class="items sl-toc" role="list" aria-label="Collections">
     {#each model.list as c (c.id)}
       <li>
         <a href={`/collections/${c.id}`}><span class="title">{c.name}</span><span class="sl-leader" aria-hidden="true"></span><span class="sl-toc-count">{countWords(c.itemCount)}</span></a>

@@ -68,14 +68,16 @@
 .sl-toc .title { font: 500 var(--vk-text-md)/1.3 var(--vk-font-display); }
 .sl-leader { flex: 1; border-bottom: 1px dotted var(--vk-color-faint); }
 .sl-toc-count { flex: none; white-space: nowrap; }
-.sl-toc-desc { margin: calc(-1 * var(--vk-space-2)) 0 var(--vk-space-3); color: var(--vk-color-muted); }
-.sl-letter-body { font: 400 var(--vk-text-md)/1.6 var(--vk-font-display); }
-.sl-numbered { padding-left: var(--vk-space-5); list-style: decimal; }
-.sl-numbered { margin-left: var(--vk-space-2); }
-.sl-numbered .result { display: list-item; padding: var(--vk-space-3) 0 var(--vk-space-3) var(--vk-space-1); border-left: 0; border-bottom: 1px solid var(--vk-color-line); }
-.sl-numbered::marker, .sl-numbered .result::marker { color: var(--vk-color-muted); font-family: var(--vk-font-display); }
+.sl-toc-desc { margin: calc(-1 * var(--vk-space-2)) 0 0; color: var(--vk-color-muted); }
+.sl-toc li { margin-bottom: var(--vk-space-3); }
+.sl-toc li:has(.sl-toc-desc) a { padding-bottom: 0; }
+.sl-letter-body { margin: 0 0 var(--vk-space-3); font: 400 var(--vk-text-md)/1.6 var(--vk-font-display); }
+.sl-numbered { padding: 0; counter-reset: sl-n; }
+.sl-numbered .result { display: block; position: relative; counter-increment: sl-n; padding: var(--vk-space-3) 0 var(--vk-space-3) var(--vk-space-5); border-left: 0; border-bottom: 1px solid var(--vk-color-line); }
+.sl-numbered .result::before { content: counter(sl-n) '.' / ''; position: absolute; left: 0; top: calc(var(--vk-space-3) + var(--vk-space-2)); line-height: 1.25; color: var(--vk-color-muted); font: 500 var(--vk-text-lg)/1.25 var(--vk-font-display); }
 .sl-numbered .result-title { font: 500 var(--vk-text-lg)/1.25 var(--vk-font-display); }
-.sl-numbered .result-link { padding-block: 0; }
+.sl-numbered .result-link { box-sizing: border-box; padding-block: var(--vk-space-2); align-content: start; }
 .sl-numbered .sl-byline { margin: var(--vk-space-1) 0 0; }
 .sl-numbered button { margin-top: var(--vk-space-2); }
 .sl-numbered .snippet { display: block; margin: var(--vk-space-2) 0; padding-left: var(--vk-space-3); border-left: 2px solid var(--vk-color-line); font-family: var(--vk-font-display); }
+@media (max-width: 639px) { .sl-underline .inline-form .field { flex-basis: 100%; } }

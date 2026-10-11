@@ -14,6 +14,6 @@
     <p class="sl-dateline">{model.meta}</p>
   </header>
   {#if c.description}<p class="body sl-letter-body">{c.description}</p>{/if}
-  <CollectionActions {model} />
+  <div class="sl-underline"><CollectionActions {model} /></div>
   <CollectionEntries {model} variant="numbered" />
 </div>
