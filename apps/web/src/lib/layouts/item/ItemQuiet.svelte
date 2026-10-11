@@ -22,11 +22,11 @@
 <div class="sl-quiet">
   <p><a class="sl-back" href="/">← Library</a></p>
   <h1>{item.title}</h1>
-  <dl class="sl-facts item-meta">
-    <dt>Outcome</dt><dd><OutcomeBadge outcome={item.outcome} /></dd>
-    {#if model.versionWords}<dt>Version</dt><dd>{model.versionWords}</dd>{/if}
-    <dt>Visible to</dt><dd>{model.visibility}</dd>
-    {#if model.deleteWords}<dt>Delete date</dt><dd>{model.deleteWords}</dd>{/if}
+  <dl class="sl-facts">
+    <div><dt>Outcome</dt><dd><OutcomeBadge outcome={item.outcome} /></dd></div>
+    {#if model.versionWords}<div><dt>Version</dt><dd>{model.versionWords}</dd></div>{/if}
+    <div><dt>Visible to</dt><dd>{model.visibility}</dd></div>
+    {#if model.deleteWords}<div><dt>Delete date</dt><dd>{model.deleteWords}</dd></div>{/if}
   </dl>
 
   {#if item.kind === 'artifact'}

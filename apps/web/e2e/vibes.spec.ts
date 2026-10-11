@@ -1,7 +1,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import { mkdirSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
-import { devWorkspace, expectNoSideways, seedWorkRecordLocal, shortControls, uploadViaApi } from './helpers';
+import { DEV, devWorkspace, expectNoSideways, seedWorkRecordLocal, shortControls, uploadViaApi } from './helpers';
 import { VIBES_E2E, seedCollection, useAppearance } from './vibes';
 
 /** Every key screen in every vibe and theme: accessible, no sideways scroll, 44px targets, a screenshot to look at. Chromium only (playwright.config.ts). */
@@ -12,6 +12,9 @@ let paths: Array<[string, string]> = [];
 test.beforeAll(async ({ request }) => {
   const ws = await devWorkspace(request);
   const art = await uploadViaApi(request, [{ path: 'v.md', body: '# Vibe check\n\nA paragraph.' }], { title: 'Vibe check artifact' });
+  // A delete date adds a fourth fact: the title budget is measured with the most facts the header can hold.
+  const dated = await request.patch(`http://localhost:8787/api/v1/items/${art.itemId}`, { headers: DEV, data: { expiresAt: '2030-01-15T00:00:00.000Z' } });
+  if (!dated.ok()) throw new Error(`delete date: ${dated.status()} ${await dated.text()}`);
   const rec = seedWorkRecordLocal({ ws, title: 'Vibe check record', text: 'vibe check', outcome: 'approved' });
   // The longest outcome words, so the library's table and tiles are measured with them.
   seedWorkRecordLocal({ ws, title: 'Vibe check superseded', text: 'vibe check', outcome: 'superseded' });
