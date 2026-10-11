@@ -13,7 +13,10 @@ describe('an enclosure', () => {
     c = mount(Enclosure, { target: document.body, props: { id: 'v', title: 'Versions', summary: '2 versions', children: body } });
     flushSync();
     const region = document.querySelector('section.sl-enclosure')!;
-    expect(document.getElementById(region.getAttribute('aria-labelledby')!)!.tagName).toBe('H2');
+    // The region and the heading are both named by the title alone; the summary is only in the button.
+    expect(document.getElementById(region.getAttribute('aria-labelledby')!)!.textContent).toBe('Versions');
+    const h2 = document.querySelector('h2')!;
+    expect(document.getElementById(h2.getAttribute('aria-labelledby')!)!.textContent).toBe('Versions');
     const b = document.querySelector<HTMLButtonElement>('h2 > button.sl-enclosure-toggle')!;
     const panel = document.getElementById(b.getAttribute('aria-controls')!)!;
     expect(b.getAttribute('aria-expanded')).toBe('false');

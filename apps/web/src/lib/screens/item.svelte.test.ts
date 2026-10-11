@@ -39,6 +39,20 @@ describe('the item page model', () => {
     expect(m.tabTitle).toBe('Report');
   });
 
+  it('says what is inside each enclosure, from data', async () => {
+    reply = () => Response.json({ item, versions: [v(2, { totalBytes: 1234 }), v(1)] });
+    const m = make({ itemId: ID });
+    await settle();
+    expect(m.versionsSummary).toBe('2 versions · v2 latest');
+    expect(m.detailsSummary).toBe('Markdown · 1.2 KB');
+    expect(m.artifactsSummary).toBe('');
+    stop!();
+    reply = () => Response.json({ item, versions: [v(1)] });
+    const one = make({ itemId: ID });
+    await settle();
+    expect(one.versionsSummary).toBe('1 version · v1 latest');
+  });
+
   it('a bad id is refused without asking; an unreachable library offers Try again', async () => {
     const calls: string[] = [];
     reply = (p) => { calls.push(p); throw new TypeError('offline'); };

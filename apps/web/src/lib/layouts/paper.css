@@ -34,14 +34,20 @@
 .sl-letterhead h1 { margin: var(--vk-space-1) 0; font: 500 var(--vk-text-lg)/1.2 var(--vk-font-display); overflow-wrap: anywhere; }
 .viewer.sl-sheet { box-shadow: inset 0 0 0 1px var(--vk-color-line); border-radius: var(--vk-radius-sm); background: var(--vk-color-surface); }
 .sl-letter-col { max-width: 720px; }
-.sl-letter dl.rows { grid-template-columns: minmax(0, 1fr); }
-.sl-letter dt { font-weight: 700; color: var(--vk-color-text); }
+.sl-letter dl.rows { display: block; }
+.sl-letter dt { display: inline; font-weight: 700; color: var(--vk-color-text); }
+.sl-letter dt::after { content: '\2002' / ''; }
+.sl-letter dd { display: inline; }
+.sl-letter dd::after { content: ''; display: block; margin-bottom: var(--vk-space-2); }
+/* The record's line reads as a dateline: board, a dot, the stage. */
+.sl-letter-col .result-meta { display: flex; flex-wrap: wrap; gap: 0 var(--vk-space-2); margin: 0 0 var(--vk-space-3); font-style: italic; }
+.sl-letter-col .result-meta span + span::before { content: '\00b7' / ''; margin-right: var(--vk-space-2); }
 .sl-enclosed-h { margin: var(--vk-space-5) 0 var(--vk-space-2); font: 500 var(--vk-text-md)/1.2 var(--vk-font-display); font-style: italic; }
 .sl-enclosure { border-top: 1px solid var(--vk-color-line); }
 .sl-enclosure h2 { margin: 0; font-size: inherit; }
 .sl-enclosure-toggle { display: flex; width: 100%; justify-content: space-between; gap: var(--vk-space-3); min-height: var(--vk-target-min); padding: var(--vk-space-2) 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; text-align: left; font: 500 var(--vk-text-md)/1.3 var(--vk-font-display); }
-.sl-enclosure-toggle::after { content: "+" / ""; color: var(--vk-color-muted); }
-.sl-enclosure-toggle[aria-expanded="true"]::after { content: "−" / ""; }
+.sl-enclosure-toggle::after { content: ''; flex: none; align-self: center; width: 0.5em; height: 0.5em; border: solid var(--vk-color-muted); border-width: 0 2px 2px 0; transform: rotate(-45deg); transition: transform var(--vk-motion-fast) var(--vk-motion-easing); }
+.sl-enclosure-toggle[aria-expanded="true"]::after { transform: rotate(45deg); }
 .sl-enclosure-sum { margin-left: auto; color: var(--vk-color-muted); font: 400 var(--vk-text-sm)/1.3 var(--vk-font-body); }
 .sl-enclosure-body { padding: 0 0 var(--vk-space-4); }
 .sl-enclosure-fade { animation: sl-fade var(--vk-motion-base) var(--vk-motion-easing); }

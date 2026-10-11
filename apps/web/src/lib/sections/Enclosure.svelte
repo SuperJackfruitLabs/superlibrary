@@ -9,7 +9,7 @@
   onMount(() => { if (openFrom !== null && window.matchMedia(`(min-width: ${openFrom}px)`).matches) open = true; });
 </script>
 
-<section class="sl-enclosure" aria-labelledby={`${id}-h`}>
+<section class="sl-enclosure" aria-labelledby={`${id}-t`}>
   <h2 id={`${id}-h`} aria-labelledby={`${id}-t`}>
     <button type="button" class="sl-enclosure-toggle" aria-expanded={open} aria-controls={`${id}-body`} onclick={() => { touched = true; open = !open; }}>
       <span class="sl-enclosure-title" id={`${id}-t`}>{title}</span>{#if summary}<span class="sl-enclosure-sum">{summary}</span>{/if}
