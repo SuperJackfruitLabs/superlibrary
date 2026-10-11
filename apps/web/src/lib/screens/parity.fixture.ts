@@ -119,8 +119,9 @@ export const PARITY: Record<'library' | 'artifact' | 'record' | 'collections' | 
     { role: 'link', name: 'Upload a new version' },
     { css: '.viewer', what: 'the viewer' },
     { heading: 'Versions' },
-    { in: 'li, tr', together: ['v2', `${when(VERSIONS[0]!.createdAt)} · ${formatBytes(2048)} · 2 files`, 'Shown', 'Latest', 'Secret scan overridden', 'Revoke version 2'] },
-    { in: 'li, tr', together: ['v1', `${when(VERSIONS[1]!.createdAt)} · ${formatBytes(512)} · 1 file`, 'Revoked'] },
+    // V2-V3 by parts: Studio's table gives uploaded, size and files their own columns.
+    { in: 'li, tr', together: ['v2', when(VERSIONS[0]!.createdAt), formatBytes(2048), '2 files', 'Shown', 'Latest', 'Secret scan overridden', 'Revoke version 2'] },
+    { in: 'li, tr', together: ['v1', when(VERSIONS[1]!.createdAt), formatBytes(512), '1 file', 'Revoked'] },
     { role: 'link', name: 'v2' }, { plain: 'v1' },
     { role: 'button', name: 'Revoke version 2' },
     { heading: 'Details · version 2' },
