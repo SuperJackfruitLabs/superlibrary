@@ -88,9 +88,12 @@ test.describe('the person’s appearance', () => {
   });
 
   test('an old Light or Dark choice carries over', async ({ page, context }) => {
+    // Noon, so following the sun alone would be light: dark can only come from the old choice.
+    await page.clock.setFixedTime(new Date('2026-06-21T12:00:00'));
     await context.addInitScript(() => { if (!document.cookie.includes('vk_appearance')) localStorage.setItem('superlibrary:theme', 'dark'); });
     await page.goto('/');
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
-    expect((await context.cookies()).find((c) => c.name === 'vk_appearance')?.value).toBe('daylight.dark.strong.0');
+    // The app writes the cookie after mount; wait for it rather than reading once.
+    await expect.poll(async () => (await context.cookies()).find((c) => c.name === 'vk_appearance')?.value).toBe('daylight.dark.strong.0');
   });
 });
