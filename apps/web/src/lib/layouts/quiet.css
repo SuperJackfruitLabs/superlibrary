@@ -1,0 +1,14 @@
+/* Quiet layouts (spec §5): one column, everything open, visible labels, no decoration, no motion. */
+.sl-quiet { max-width: 720px; }
+.searchbar-label { display: block; margin: 0 0 var(--vk-space-1); font-weight: 700; }
+.sl-quiet .searchbar { flex-wrap: wrap; }
+.sl-quiet .searchbar-label { flex-basis: 100%; }
+.results--plain .result { padding: var(--vk-space-3) 0; border-left: 0; border-bottom: 1px solid var(--vk-color-line); }
+.results--plain .result-link { text-decoration: underline; }
+.results--plain .snippet { display: block; -webkit-line-clamp: unset; }
+.sl-facts-line { margin: var(--vk-space-1) 0; }
+.sl-facts-line .outcome::before { display: none; }
+.sl-back { display: inline-flex; align-items: center; min-height: var(--vk-target-min); }
+.sl-facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 2px var(--vk-space-3); margin: var(--vk-space-2) 0; }
+.sl-facts dt { font-weight: 700; }
+.sl-facts dd { margin: 0; }

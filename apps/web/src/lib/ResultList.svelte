@@ -7,10 +7,11 @@
   import ResultsIndex from '$lib/sections/results/ResultsIndex.svelte';
   import ResultsCards from '$lib/sections/results/ResultsCards.svelte';
   import ResultsTable from '$lib/sections/results/ResultsTable.svelte';
+  import ResultsPlain from '$lib/sections/results/ResultsPlain.svelte';
 
   let { rows, label, variant }: { rows: Row[]; label: string; variant?: RowVariant } = $props();
-  // Phase 4 adds plain. Until then a vibe's rows fall back to cards.
-  const SHAPES: Partial<Record<RowVariant, Component<{ rows: Row[]; label: string }>>> = { cards: ResultsCards, index: ResultsIndex, table: ResultsTable };
+  // A shape with no component here falls back to cards.
+  const SHAPES: Partial<Record<RowVariant, Component<{ rows: Row[]; label: string }>>> = { cards: ResultsCards, index: ResultsIndex, table: ResultsTable, plain: ResultsPlain };
   const Shape = $derived(SHAPES[variant ?? ROWS[look.appearance.vibe]] ?? ResultsCards);
 </script>
 
