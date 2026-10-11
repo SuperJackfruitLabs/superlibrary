@@ -14,9 +14,9 @@ import Page from '../../../routes/+page.svelte';
 
 let c: ReturnType<typeof mount> | null = null;
 const settle = async () => { for (let i = 0; i < 8; i++) { await new Promise((r) => setTimeout(r, 0)); flushSync(); } };
-const was = look.appearance.vibe;
+const was = { vibe: look.appearance.vibe, timeStrength: look.appearance.timeStrength, phase: look.phase };
 beforeEach(() => { window.matchMedia = ((q: string) => ({ matches: false, media: q, addEventListener() {}, removeEventListener() {} })) as unknown as typeof window.matchMedia; look.appearance = { ...look.appearance, vibe: 'quiet' }; });
-afterEach(() => { pg.url = new URL('http://localhost/'); ctl.fail = false; ctl.hold = null; if (c) unmount(c); c = null; document.body.innerHTML = ''; look.appearance = { ...look.appearance, vibe: was }; });
+afterEach(() => { pg.url = new URL('http://localhost/'); ctl.fail = false; ctl.hold = null; if (c) unmount(c); c = null; document.body.innerHTML = ''; look.appearance = { ...look.appearance, vibe: was.vibe, timeStrength: was.timeStrength }; look.phase = was.phase; });
 
 describe('Quiet: the library as a printed page', () => {
   it('a visible search label, filters open, plain rows that say their facts in words, no faces and no sky', async () => {

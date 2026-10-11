@@ -1,6 +1,7 @@
 <script lang="ts">
   import { untrack } from 'svelte';
   import { Segmented, VIBES } from '@superjackfruit/vibekit';
+  import Button from '$kit/Button.svelte';
   import { holdModal } from '$kit/modal';
   import { chooseLocation, chooseStrength, chooseTheme, chooseVibe, look } from './appearance.svelte';
   import { VIBE_WORDS } from './copy';
@@ -48,6 +49,6 @@
     <label class="check"><input type="checkbox" checked={look.appearance.useLocation} onchange={location} /> Use my location for the sun</label>
     <p class="muted sl-setting-hint" role="status">{locationNote ?? 'A rough location that never leaves this device. Without it, the day runs 6:00 to 18:00 in your time zone.'}</p>
     <p class="muted">Saved in this browser for Superlibrary.</p>
-    <div class="modal-actions"><button type="button" class="kit-button kit-button--primary" onclick={onclose}>Done</button></div>
+    <div class="modal-actions"><Button variant="primary" onclick={onclose}>Done</Button></div>
   </div>
 </div>

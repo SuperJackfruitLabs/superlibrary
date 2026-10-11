@@ -17,7 +17,21 @@ export function holdModal(dialog: HTMLElement, onEscape: () => void, returnTo: H
       if (sib !== node && !sib.hasAttribute('inert')) { sib.setAttribute('inert', ''); inerted.push(sib); }
     }
   }
-  const focusables = () => [...dialog.querySelectorAll<HTMLElement>(FOCUSABLE)];
+  // The Tab stops, as the browser would have them: nothing taken out of the order (a roving group's
+  // tabindex=-1 items) and one stop per radio group, its checked radio (the first when none is).
+  const focusables = () => {
+    const seen = new Set<string>();
+    return [...dialog.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((el) => {
+      if (el.tabIndex < 0) return false;
+      if (!(el instanceof HTMLInputElement) || el.type !== 'radio' || !el.name) return true;
+      if (seen.has(el.name)) return false;
+      const group = [...dialog.querySelectorAll<HTMLInputElement>('input[type="radio"]:not([disabled])')].filter((r) => r.name === el.name);
+      const stop = group.find((r) => r.checked) ?? group[0];
+      if (el !== stop) return false;
+      seen.add(el.name);
+      return true;
+    });
+  };
   const start = () => (dialog.querySelector<HTMLElement>('[data-autofocus]:not([disabled])') ?? focusables()[0] ?? dialog).focus();
   start();
 
@@ -35,8 +49,16 @@ export function holdModal(dialog: HTMLElement, onEscape: () => void, returnTo: H
     e.preventDefault();
     const f = focusables();
     if (f.length === 0) return;
-    const i = f.indexOf(doc.activeElement as HTMLElement);
-    const next = e.shiftKey ? (i <= 0 ? f.length - 1 : i - 1) : (i === -1 || i === f.length - 1 ? 0 : i + 1);
+    const at = doc.activeElement as HTMLElement | null;
+    const i = f.indexOf(at as HTMLElement);
+    let next: number;
+    if (i === -1 && at && dialog.contains(at)) {
+      // Focus is on something that is not a stop (an unchecked radio, a roving item): move from where it sits.
+      const after = f.findIndex((el) => (at.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0);
+      next = e.shiftKey ? ((after === -1 ? f.length : after) - 1 + f.length) % f.length : (after === -1 ? 0 : after);
+    } else {
+      next = e.shiftKey ? (i <= 0 ? f.length - 1 : i - 1) : (i === -1 || i === f.length - 1 ? 0 : i + 1);
+    }
     f[next]!.focus();
   };
   // Focus can still land outside (a click on the backdrop in WebKit, a screen reader): bring it back.

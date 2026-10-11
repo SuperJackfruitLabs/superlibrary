@@ -33,7 +33,8 @@ function timeZone(): string | undefined {
 function place(): Place | undefined {
   try {
     const p = JSON.parse(read(PLACE_KEY) ?? 'null') as Place | null;
-    if (p && Math.abs(p.latitude) <= 90 && Math.abs(p.longitude) <= 180) return { latitude: p.latitude, longitude: p.longitude };
+    // Numbers only: Math.abs(null) is 0 and Math.abs("12") is 12, so a junk place would pass a range check alone.
+    if (p && Number.isFinite(p.latitude) && Number.isFinite(p.longitude) && Math.abs(p.latitude) <= 90 && Math.abs(p.longitude) <= 180) return { latitude: p.latitude, longitude: p.longitude };
   } catch { /* junk: no place */ }
   return undefined;
 }

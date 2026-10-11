@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_APPEARANCE } from '@superjackfruit/vibekit';
-import { OLD_THEME_KEY, PLACE_KEY, chooseLocation, chooseVibe, initAppearance, look, setAppearance } from './appearance.svelte';
+import { OLD_THEME_KEY, PLACE_KEY, chooseLocation, chooseVibe, initAppearance, look, phaseFor, setAppearance } from './appearance.svelte';
 
 const html = () => document.documentElement;
 const attrs = () => ({ vibe: html().dataset.vibe, theme: html().dataset.theme, phase: html().dataset.phase, time: html().dataset.time });
@@ -126,6 +126,18 @@ describe('the appearance setting', () => {
     expect(() => { stop = initAppearance(document, noon); }).not.toThrow();
     expect(() => setAppearance({ ...DEFAULT_APPEARANCE, vibe: 'studio' })).not.toThrow();
     expect(attrs().vibe).toBe('studio');
+  });
+
+  it('a stored place that is not two numbers is no place: the time zone is used', () => {
+    // A zone far from Greenwich, so the equator at longitude 0 (what null would read as) gives other phases.
+    const zone = Intl.DateTimeFormat.prototype.resolvedOptions;
+    vi.spyOn(Intl.DateTimeFormat.prototype, 'resolvedOptions').mockImplementation(function (this: Intl.DateTimeFormat) { return { ...zone.call(this), timeZone: 'Asia/Tokyo' }; });
+    const hours = Array.from({ length: 24 }, (_, h) => new Date(Date.UTC(2026, 9, 11, h, 0)));
+    const byZone = hours.map((t) => phaseFor({ ...DEFAULT_APPEARANCE, useLocation: false }, t));
+    for (const junk of [{ latitude: null, longitude: null }, { latitude: '12', longitude: '77' }, { latitude: 12 }]) {
+      localStorage.setItem(PLACE_KEY, JSON.stringify(junk));
+      expect(hours.map((t) => phaseFor({ ...DEFAULT_APPEARANCE, useLocation: true }, t)), JSON.stringify(junk)).toEqual(byZone);
+    }
   });
 
   it('location is rounded to about 10 km and kept on this device; a refusal turns it off', async () => {
