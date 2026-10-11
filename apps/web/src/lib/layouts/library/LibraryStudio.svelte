@@ -23,7 +23,7 @@
   {#if look.appearance.timeStrength !== 'off'}<p class="sl-readout" aria-hidden="true"><span class="sl-led sl-led--sun"></span>{readout(look.now, look.phase)}</p>{/if}
   <Button variant="primary" href="/upload">Upload</Button>
 </div>
-{#if !model.error && !(model.loading && model.rows.length === 0)}<Tiles label="Summary" {tiles} />{/if}
+{#if !model.error && !model.refreshing}<Tiles label="Summary" {tiles} />{/if}
 <div class="sl-studio-bar">
   <SearchForm {model} />
   <FilterBar filters={model.filters} facets={model.facets} onchange={(f) => void model.setFilters(f)} openFrom={1024} />

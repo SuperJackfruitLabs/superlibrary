@@ -68,4 +68,30 @@ describe('the library home model', () => {
     expect(calls.filter((c) => c.path === '/api/v1/browse')).toHaveLength(0);
     expect(m.rows).toEqual([]);
   });
+
+  it('says it is refreshing for a new query (the rows on screen are the old one), not for More', async () => {
+    let release!: () => void;
+    const held = new Promise<void>((r) => { release = r; });
+    browse = (n) => Response.json({ items: [item(n)], next: 'c1', counts: {} });
+    const { m } = make();
+    await settle();
+    expect(m.refreshing).toBe(false);
+    const firstRows = m.rows.length;
+    const slow = browse;
+    browse = (n, b) => slow(n, b);
+    // More: loading, but the counts and rows are still this query's
+    const more = m.more();
+    expect(m.loading).toBe(true);
+    expect(m.refreshing).toBe(false);
+    await more;
+    expect(m.rows.length).toBe(firstRows + 1);
+    // A new query: the old rows stay until the answer lands, and refreshing says they are stale
+    m.setFilters({ ...m.filters, outcomes: ['failed'] });
+    await Promise.resolve();
+    expect(m.refreshing).toBe(true);
+    expect(m.rows.length).toBe(firstRows + 1);
+    release();
+    await settle();
+    expect(m.refreshing).toBe(false);
+  });
 });
