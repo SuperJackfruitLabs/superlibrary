@@ -8,8 +8,9 @@ import Page from '../../../routes/+page.svelte';
 
 let c: ReturnType<typeof mount> | null = null;
 const settle = async () => { for (let i = 0; i < 8; i++) { await new Promise((r) => setTimeout(r, 0)); flushSync(); } };
+const was = look.appearance.vibe;
 beforeEach(() => { window.matchMedia = ((q: string) => ({ matches: false, media: q, addEventListener() {}, removeEventListener() {} })) as unknown as typeof window.matchMedia; look.appearance = { ...look.appearance, vibe: 'paper' }; });
-afterEach(() => { if (c) unmount(c); c = null; document.body.innerHTML = ''; });
+afterEach(() => { if (c) unmount(c); c = null; document.body.innerHTML = ''; look.appearance = { ...look.appearance, vibe: was }; });
 
 describe('Paper: the library as a front page', () => {
   it('a masthead, the filters beside the results, and the rows as an index', async () => {

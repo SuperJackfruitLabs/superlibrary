@@ -18,7 +18,7 @@
 <div class="sl-underline"><SearchForm {model} /></div>
 <div class="sl-paper-columns">
   <div class="sl-paper-side">
-    <FilterBar filters={model.filters} facets={model.facets} onchange={(f) => void model.setFilters(f)} openFrom={1024} />
+    <FilterBar filters={model.filters} facets={model.facets} onchange={(f) => void model.setFilters(f)} />
     <LibraryStatus {model} />
   </div>
   <div class="sl-paper-main"><LibraryResults {model} /></div>

@@ -8,12 +8,21 @@
 @media (min-width: 1024px) {
   .sl-paper-columns { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: var(--vk-space-6); }
   .sl-paper-main { grid-column: 1; grid-row: 1; }
-  .sl-paper-side { grid-column: 2; grid-row: 1; align-self: start; position: sticky; top: var(--vk-space-4); }
+  .sl-paper-side { grid-column: 2; grid-row: 1; align-self: start; }
   .sl-paper-side .filter-grid { grid-template-columns: minmax(0, 1fr); }
 }
 .results--index .result { padding: var(--vk-space-3) 0; border-left: 0; border-bottom: 1px solid var(--vk-color-line); }
 .results--index .result-title { font: 500 var(--vk-text-lg)/1.25 var(--vk-font-display); }
 .results--index .result-meta { margin: var(--vk-space-1) 0 0; }
-.sl-byline { display: flex; flex-wrap: wrap; align-items: center; gap: var(--vk-space-2); margin: 0; color: var(--vk-color-muted); }
+.sl-byline { font-style: italic; display: flex; flex-wrap: wrap; align-items: center; gap: var(--vk-space-2); margin: 0; color: var(--vk-color-muted); }
 .results--index .snippet { display: block; margin: var(--vk-space-2) 0 0; padding-left: var(--vk-space-3); border-left: 2px solid var(--vk-color-line); font-family: var(--vk-font-display); -webkit-line-clamp: unset; }
 [data-vibe="paper"] .sl-more { display: flex; margin-inline: auto; }
+/* The status line sits in the page's rhythm, not in a notice's padding. */
+.sl-paper-side [role="status"] { margin: 0; }
+/* Title and byline read as one entry: the link keeps its 44px target without floating the title. */
+.results--index .result-link { padding-block: 0; align-content: center; }
+.results--index .result-meta span:not(.outcome)::before { content: '\00b7'; margin-right: calc(-1 * var(--vk-space-2)); }
+/* A disclosure marker for the filters (the flex summary has none). */
+[data-vibe="paper"] .filters summary { gap: var(--vk-space-2); cursor: pointer; }
+[data-vibe="paper"] .filters summary::before { content: ''; width: 0.5em; height: 0.5em; border: solid currentColor; border-width: 0 2px 2px 0; transform: rotate(-45deg); transition: transform var(--vk-motion-fast) var(--vk-motion-easing); }
+[data-vibe="paper"] .filters[open] summary::before { transform: rotate(45deg); }
