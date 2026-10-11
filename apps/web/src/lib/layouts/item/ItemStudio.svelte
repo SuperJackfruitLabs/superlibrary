@@ -62,7 +62,7 @@
     <section class="sl-panel" aria-labelledby="details-h"><h2 id="details-h">{model.detailsHeading}</h2><DetailsSection {model} /></section>
   {:else if model.record}
     <section class="sl-panel sl-panel--wide" aria-labelledby="timeline-h"><h2 id="timeline-h">Timeline</h2><Timeline view={model.record} variant="log" /></section>
-    <section class="sl-panel" aria-labelledby="record-h"><h2 id="record-h" class="visually-hidden">Record</h2><RecordLine view={model.record} />{#if model.hasSpec}<h2>Spec</h2><SpecRows view={model.record} />{/if}</section>
+    <section class="sl-panel" aria-labelledby={model.hasSpec ? 'spec-h' : undefined}><RecordLine view={model.record} />{#if model.hasSpec}<h2 id="spec-h">Spec</h2><SpecRows view={model.record} />{/if}</section>
     <section class="sl-panel" aria-labelledby="artifacts-h"><h2 id="artifacts-h">Artifacts</h2><LinkedArtifacts view={model.record} /></section>
   {:else}
     <RecordFailed {model} />

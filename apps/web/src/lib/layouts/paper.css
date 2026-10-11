@@ -15,6 +15,7 @@
 .results--index .result-title { font: 500 var(--vk-text-lg)/1.25 var(--vk-font-display); }
 .results--index .result-meta { margin: var(--vk-space-1) 0 0; }
 .sl-byline { font-style: italic; display: flex; flex-wrap: wrap; align-items: center; gap: var(--vk-space-2); margin: 0; color: var(--vk-color-muted); }
+.sl-byline-label { font-style: normal; }
 .results--index .snippet { display: block; margin: var(--vk-space-2) 0 0; padding-left: var(--vk-space-3); border-left: 2px solid var(--vk-color-line); font-family: var(--vk-font-display); -webkit-line-clamp: unset; }
 [data-vibe="paper"] .sl-more { display: flex; margin-inline: auto; }
 /* The status line sits in the page's rhythm, not in a notice's padding. */
@@ -44,7 +45,7 @@
 .sl-letter-col .result-meta span + span::before { content: '\00b7' / ''; margin-right: var(--vk-space-2); }
 .sl-enclosed-h { margin: var(--vk-space-5) 0 var(--vk-space-2); font: 500 var(--vk-text-md)/1.2 var(--vk-font-display); font-style: italic; }
 .sl-enclosure { border-top: 1px solid var(--vk-color-line); }
-.sl-enclosure h2 { margin: 0; font-size: inherit; }
+.sl-enclosure :is(h2, h3) { margin: 0; font-size: inherit; }
 .sl-enclosure-toggle { display: flex; width: 100%; justify-content: space-between; gap: var(--vk-space-3); min-height: var(--vk-target-min); padding: var(--vk-space-2) 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; text-align: left; font: 500 var(--vk-text-md)/1.3 var(--vk-font-display); }
 .sl-enclosure-toggle::after { content: ''; flex: none; align-self: center; width: 0.5em; height: 0.5em; border: solid var(--vk-color-muted); border-width: 0 2px 2px 0; transform: rotate(-45deg); transition: transform var(--vk-motion-fast) var(--vk-motion-easing); }
 .sl-enclosure-toggle[aria-expanded="true"]::after { transform: rotate(45deg); }
@@ -63,13 +64,12 @@
 /* Collections (spec §5): a table of contents, and numbered enclosures. */
 .sl-standfirst { max-width: 720px; margin: 0 0 var(--vk-space-4); font: italic 400 var(--vk-text-md)/1.5 var(--vk-font-display); color: var(--vk-color-muted); }
 .sl-toc { list-style: none; padding: 0; }
-.sl-toc li { border-bottom: 0; }
 .sl-toc a { flex-direction: row; align-items: baseline; gap: var(--vk-space-2); }
 .sl-toc .title { font: 500 var(--vk-text-md)/1.3 var(--vk-font-display); }
 .sl-leader { flex: 1; border-bottom: 1px dotted var(--vk-color-faint); }
 .sl-toc-count { flex: none; white-space: nowrap; }
 .sl-toc-desc { margin: calc(-1 * var(--vk-space-2)) 0 0; color: var(--vk-color-muted); }
-.sl-toc li { margin-bottom: var(--vk-space-3); }
+.sl-toc li { margin-bottom: var(--vk-space-3); border-bottom: 0; }
 .sl-toc li:has(.sl-toc-desc) a { padding-bottom: 0; }
 .sl-letter-body { margin: 0 0 var(--vk-space-3); font: 400 var(--vk-text-md)/1.6 var(--vk-font-display); }
 .sl-numbered { padding: 0; counter-reset: sl-n; }

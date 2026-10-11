@@ -53,6 +53,24 @@ describe('the item page model', () => {
     expect(one.versionsSummary).toBe('1 version · v1 latest');
   });
 
+  it('the timeline, related and collections summaries count correctly, one and many', async () => {
+    reply = () => Response.json({ item, versions: [v(1)] });
+    const m = make({ itemId: ID });
+    await settle();
+    const rec = (handoffs: number) => ({ record: { createdAt: '2026-10-01T00:00:00.000Z', archivedAt: null, comments: [], gates: [],
+      handoffs: Array.from({ length: handoffs }, (_, i) => ({ runId: `r${i}`, stage: 'draft', agent: null, startedAt: null, endedAt: null, attempt: i + 1, status: 'completed', handoff: null, failureReason: null })) } });
+    m.record = rec(0) as unknown as typeof m.record;
+    expect(m.timelineSummary).toBe('1 entry');
+    m.record = rec(2) as unknown as typeof m.record;
+    expect(m.timelineSummary).toBe('3 entries');
+    // Still looking (or failed): no summary rather than a wrong one.
+    expect([m.relatedSummary, m.collectionsSummary]).toEqual(['', '']);
+    m.relatedCount = 1; m.collectionCount = 1;
+    expect([m.relatedSummary, m.collectionsSummary]).toEqual(['1 item', '1 collection']);
+    m.relatedCount = 0; m.collectionCount = 3;
+    expect([m.relatedSummary, m.collectionsSummary]).toEqual(['0 items', '3 collections']);
+  });
+
   it('a bad id is refused without asking; an unreachable library offers Try again', async () => {
     const calls: string[] = [];
     reply = (p) => { calls.push(p); throw new TypeError('offline'); };
