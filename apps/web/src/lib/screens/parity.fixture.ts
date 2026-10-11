@@ -1,6 +1,7 @@
 /** The inventory (spec §6) as data, and an API that answers with all of it. Used only by tests. */
 import { formatBytes } from '@superlibrary/embed';
 import { day, when } from '$lib/item';
+import { OUTCOME_WORDS } from './parity.controls';
 
 /**
  * One thing a person can see. Every form is checked strictly (parity.svelte.test.ts):
@@ -80,7 +81,6 @@ export const FIX = {
   },
 };
 
-const OUTCOME_WORDS = ['Approved', 'Completed', 'In progress', 'Superseded', 'Rejected', 'Failed', 'Abandoned'];
 /** A row or entry of a list, whatever shape a vibe gives it (a card, a line, a table row). */
 const ROW = (list: string) => `[aria-label="${list}"] li, [aria-label="${list}"] tr`;
 /** The element holding the h1: the item's header facts (IH2–IH5) belong with the title, wherever a vibe puts it. */

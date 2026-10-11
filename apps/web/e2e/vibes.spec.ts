@@ -9,19 +9,19 @@ const THEMES = ['light', 'dark'] as const;
 const SCREENS = 'vibe-screens';
 let paths: Array<[string, string]> = [];
 
-test.describe.configure({ mode: 'serial' });
 test.beforeAll(async ({ request }) => {
   const ws = await devWorkspace(request);
   const art = await uploadViaApi(request, [{ path: 'v.md', body: '# Vibe check\n\nA paragraph.' }], { title: 'Vibe check artifact' });
   const rec = seedWorkRecordLocal({ ws, title: 'Vibe check record', text: 'vibe check', outcome: 'approved' });
   const col = await seedCollection(request, `Vibe check ${Date.now()}`, art.itemId);
-  paths = [['home', '/'], ['artifact', `/a/${art.itemId}`], ['record', `/a/${rec}`], ['collections', '/collections'], ['collection', `/collections/${col}`]];
+  paths = [['home', '/'], ['artifact', `/a/${art.itemId}`], ['record', `/a/${rec}`], ['collections', '/collections'], ['upload', '/upload'], ['collection', `/collections/${col}`]];
   mkdirSync(SCREENS, { recursive: true });
 });
 
 for (const vibe of VIBES_E2E) {
   for (const theme of THEMES) {
     test(`${vibe} ${theme}`, async ({ browser }) => {
+      test.setTimeout(180_000);
       for (const width of [390, 1280]) {
         // A phone is a touch device: the embed's 44px targets answer to `pointer: coarse`, so the 390px leg is touch.
         const context = await browser.newContext({ viewport: { width, height: 900 }, ...(width === 390 ? { hasTouch: true, isMobile: true } : {}) });
@@ -54,4 +54,23 @@ for (const vibe of VIBES_E2E) {
       }
     });
   }
+}
+
+// Paper's strong time-of-day tints the page by the hour: the same checks at dusk and at night, in the theme that tints most.
+for (const [phase, time] of [['dusk', '2026-10-11T18:10:00'], ['night', '2026-10-11T23:30:00']] as const) {
+  test(`paper light at ${phase}: accessible`, async ({ browser }) => {
+    test.setTimeout(120_000);
+    const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    const page = await context.newPage();
+    await useAppearance(context, 'paper', 'light');
+    await page.clock.setFixedTime(new Date(time));
+    for (const [name, path] of paths) {
+      await page.goto(path);
+      await expect(page.locator('h1').first()).toBeVisible();
+      await expect(page.locator('[role="status"]', { hasText: /^(Loading…|Connecting…|Looking for related work…)$/ })).toHaveCount(0);
+      const axe = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).exclude('iframe.sl-frame').analyze();
+      expect(axe.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`), `paper/light ${phase} ${name}`).toEqual([]);
+    }
+    await context.close();
+  });
 }
