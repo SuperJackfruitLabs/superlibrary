@@ -2,10 +2,10 @@ import { tick, untrack } from 'svelte';
 import type { Attachment } from 'svelte/attachments';
 import { replaceState } from '$app/navigation';
 import type { ItemSummary, VersionSummary, WorkRecordView } from '@superlibrary/contract';
-import { mountArtifact, visibilityWords, type Mounted } from '@superlibrary/embed';
+import { formatBytes, mountArtifact, visibilityWords, type Mounted } from '@superlibrary/embed';
 import type { ToolbarItem } from '$kit/Toolbar.svelte';
 import {
-  ITEM_KIND_WORD, ItemError, UNREACHABLE, askRevokeItem, askRevokeVersion, change, day, embedUrlGetter, explain, mayManage, provenanceRows, readItem,
+  ITEM_KIND_WORD, ItemError, UNREACHABLE, askRevokeItem, askRevokeVersion, change, day, embedUrlGetter, explain, kindWords, mayManage, provenanceRows, readItem,
   scopeSetter, shareInfoGetter, shownVersion, versionRows, versionsGetter, type Ask, type Row,
 } from '$lib/item';
 import { api as sessionApi, session } from '$lib/session.svelte';
@@ -83,6 +83,10 @@ export class ItemModel {
   readonly tabTitle = $derived(this.item ? this.item.title : this.phase === 'expired' ? 'Expired' : 'Item');
   /** Work records: whether there is a spec to show, and how many timeline entries (summaries and tiles). */
   readonly hasSpec = $derived(this.record ? specRows(this.record.record.spec).length > 0 : false);
+  /** The closed-state summaries of the enclosures (Paper; reusable), built from data, not from display strings. */
+  readonly versionsSummary = $derived(`${this.versions.length} version${this.versions.length === 1 ? '' : 's'}${this.latestLive !== undefined ? ` · v${this.latestLive} latest` : ''}`);
+  readonly detailsSummary = $derived(this.current ? `${kindWords(this.current.view)} · ${formatBytes(this.current.totalBytes)}` : '');
+  readonly artifactsSummary = $derived(this.record ? `${this.record.artifacts.length} linked` : '');
   readonly entryCount = $derived(this.record ? timelineOf(this.record.record).length : 0);
 
   /** Where the viewer mounts. Any layout attaches it: `<div class="viewer" {@attach model.viewer}></div>`. */

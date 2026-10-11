@@ -32,7 +32,7 @@
 {:else if items.length === 0}
   <p class="muted">Nothing related found yet.</p>
 {:else}
-  <ul class="results" aria-label="Related items">
+  <ul class="results" role="list" aria-label="Related items">
     {#each items as r (r.itemId)}
       <li class="result" style:--o={outcomeVar(r.outcome)}>
         <a class="result-link" href={`/a/${r.itemId}`}>

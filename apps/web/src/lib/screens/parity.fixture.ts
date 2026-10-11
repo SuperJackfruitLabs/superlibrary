@@ -32,7 +32,7 @@ const ARTIFACT = {
   caption: 'A caption for search', supersededBy: null,
   source: { agent: true, agentPrincipal: AGENT, sourceKind: 'agentpod', station: 'stn_00000000000000s1', stationName: 'docs', path: 'out/report', board: BOARD, card: 'card_00000000000000c1', stage: 'review', run: 'run_00000000000000r1' },
 };
-const VERSIONS = [
+export const VERSIONS = [
   { version: 2, entry: 'index.md', view: 'markdown', mediaType: 'text/markdown', totalBytes: 2048, fileCount: 2, sha256: 'b'.repeat(64), createdAt: '2026-10-02T09:00:00.000Z', revokedAt: null, scanOverride: true, files: [] },
   { version: 1, entry: 'index.md', view: 'markdown', mediaType: 'text/markdown', totalBytes: 512, fileCount: 1, sha256: 'c'.repeat(64), createdAt: '2026-10-01T09:00:00.000Z', revokedAt: '2026-10-02T10:00:00.000Z', scanOverride: false, files: [] },
 ];
@@ -119,8 +119,9 @@ export const PARITY: Record<'library' | 'artifact' | 'record' | 'collections' | 
     { role: 'link', name: 'Upload a new version' },
     { css: '.viewer', what: 'the viewer' },
     { heading: 'Versions' },
-    { in: 'li, tr', together: ['v2', `${when(VERSIONS[0]!.createdAt)} · ${formatBytes(2048)} · 2 files`, 'Shown', 'Latest', 'Secret scan overridden', 'Revoke version 2'] },
-    { in: 'li, tr', together: ['v1', `${when(VERSIONS[1]!.createdAt)} · ${formatBytes(512)} · 1 file`, 'Revoked'] },
+    // V2-V3 by parts: Studio's table gives uploaded, size and files their own columns.
+    { in: 'li, tr', together: ['v2', when(VERSIONS[0]!.createdAt), formatBytes(2048), '2 files', 'Shown', 'Latest', 'Secret scan overridden', 'Revoke version 2'] },
+    { in: 'li, tr', together: ['v1', when(VERSIONS[1]!.createdAt), formatBytes(512), '1 file', 'Revoked'] },
     { role: 'link', name: 'v2' }, { plain: 'v1' },
     { role: 'button', name: 'Revoke version 2' },
     { heading: 'Details · version 2' },

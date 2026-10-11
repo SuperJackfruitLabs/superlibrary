@@ -16,6 +16,8 @@ export class LibraryModel {
   counts = $state<OutcomeCounts | null>(null);
   next = $state<string | null>(null);
   loading = $state(true);
+  /** True while a first page (not a "More") is loading: the rows and counts on screen are then the previous query's. */
+  refreshing = $state(true);
   error = $state<string | null>(null);
   /** The search box's words; submitted into the address. */
   words = $state('');
@@ -61,8 +63,9 @@ export class LibraryModel {
     const mine = ++this.#loads;
     this.#tried = cursor;
     this.loading = true;
+    this.refreshing = cursor === null;
     this.error = null;
-    if (rangeProblem(f)) { this.results = []; this.items = []; this.next = null; this.loading = false; return; }
+    if (rangeProblem(f)) { this.results = []; this.items = []; this.next = null; this.loading = false; this.refreshing = false; return; }
     if (f.q.trim()) {
       const r = await searchLibrary(this.#api, f);
       if (mine !== this.#loads) return;
@@ -73,5 +76,6 @@ export class LibraryModel {
       if (r.ok) { this.items = cursor ? [...this.items, ...r.value.items] : r.value.items; this.next = r.value.next; if (!cursor) this.counts = r.value.counts; } else this.error = r.message;
     }
     this.loading = false;
+    this.refreshing = false;
   }
 }

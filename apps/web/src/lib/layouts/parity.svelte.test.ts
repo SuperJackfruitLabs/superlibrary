@@ -11,7 +11,9 @@ vi.mock('$app/navigation', () => ({ goto: vi.fn(), replaceState: vi.fn() }));
 vi.mock('$app/state', () => ({ page: { url: new URL('http://localhost/'), params: { id: 'col_0123456789abcdef' } } }));
 vi.mock('@superlibrary/embed', async (orig) => ({ ...(await orig<object>()), mountArtifact: async () => ({ destroy() {}, setTheme() {}, setVersion: async () => true }) }));
 
-import { FIX, PARITY, type Need } from '$lib/screens/parity.fixture';
+import { formatBytes } from '@superlibrary/embed';
+import { when } from '$lib/item';
+import { FIX, PARITY, VERSIONS, type Need } from '$lib/screens/parity.fixture';
 import { look } from '$lib/vibe/appearance.svelte';
 import ItemView from '$lib/ItemView.svelte';
 import LibraryPage from '../../routes/+page.svelte';
@@ -142,6 +144,20 @@ describe.each([...VIBES])('%s keeps everything visible today (spec §6)', (vibe)
     openAll();
     await settle();
     expect(missing(needs)).toEqual([]);
+  });
+});
+
+// The by-parts fixture rows (Studio's table) must not hide a regression of the joined wording the list variant promises.
+describe.each(['daylight', 'paper'] as const)('%s: a version row reads uploaded, size and files as one line', (vibe) => {
+  let c: ReturnType<typeof mount> | null = null;
+  beforeEach(() => { look.appearance = { ...look.appearance, vibe }; });
+  afterEach(() => { if (c) unmount(c); c = null; document.body.innerHTML = ''; });
+  it('v2 and v1', async () => {
+    c = mount(ItemView, { target: document.body, props: { itemId: FIX.artifactId } });
+    await settle(); openAll(); await settle();
+    const text = document.body.textContent?.replace(/\s+/g, ' ') ?? '';
+    expect(text).toContain(`${when(VERSIONS[0]!.createdAt)} · ${formatBytes(2048)} · 2 files`);
+    expect(text).toContain(`${when(VERSIONS[1]!.createdAt)} · ${formatBytes(512)} · 1 file`);
   });
 });
 

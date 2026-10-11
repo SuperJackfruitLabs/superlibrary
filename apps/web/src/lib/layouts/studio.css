@@ -1,0 +1,125 @@
+/* Studio layouts (spec §5): dense, mono labels, status lights. The words are unchanged; capitals are CSS. */
+.sl-studio-head { flex-wrap: wrap; }
+.sl-studio-head h1 { margin: 0; }
+.sl-readout { display: inline-flex; align-items: center; gap: var(--vk-space-2); margin: 0 auto 0 0; font: 500 var(--vk-text-sm)/1 var(--vk-font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--vk-color-muted); }
+.sl-led { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--o, var(--vk-color-faint)); }
+.sl-led--sun { background: var(--vk-sky-noon-sun); }
+[data-phase="dawn"] .sl-led--sun { background: var(--vk-sky-dawn-sun); }
+[data-phase="morning"] .sl-led--sun { background: var(--vk-sky-morning-sun); }
+[data-phase="golden"] .sl-led--sun { background: var(--vk-sky-golden-sun); }
+[data-phase="dusk"] .sl-led--sun { background: var(--vk-sky-dusk-sun); }
+[data-phase="night"] .sl-led--sun { background: var(--vk-sky-night-sun); }
+[data-time="subtle"] .sl-led--sun { display: none; }
+.sl-led--live { animation: sl-blink 1.6s ease-in-out infinite; }
+@keyframes sl-blink { 50% { opacity: 0.4; } }
+.sl-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: var(--vk-space-2); margin: var(--vk-space-3) 0; }
+/* From 1024px one row, whatever the count (nine outcome tiles would orphan the last), each tile no wider than it needs. */
+@media (min-width: 1024px) { .sl-tiles { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(0, 12rem); } }
+.sl-tile { display: grid; align-content: space-between; gap: var(--vk-space-1); margin: 0; padding: var(--vk-space-2); border-radius: var(--vk-radius-sm); background: var(--vk-color-surface); box-shadow: inset 0 0 0 1px var(--vk-color-line), inset 3px 0 0 var(--o, var(--vk-color-line)); }
+.sl-tile dt { font: 500 0.75rem/1.2 var(--vk-font-mono); letter-spacing: 0.02em; text-transform: uppercase; color: var(--vk-color-muted); overflow-wrap: anywhere; }
+.sl-tile dd { margin: 0; font: 600 var(--vk-text-lg)/1 var(--vk-font-mono); }
+.sl-studio-bar { display: grid; gap: var(--vk-space-2); margin: 0 0 var(--vk-space-3); }
+@media (min-width: 1024px) { .sl-studio-bar .filter-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.sl-table { width: 100%; table-layout: fixed; border-collapse: collapse; margin: 0 0 var(--vk-space-4); font-size: var(--vk-text-sm); }
+.sl-table th { padding: var(--vk-space-2); text-align: left; font: 500 var(--vk-text-sm)/1.2 var(--vk-font-mono); letter-spacing: 0.03em; text-transform: uppercase; color: var(--vk-color-muted); border-bottom: 1px solid var(--vk-color-line); }
+.sl-table td { padding: var(--vk-space-2); vertical-align: top; border-bottom: 1px solid var(--vk-color-line); overflow-wrap: anywhere; }
+.sl-table--wide th:first-child, .sl-table--wide td:first-child { width: 24px; padding-inline: var(--vk-space-1); }
+/* Column widths for the ten-column table (fixed layout): the title and the excerpt get the room, the short facts the least. */
+.sl-table--wide th:nth-child(2) { width: 15%; }
+.sl-table--wide th:nth-child(3) { width: 12%; }
+.sl-table--wide th:nth-child(4) { width: 7%; }
+.sl-table--wide th:nth-child(5) { width: 9%; }
+.sl-table--wide th:nth-child(6) { width: 8%; }
+.sl-table--wide th:nth-child(7) { width: 9%; }
+.sl-table--wide th:nth-child(8) { width: 10%; }
+.sl-table--wide th:nth-child(9) { width: 15%; }
+.sl-table--wide th:nth-child(10) { width: 9%; }
+.sl-table .snippet { -webkit-line-clamp: 2; line-clamp: 2; }
+.sl-table .result-link { display: inline; font-weight: 600; text-decoration: underline; text-decoration-color: var(--vk-color-line); text-underline-offset: 3px; }
+.sl-table .result-link:hover, .sl-table .result-link:focus-visible { text-decoration-color: currentColor; }
+.sl-table .sl-led { margin-top: 0.4em; }
+/* Stacked below the width the table needs (ten columns: 1024px; others: 768px). Roles in the markup keep the semantics. */
+@media (max-width: 1023px) {
+  .sl-table--wide, .sl-table--wide tbody, .sl-table--wide tr, .sl-table--wide td { display: block; }
+  .sl-table--wide thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .sl-table--wide tr { padding: var(--vk-space-2) 0 var(--vk-space-2) var(--vk-space-3); border-bottom: 1px solid var(--vk-color-line); }
+  .sl-table--wide td { display: grid; grid-template-columns: 6.5rem minmax(0, 1fr); gap: var(--vk-space-2); padding: 2px 0; border: 0; }
+  .sl-table--wide td:empty, .sl-table--wide td:first-child { display: none; }
+  .sl-table--wide td[data-label="Title"] { display: block; padding-bottom: var(--vk-space-1); }
+  .sl-table--wide td[data-label="Title"]::before { content: none; }
+  .sl-table--wide .result-link { display: inline-flex; align-items: center; min-height: var(--vk-target-min); }
+  .sl-table--wide td::before { content: attr(data-label) / ""; color: var(--vk-color-muted); font: 500 var(--vk-text-sm)/1.4 var(--vk-font-mono); text-transform: uppercase; }
+}
+@media (max-width: 767px) {
+  .sl-table--stack, .sl-table--stack tbody, .sl-table--stack tr, .sl-table--stack td { display: block; }
+  .sl-table--stack thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .sl-table--stack tr { padding: var(--vk-space-2) 0; border-bottom: 1px solid var(--vk-color-line); }
+  .sl-table--stack td { display: grid; grid-template-columns: 7rem minmax(0, 1fr); gap: var(--vk-space-2); padding: 2px 0; border: 0; }
+  .sl-table--stack td::before { content: attr(data-label) / ""; color: var(--vk-color-muted); font: 500 var(--vk-text-sm)/1.4 var(--vk-font-mono); text-transform: uppercase; }
+}
+[data-vibe="studio"] .sl-more { display: flex; margin-left: auto; }
+.sl-readout-bar { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: var(--vk-space-2); margin: 0 0 var(--vk-space-2); padding: var(--vk-space-1) var(--vk-space-3); border-radius: var(--vk-radius-sm); background: var(--vk-color-raised); font: 500 var(--vk-text-sm)/1.4 var(--vk-font-mono); }
+.sl-readout-bar .sl-readout { margin: 0 0 0 auto; }
+.sl-k { text-transform: uppercase; letter-spacing: 0.08em; color: var(--vk-color-muted); }
+.sl-studio-item { display: grid; gap: var(--vk-space-1) var(--vk-space-4); }
+@media (min-width: 768px) { .sl-studio-item:has(.kit-toolbar-wrap) { grid-template-columns: minmax(0, 1fr) minmax(14rem, auto); } .sl-studio-item .kit-toolbar-wrap { grid-column: 2; grid-row: 2 / span 2; } }
+.sl-studio-item h1 { margin: 0; }
+.sl-chip { padding: 2px var(--vk-space-2); border-radius: var(--vk-radius-sm); box-shadow: inset 0 0 0 1px var(--vk-color-line); font-family: var(--vk-font-mono); font-size: var(--vk-text-sm); }
+.sl-panels { display: grid; gap: var(--vk-space-3); grid-template-columns: minmax(0, 1fr); margin: var(--vk-space-3) 0; }
+@media (min-width: 800px) { .sl-panels { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1280px) { .sl-panels { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.sl-panel { min-width: 0; padding: 0 var(--vk-space-3) var(--vk-space-3); border-radius: var(--vk-radius-sm); background: var(--vk-color-surface); box-shadow: inset 0 0 0 1px var(--vk-color-line); }
+.sl-panel--wide { grid-column: 1 / -1; }
+.sl-panel .rows { grid-template-columns: minmax(0, 1fr); gap: 0; }
+.sl-panel .rows dd { margin: 0 0 var(--vk-space-2); }
+.sl-panel .rows code, .sl-panel .rows dd { font-size: var(--vk-text-sm); }
+.sl-panel .rows dt { font: 500 var(--vk-text-sm)/1.4 var(--vk-font-mono); text-transform: uppercase; letter-spacing: 0.04em; }
+.sl-command .danger, .sl-command .kit-button--danger { display: flex; margin-inline-start: auto; }
+@media (max-width: 480px) { .sl-command .danger, .sl-command .kit-button--danger { width: 100%; justify-content: center; } }
+.timeline--log { padding-left: 0; border-left: 0; }
+.timeline--log li { display: grid; grid-template-columns: 12px minmax(0, 1fr); column-gap: var(--vk-space-2); padding: var(--vk-space-2) 0; border-bottom: 1px solid var(--vk-color-line); }
+.timeline--log li::before { position: static; grid-row: 1 / span 3; width: 10px; height: 10px; margin-top: 5px; border: 0; background: var(--o, var(--vk-color-faint)); }
+.timeline--log .when { font-family: var(--vk-font-mono); }
+.sl-tile dd { line-height: 1.2; overflow-wrap: anywhere; }
+@media (min-width: 768px) {
+  .sl-table--stack th:nth-child(1) { width: 11%; } .sl-table--stack th:nth-child(2) { width: 27%; } .sl-table--stack th:nth-child(3) { width: 12%; }
+  .sl-table--stack th:nth-child(4) { width: 10%; } .sl-table--stack th:nth-child(6) { width: 15%; }
+}
+.sl-studio-item > h1, .sl-studio-item > .item-meta { grid-column: 1; }
+/* Item tiles carry words ("Markdown", a date), so they are wider than the library's counts. */
+.sl-studio-item ~ .sl-tiles { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+.sl-studio-item ~ .sl-tiles .sl-tile { align-content: start; }
+.sl-studio-item ~ .sl-tiles dd { font-size: var(--vk-text-md); }
+@media (min-width: 1024px) { .sl-studio-item ~ .sl-tiles { grid-template-columns: none; } }
+.sl-command-bar { padding-top: var(--vk-space-3); margin: 0 0 var(--vk-space-3); }
+/* An odd last panel takes the row, so the two-column grid never ends half empty. */
+@media (min-width: 800px) and (max-width: 1279px) {
+  .sl-panels:not(:has(> .sl-panel--wide:first-child)) > :last-child:nth-child(odd) { grid-column: 1 / -1; }
+  /* The leading wide panel takes a row of its own, so the rest are counted from after it. */
+  .sl-panels > .sl-panel--wide:first-child ~ :last-child:nth-child(even) { grid-column: 1 / -1; }
+}
+/* A row with nothing in a cell does not print the label alone when stacked. */
+@media (max-width: 767px) { .sl-table--stack td:empty { display: none; } }
+@media (min-width: 768px) {
+  .sl-table--entries .entry { display: table-row; }
+  .sl-table--entries td { overflow-wrap: break-word; }
+  .sl-table--entries th:nth-child(1) { width: 24%; } .sl-table--entries th:nth-child(2) { width: 13%; } .sl-table--entries th:nth-child(3) { width: 14%; }
+  .sl-table--entries th:nth-child(4) { width: auto; } .sl-table--entries th:nth-child(6) { width: auto; }
+  .sl-table--entries th:nth-child(5) { width: 10rem; }
+  .sl-table--collections th:nth-child(1) { width: 32%; } .sl-table--collections th:nth-child(2) { width: 14%; } .sl-table--collections th:nth-child(3) { width: auto; }
+}
+.sl-table--entries td[data-label="Action"] button { width: 100%; }
+/* A collection's tiles hold a date and a count in words, wider than the library's counts. */
+.sl-tiles--facts { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+.sl-tiles--facts .sl-tile { align-content: start; }
+.sl-tiles--facts dd { font-size: var(--vk-text-sm); }
+@media (min-width: 1024px) { .sl-tiles--facts { grid-template-columns: none; grid-auto-columns: minmax(0, 14rem); } }
+@media (max-width: 767px) { .sl-table--stack td { align-items: baseline; } }
+@media (max-width: 767px) {
+  .sl-table--entries .entry { padding-left: var(--vk-space-3); }
+  /* The name or title leads its stacked row, as in the library; the action needs no label. */
+  .sl-table--stack td[data-label="Name"], .sl-table--stack td[data-label="Title"] { display: block; padding-bottom: 0; }
+  .sl-table--stack td[data-label="Name"]::before, .sl-table--stack td[data-label="Title"]::before, .sl-table--stack td[data-label="Action"]::before { content: none; }
+  .sl-table--stack td[data-label="Action"] { display: block; }
+  .sl-table--stack .result-link { display: inline-flex; align-items: center; min-height: var(--vk-target-min); }
+}

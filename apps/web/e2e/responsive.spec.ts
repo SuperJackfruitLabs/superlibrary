@@ -1,6 +1,7 @@
 // apps/web/e2e/responsive.spec.ts
 import { expect, test } from '@playwright/test';
 import { devWorkspace, expectNoSideways, seedWorkRecordLocal, shortControls, uploadViaApi } from './helpers';
+import { seedCollection } from './vibes';
 
 /** The operator reads on a phone first; the app must hold at every width it is used at. */
 const WIDTHS = [390, 768, 1024, 1280, 1920];
@@ -14,9 +15,13 @@ for (const width of WIDTHS) {
     const ws = await devWorkspace(request);
     const record = seedWorkRecordLocal({ ws, title: `A long title that has to wrap at phone width ${'word '.repeat(12)}`, text: 'responsive check', outcome: 'failed' });
     const art = await uploadViaApi(request, [{ path: 'r.md', body: '# r' }], { title: 'Responsive artifact' });
+    // A collection name longer than a phone is wide: the item page's Collection picker lists it.
+    await seedCollection(request, `Pipeline reviews, a collection name longer than a phone is wide ${Date.now()}`, art.itemId);
     for (const path of ['/', '/?q=responsive', '/outcomes', '/collections', `/a/${record}`, `/a/${art.itemId}`]) {
       await page.goto(path);
       await expect(page.locator('h1').first()).toBeVisible();
+      // The item page's Collection picker fills in after the page paints; measure once it has.
+      if (path.startsWith('/a/')) await expect(page.getByRole('region', { name: 'Collections' }).getByRole('combobox')).toBeVisible();
       await expectNoSideways(page, `${path} at ${width}px`);
       if (width === 390) expect(await shortControls(page, 3), `${path} at 390px`).toEqual([]);
     }

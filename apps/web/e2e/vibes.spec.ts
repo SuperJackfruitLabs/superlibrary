@@ -13,6 +13,9 @@ test.beforeAll(async ({ request }) => {
   const ws = await devWorkspace(request);
   const art = await uploadViaApi(request, [{ path: 'v.md', body: '# Vibe check\n\nA paragraph.' }], { title: 'Vibe check artifact' });
   const rec = seedWorkRecordLocal({ ws, title: 'Vibe check record', text: 'vibe check', outcome: 'approved' });
+  // The longest outcome words, so the library's table and tiles are measured with them.
+  seedWorkRecordLocal({ ws, title: 'Vibe check superseded', text: 'vibe check', outcome: 'superseded' });
+  seedWorkRecordLocal({ ws, title: 'Vibe check in progress', text: 'vibe check', outcome: 'in-progress' });
   const col = await seedCollection(request, `Vibe check ${Date.now()}`, art.itemId);
   paths = [['home', '/'], ['artifact', `/a/${art.itemId}`], ['record', `/a/${rec}`], ['collections', '/collections'], ['upload', '/upload'], ['collection', `/collections/${col}`]];
   mkdirSync(SCREENS, { recursive: true });
@@ -49,6 +52,20 @@ for (const vibe of VIBES_E2E) {
           if (process.env.PW_VISUAL) {
             await expect(page).toHaveScreenshot(`${vibe}-${theme}-${name}-${width}.png`, { fullPage: true, mask: [page.locator('iframe.sl-frame'), page.locator('.sl-readout, .sl-dateline, .sl-greeting')] });
           }
+        }
+        await context.close();
+      }
+      // The global constraint is no sideways scroll from 390 to 1920: the widths between and beyond, measured only (axe ran above).
+      for (const width of [768, 1024, 1920]) {
+        const context = await browser.newContext({ viewport: { width, height: 900 } });
+        const page = await context.newPage();
+        await useAppearance(context, vibe, theme);
+        await page.clock.setFixedTime(new Date('2026-10-11T12:00:00'));
+        for (const [name, path] of paths) {
+          await page.goto(path);
+          await expect(page.locator('h1').first()).toBeVisible();
+          await expect(page.locator('[role="status"]', { hasText: /^(Loading…|Connecting…|Looking for related work…)$/ })).toHaveCount(0);
+          await expectNoSideways(page, `${vibe}/${theme} ${name} ${width}px`);
         }
         await context.close();
       }
