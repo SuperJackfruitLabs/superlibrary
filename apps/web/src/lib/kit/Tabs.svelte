@@ -11,7 +11,8 @@
       <li style:--o={t.tone ? outcomeVar(t.tone) : undefined}>
         <a href={t.href} aria-current={t.current ? 'page' : undefined}>
           {#if t.tone}<span class="outcome">{t.label}</span>{:else}{t.label}{/if}
-          {#if t.count !== undefined && t.count !== null}<span class="count">{t.count}</span>{/if}
+          <!-- null: not known yet, a dash in the number's place (never 0, and the tab does not grow when it lands). -->
+          {#if t.count !== undefined}<span class="count">{t.count ?? '–'}</span>{/if}
         </a>
       </li>
     {/each}

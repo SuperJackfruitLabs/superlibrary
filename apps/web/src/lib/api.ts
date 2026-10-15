@@ -1,4 +1,5 @@
 import type { PlaneDiscovery } from './auth/org-plane';
+import { withReadTimeout } from './loading';
 
 /** The local-dev person (API DEV_AUTH, plane off). Never sent when a plane is configured. */
 export const DEV_PRINCIPAL = 'prn_0000000000000000de01';
@@ -12,7 +13,10 @@ export interface ApiDeps {
   fetchFn?: typeof fetch;
 }
 
-/** Every call asks for a token: a refresh happens whenever one is due, mid-upload included. */
+/**
+ * Every call asks for a token: a refresh happens whenever one is due, mid-upload included. A read
+ * (GET) unanswered after 20 s is aborted (loading.ts), so no screen waits forever.
+ */
 export function createApi(deps: ApiDeps) {
   return async function api(path: string, init: RequestInit = {}): Promise<Response> {
     const headers = new Headers(init.headers);
@@ -25,7 +29,7 @@ export function createApi(deps: ApiDeps) {
       headers.set('X-Dev-Principal', DEV_PRINCIPAL);
       headers.set('X-Dev-Org', DEV_ORG);
     }
-    const res = await (deps.fetchFn ?? fetch)(path, { ...init, headers });
+    const res = await withReadTimeout(deps.fetchFn ?? ((i, o) => fetch(i, o)))(path, { ...init, headers });
     if (res.status === 401) deps.onUnauthorized(sent);
     return res;
   };

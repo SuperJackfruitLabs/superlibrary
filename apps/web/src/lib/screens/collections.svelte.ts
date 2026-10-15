@@ -4,6 +4,7 @@ import { COLLECTION_ID, type CollectionDetail, type CollectionSummary } from '@s
 import { askDeleteCollection, createCollection, deleteCollection, getCollection, listCollections, removeFromCollection, updateCollection } from '$lib/collections';
 import { when } from '$lib/item';
 import { api as sessionApi } from '$lib/session.svelte';
+import { MISSING_COPY, type FailKind } from '$lib/loading';
 
 type Api = (path: string, init?: RequestInit) => Promise<Response>;
 export const countWords = (n: number) => `${n} item${n === 1 ? '' : 's'}`;
@@ -13,6 +14,7 @@ export class CollectionsModel {
   list = $state<CollectionSummary[]>([]);
   loading = $state(true);
   error = $state<string | null>(null);
+  failKind = $state<FailKind | null>(null);
   name = $state('');
   description = $state('');
   creating = $state(false);
@@ -29,7 +31,7 @@ export class CollectionsModel {
     this.loading = true;
     const r = await listCollections(this.#api);
     this.loading = false;
-    if (r.ok) { this.list = r.value.collections; this.error = null; } else this.error = r.message;
+    if (r.ok) { this.list = r.value.collections; this.error = null; this.failKind = null; } else { this.error = r.message; this.failKind = r.kind; }
   }
   async create(e?: SubmitEvent) {
     e?.preventDefault();
@@ -46,7 +48,11 @@ export class CollectionsModel {
 /** /collections/[id] (spec §5.4). */
 export class CollectionModel {
   c = $state<CollectionDetail | null>(null);
+  /** True until the first read answered (and again while a Try again is out). */
+  loading = $state(true);
   error = $state<string | null>(null);
+  /** Why it failed: not there for this person (404/403, a bad id) or could not load (5xx, network). */
+  failKind = $state<FailKind | null>(null);
   notice = $state<string | null>(null);
   editing = $state(false);
   name = $state('');
@@ -75,10 +81,14 @@ export class CollectionModel {
     $effect(() => { void this.id; untrack(() => void this.load()); });
   }
   async load() {
-    if (!COLLECTION_ID.test(this.id)) { this.error = 'Nothing here, or you cannot see it.'; return; }
+    if (!COLLECTION_ID.test(this.id)) { this.error = MISSING_COPY; this.failKind = 'missing'; this.loading = false; return; }
+    if (!this.c) this.loading = true;
     const r = await getCollection(this.#api, this.id);
-    if (r.ok) { this.c = r.value; this.error = null; } else this.error = r.message;
+    this.loading = false;
+    if (r.ok) { this.c = r.value; this.error = null; this.failKind = null; } else { this.error = r.message; this.failKind = r.kind; }
   }
+  /** Try again after a failed read: back to loading, then the read. */
+  retry() { this.c = null; this.error = null; this.failKind = null; this.loading = true; return this.load(); }
   startEdit() { this.name = this.c!.name; this.description = this.c!.description; this.editError = null; this.editing = true; }
   async stopEditing() { this.editing = false; await tick(); this.#renameEl?.focus(); }
   async save(e: SubmitEvent) {

@@ -3,10 +3,10 @@
   import { look } from '$lib/vibe/appearance.svelte';
   import Mark from '$lib/Mark.svelte';
   import { beginSignIn } from '$lib/auth/org-plane';
-  import { currentPlane } from '$lib/session.svelte';
+  import { planeReady } from '$lib/session.svelte';
   let error = $state<string | null>(null);
   async function signIn() {
-    const p = currentPlane();
+    const p = await planeReady();
     if (!p) { error = 'This deployment has no sign-in service configured.'; return; }
     try { await beginSignIn(p, { returnTo: '/' }); } catch (e) { error = e instanceof Error ? e.message : 'Sign-in failed.'; }
   }

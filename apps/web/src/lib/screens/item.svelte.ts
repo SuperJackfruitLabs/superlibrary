@@ -12,6 +12,7 @@ import { api as sessionApi, session } from '$lib/session.svelte';
 import { deleteOnToIso } from '$lib/upload';
 import { specRows, timelineOf } from '$lib/record';
 import { look } from '$lib/vibe/appearance.svelte';
+import { failCopy, type FailKind } from '$lib/loading';
 import { makerOf, type Maker } from '$lib/vibe/faces';
 
 type Api = (path: string, init?: RequestInit) => Promise<Response>;
@@ -32,6 +33,8 @@ const anchor = (get: () => HTMLElement | null, set: (el: HTMLElement | null) => 
 export class ItemModel {
   phase = $state<ItemPhase>('loading');
   refusal = $state('');
+  /** Why the page refused: not there for you (404/403), could not load (5xx, network, timeout), or another reason in words. */
+  refusalKind = $state<FailKind | 'other' | null>(null);
   item = $state<ItemSummary | null>(null);
   versions = $state<VersionSummary[]>([]);
   /** The version the viewer shows: the route's, then the person's choice; undefined is the newest live one. */
@@ -66,7 +69,7 @@ export class ItemModel {
   readonly manage = $derived(this.item !== null && this.me !== null && mayManage(this.me, this.item));
   readonly current = $derived(shownVersion(this.versions, this.shown));
   readonly latestLive = $derived(this.versions.find((v) => !v.revokedAt)?.version);
-  readonly canRetryRefusal = $derived(this.refusal === UNREACHABLE);
+  readonly canRetryRefusal = $derived(this.refusalKind === 'failed');
   readonly showLatestOffer = $derived(this.shown !== undefined && this.latestLive !== undefined && this.shown !== this.latestLive);
   readonly details: Row[] = $derived(this.current ? versionRows(this.current) : []);
   readonly detailsHeading = $derived(`Details${this.current ? ` · version ${this.current.version}` : ''}`);
@@ -162,8 +165,15 @@ export class ItemModel {
     this.item = null;
     this.versions = [];
     this.phase = r.state;
-    this.refusal = r.state === 'refused' ? (r.code === 'unreachable' ? UNREACHABLE : explain(r.code)) : '';
+    if (r.state === 'refused') {
+      const kind: FailKind | 'other' = r.code === 'unreachable' || (r.status ?? 0) >= 500 ? 'failed' : r.status === 404 || r.status === 403 || r.code === 'not_found' ? 'missing' : 'other';
+      this.refusalKind = kind;
+      this.refusal = kind === 'other' ? explain(r.code) : failCopy(kind);
+    } else { this.refusalKind = null; this.refusal = ''; }
   }
+
+  /** Try again after a failed read: back to the loading form, then the read. */
+  retry() { this.phase = 'loading'; this.refusalKind = null; return this.load(); }
 
   showUrl = (n: number | undefined) => (n === undefined ? `/a/${this.itemId}` : `/a/${this.itemId}/v/${n}`);
   followVersion(n: number | undefined) { this.shown = n; replaceState(this.showUrl(n), {}); }

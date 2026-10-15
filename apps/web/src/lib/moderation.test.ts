@@ -19,7 +19,7 @@ describe('moderation helpers (spec §11)', () => {
   it('refusals read as sentences', () => {
     expect(explain('invalid', 'that would make a loop of replacements')).toBe('That would make a loop: the replacement is already marked as superseded by this item.');
     expect(explain('invalid', 'an item cannot supersede itself')).toBe('An item cannot replace itself.');
-    expect(explain('not_found', 'the replacement was not found')).toBe('Nothing here, or you cannot see it.');
+    expect(explain('not_found', 'the replacement was not found')).toBe("This doesn't exist or isn't shared with you.");
   });
 });
 

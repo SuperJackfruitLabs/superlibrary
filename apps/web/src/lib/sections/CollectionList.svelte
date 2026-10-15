@@ -1,13 +1,14 @@
 <script lang="ts">
   import { countWords, type CollectionsModel } from '$lib/screens/collections.svelte';
+  import LoadFailed from './LoadFailed.svelte';
+  import Skeleton from './Skeleton.svelte';
   let { model, variant = 'cards' }: { model: CollectionsModel; variant?: 'cards' | 'toc' | 'table' | 'plain' } = $props();
 </script>
 
 {#if model.loading}
-  <p class="muted" role="status">Loading…</p>
+  <Skeleton label="Loading collections" rows={8} />
 {:else if model.error}
-  <p class="error" role="alert">{model.error}</p>
-  <button type="button" onclick={() => model.load()}>Try again</button>
+  <LoadFailed kind={model.failKind ?? 'failed'} message={model.error} onretry={() => model.load()} />
 {:else if model.list.length === 0}
   <p>No collections yet. Create the first one above.</p>
 {:else if variant === 'cards'}

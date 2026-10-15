@@ -1,6 +1,7 @@
 import { untrack } from 'svelte';
 import type { Facets, ItemSummary, OutcomeCounts, SearchResult } from '@superlibrary/contract';
 import { api as sessionApi } from '$lib/session.svelte';
+import type { FailKind } from '$lib/loading';
 import {
   activeFilters, boardNames, browseLibrary, loadFacets, rangeProblem, readFilters, rowOfItem, rowOfResult, searchLibrary, writeFilters,
   type Filters, type Row,
@@ -19,6 +20,7 @@ export class LibraryModel {
   /** True while a first page (not a "More") is loading: the rows and counts on screen are then the previous query's. */
   refreshing = $state(true);
   error = $state<string | null>(null);
+  failKind = $state<FailKind | null>(null);
   /** The search box's words; submitted into the address. */
   words = $state('');
 
@@ -40,8 +42,8 @@ export class LibraryModel {
       ? this.rows.length === 25 ? 'The 25 best matches' : `${this.rows.length} match${this.rows.length === 1 ? '' : 'es'}`
       : `${this.rows.length}${this.next ? '+' : ''} item${this.rows.length === 1 ? '' : 's'}, most recent activity first`,
   );
-  /** The status line: blank on an error, which says itself. */
-  readonly status = $derived(this.loading ? 'Loading…' : this.error ? '' : this.summary);
+  /** The summary line: blank while loading (no count before the data) and on an error, which says itself. */
+  readonly status = $derived(this.loading || this.error ? '' : this.summary);
   readonly empty = $derived<'none' | 'no-match' | 'nothing-yet'>(this.error || this.loading || this.rows.length ? 'none' : this.searching ? 'no-match' : 'nothing-yet');
 
   constructor(params: () => URLSearchParams, navigate: (href: string) => unknown, api: Api = sessionApi) {
@@ -65,15 +67,16 @@ export class LibraryModel {
     this.loading = true;
     this.refreshing = cursor === null;
     this.error = null;
+    this.failKind = null;
     if (rangeProblem(f)) { this.results = []; this.items = []; this.next = null; this.loading = false; this.refreshing = false; return; }
     if (f.q.trim()) {
       const r = await searchLibrary(this.#api, f);
       if (mine !== this.#loads) return;
-      if (r.ok) { this.results = r.value.results; this.next = null; } else this.error = r.message;
+      if (r.ok) { this.results = r.value.results; this.next = null; } else { this.error = r.message; this.failKind = r.kind; }
     } else {
       const r = await browseLibrary(this.#api, f, cursor);
       if (mine !== this.#loads) return;
-      if (r.ok) { this.items = cursor ? [...this.items, ...r.value.items] : r.value.items; this.next = r.value.next; if (!cursor) this.counts = r.value.counts; } else this.error = r.message;
+      if (r.ok) { this.items = cursor ? [...this.items, ...r.value.items] : r.value.items; this.next = r.value.next; if (!cursor) this.counts = r.value.counts; } else { this.error = r.message; this.failKind = r.kind; }
     }
     this.loading = false;
     this.refreshing = false;

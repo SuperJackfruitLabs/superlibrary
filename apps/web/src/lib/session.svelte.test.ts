@@ -43,7 +43,8 @@ describe('the session never hangs on an answer it cannot use', () => {
 
   it('a server error is an error the page can show and retry', async () => {
     serve(() => new Response('', { status: 503 }));
-    await expect(refreshMe()).rejects.toThrow('The library service could not be reached (HTTP 503).');
+    await expect(refreshMe()).rejects.toThrow("Couldn't reach Superlibrary. Try again in a moment.");
+    await expect(refreshMe()).rejects.not.toThrow(/HTTP|503/);
   });
 
   it('a 401 is not an error: the guard signs in again', async () => {
@@ -60,6 +61,31 @@ describe('the session never hangs on an answer it cannot use', () => {
 
   it('any other 403 says why instead of signing in again and again', async () => {
     serve(() => Response.json({ error: 'principal_not_supported' }, { status: 403 }));
-    await expect(refreshMe()).rejects.toThrow('This account cannot use Superlibrary (principal_not_supported).');
+    await expect(refreshMe()).rejects.toThrow('This account cannot use Superlibrary.');
+    await expect(refreshMe()).rejects.not.toThrow(/principal_not_supported/);
+  });
+
+  it('a /me that never answers ends in an error at the deadline, never in Connecting… forever (S1)', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.stubGlobal('fetch', vi.fn((url: string, init?: RequestInit) => String(url).includes('oauth-protected-resource')
+        ? Promise.resolve(new Response('', { status: 404 }))
+        : new Promise<Response>((_, reject) => init?.signal?.addEventListener('abort', () => reject(init.signal!.reason)))));
+      const started = initSession().then(() => 'resolved', (e: Error) => e.message);
+      await vi.advanceTimersByTimeAsync(20_001);
+      expect(await started).toBe("Couldn't reach Superlibrary. Try again in a moment.");
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('plane discovery that never answers is given up at the deadline too', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.stubGlobal('fetch', vi.fn((url: string, init?: RequestInit) => String(url).includes('oauth-protected-resource')
+        ? new Promise<Response>((_, reject) => init?.signal?.addEventListener('abort', () => reject(init.signal!.reason)))
+        : Promise.resolve(Response.json(ME))));
+      const started = initSession().then(() => 'resolved', (e: Error) => e.message);
+      await vi.advanceTimersByTimeAsync(20_001);
+      expect(await started).toBe('resolved');
+    } finally { vi.useRealTimers(); }
   });
 });

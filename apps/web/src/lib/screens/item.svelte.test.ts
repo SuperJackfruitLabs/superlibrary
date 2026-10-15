@@ -76,7 +76,7 @@ describe('the item page model', () => {
     reply = (p) => { calls.push(p); throw new TypeError('offline'); };
     const bad = make({ itemId: 'not-an-id' });
     await settle();
-    expect(bad.refusal).toBe('Nothing here, or you cannot see it.');
+    expect(bad.refusal).toBe("This doesn't exist or isn't shared with you.");
     expect(bad.canRetryRefusal).toBe(false);
     expect(calls).toEqual([]);
     stop!();
@@ -84,6 +84,26 @@ describe('the item page model', () => {
     await settle();
     expect(off.refusal).toBe(UNREACHABLE);
     expect(off.canRetryRefusal).toBe(true);
+    expect(off.refusalKind).toBe('failed');
+    stop!();
+  });
+
+  it('a 500 is "could not load" with Try again; a 404 or 403 is "not there for you" without (S4)', async () => {
+    reply = () => Response.json({ error: 'internal' }, { status: 500 });
+    const down = make({ itemId: ID });
+    await settle();
+    expect(down.refusal).toBe("Couldn't load — try again.");
+    expect(down.canRetryRefusal).toBe(true);
+    stop!();
+    for (const status of [404, 403]) {
+      reply = () => Response.json({ error: status === 404 ? 'not_found' : 'forbidden' }, { status });
+      const gone = make({ itemId: ID });
+      await settle();
+      expect(gone.refusal).toBe("This doesn't exist or isn't shared with you.");
+      expect(gone.refusalKind).toBe('missing');
+      expect(gone.canRetryRefusal).toBe(false);
+      stop!();
+    }
   });
 
   it('mounts one viewer on the attached element; a new element replaces it', async () => {

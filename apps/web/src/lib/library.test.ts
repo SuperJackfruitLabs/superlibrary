@@ -91,3 +91,30 @@ describe('views by outcome (spec §11)', () => {
     expect(viewTitle(f.outcomes[0] ?? null, 'Marketing & Community', f.period)).toBe('Everything rejected on Marketing & Community this month');
   });
 });
+
+describe('a failed read in words (catch-up S4)', () => {
+  const answer = (res: () => Response | Promise<Response>) => (async () => res()) as never;
+  it('404 and 403 are "not there for you"; 5xx and the network are "could not load"; never a raw code', async () => {
+    const { loadJson } = await import('./library');
+    const { FAILED_COPY, MISSING_COPY } = await import('./loading');
+    expect(await loadJson(answer(() => Response.json({ error: 'not_found' }, { status: 404 })), '/x')).toEqual({ ok: false, kind: 'missing', message: MISSING_COPY });
+    expect(await loadJson(answer(() => Response.json({ error: 'forbidden' }, { status: 403 })), '/x')).toEqual({ ok: false, kind: 'missing', message: MISSING_COPY });
+    expect(await loadJson(answer(() => Response.json({ error: 'internal' }, { status: 500 })), '/x')).toEqual({ ok: false, kind: 'failed', message: FAILED_COPY });
+    expect(await loadJson(answer(() => { throw new TypeError('Failed to fetch'); }), '/x')).toEqual({ ok: false, kind: 'failed', message: FAILED_COPY });
+    const odd = await loadJson(answer(() => new Response('', { status: 418 })), '/x');
+    expect(odd.ok ? '' : odd.message).not.toMatch(/http_|418|\(/);
+  });
+});
+
+describe('browse and search are reads (catch-up S2)', () => {
+  it('carry a deadline although they are POSTs; creating a collection does not', async () => {
+    const { browseLibrary, EMPTY_FILTERS } = await import('./library');
+    const { createCollection } = await import('./collections');
+    const seen: (AbortSignal | null | undefined)[] = [];
+    const api = (async (_p: string, i?: RequestInit) => { seen.push(i?.signal); return Response.json({ items: [], next: null, counts: {} }); }) as never;
+    await browseLibrary(api, EMPTY_FILTERS);
+    await createCollection(api, 'x', '');
+    expect(seen[0]).toBeInstanceOf(AbortSignal);
+    expect(seen[1]).toBeUndefined();
+  });
+});

@@ -51,7 +51,7 @@ describe('the library page', () => {
     expect(document.querySelector('.sl-day-hero h1')!.textContent).toBe('Library');
     expect(document.querySelector('.sl-day-hero form[role="search"] label[for="q"]')!.textContent).toBe('Search the library');
     expect(document.querySelector('.sl-day-filters')!.textContent).toContain('Filters');
-    expect(document.querySelector('[role="status"]')!.textContent).toBe('1+ item, most recent activity first');
+    expect(document.querySelector('.sl-status')!.textContent).toBe('1+ item, most recent activity first');
     expect(document.querySelector('ul.results[aria-label="Library"] li .result-link')!.getAttribute('href')).toBe('/a/itm_00000000000000a1');
     expect(text).toContain('A caption');
     expect(document.querySelector('.replaced')!.textContent).toBe('See what replaced it');

@@ -33,7 +33,7 @@ describe('collections', () => {
     let bad!: CollectionModel;
     stop = $effect.root(() => { bad = new CollectionModel(() => 'nope', vi.fn()); });
     await settle();
-    expect(bad.error).toBe('Nothing here, or you cannot see it.');
+    expect(bad.error).toBe("This doesn't exist or isn't shared with you.");
     expect(calls).toEqual([]);
     stop!();
     let m!: CollectionModel;
