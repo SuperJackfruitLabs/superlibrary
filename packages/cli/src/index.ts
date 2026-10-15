@@ -5,9 +5,12 @@ import { deviceLogin, discoverPlane } from './plane-login.ts';
 import { findCommands, renderCommandHelp, renderUsage } from './commands.ts';
 import { flag, oneLine, positionals } from './args.ts';
 import { getItem, revoke, upload } from './artifacts.ts';
+import { installSkill, renderSkill } from './skill.ts';
 import { collect, scope, search } from './library.ts';
 
-const VERSION = '0.0.1';
+/** Set by `bun build --define SULI_VERSION=…` in the release workflow; any other build reports `dev`. */
+declare const SULI_VERSION: string | undefined;
+const VERSION: string = typeof SULI_VERSION === 'string' ? SULI_VERSION : 'dev';
 
 function fail(message: string): never {
   process.stderr.write(`suli: ${oneLine(message)}\n`);
@@ -41,6 +44,14 @@ async function main(argv: string[]): Promise<void> {
     case "version":
       process.stdout.write(`suli ${VERSION} ${process.platform}/${process.arch}\n`);
       return;
+
+    case "skill": {
+      if (pos[0] === undefined) { process.stdout.write(renderSkill(VERSION)); return; }
+      if (pos[0] !== 'install') fail(`unknown command: skill ${pos[0]}. Run suli help skill.`);
+      const path = installSkill(flag(rest, "--dir"), VERSION);
+      process.stdout.write(json ? JSON.stringify({ path }) + '\n' : `Wrote ${path}\n`);
+      return;
+    }
 
     case "login": {
       // A network error, a timeout or a reply that is not JSON reaches the catch below as itself;
