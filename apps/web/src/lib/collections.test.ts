@@ -23,7 +23,7 @@ describe('collections from the app', () => {
   });
   it('a taken name reads as a sentence', async () => {
     const { api } = fakeApi(() => Response.json({ error: 'name_taken' }, { status: 409 }));
-    expect(await createCollection(api, 'Week 41', '')).toEqual({ ok: false, message: 'A collection with that name already exists.' });
+    expect(await createCollection(api, 'Week 41', '')).toEqual({ ok: false, kind: 'failed', message: 'A collection with that name already exists.' });
   });
   it('deleting says what happens to the items', () => {
     expect(askDeleteCollection('Week 41')).toMatchObject({ title: 'Delete the collection “Week 41”?', action: 'Delete collection' });

@@ -3,6 +3,7 @@
 import { BOARD_ID, OUTCOMES, PRN_ID, type BrowsePage, type Facets, type ItemSource, type ItemSummary, type Outcome, type SearchResult } from '@superlibrary/contract';
 import { visibilityWords } from '@superlibrary/embed';
 import { explain, ITEM_KIND_WORD, UNREACHABLE } from './item';
+import { failCopy, failKindOf, readDeadline, type FailKind } from './loading';
 import { OUTCOME_WORDS } from './kit/outcome';
 import { makerOf, type Maker } from './vibe/faces';
 
@@ -117,22 +118,29 @@ export const rowOfItem = (i: ItemSummary, boards: Map<string, string>): Row => {
 };
 export const boardNames = (f: Facets | null) => new Map((f?.boards ?? []).map((b) => [b.id, b.name]));
 
-export type Loaded<T> = { ok: true; value: T } | { ok: false; message: string };
-/** GET, or POST with a JSON body. A refusal comes back as a sentence (`explain`). */
-export async function loadJson<T>(api: Api, path: string, body?: unknown): Promise<Loaded<T>> {
+export type Loaded<T> = { ok: true; value: T } | { ok: false; kind: FailKind; message: string };
+/**
+ * GET, or POST with a JSON body. A failure comes back as a sentence: 404/403 "not there for you",
+ * 5xx/network/timeout "could not load", another refusal in words (`explain`). Never a raw code.
+ */
+export async function loadJson<T>(api: Api, path: string, body?: unknown, opts: { read?: boolean } = {}): Promise<Loaded<T>> {
   try {
-    const res = await api(path, body === undefined ? {} : { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    // A POST that only reads (browse, search) gets the reads' 20 s deadline too; a write is never aborted.
+    const signal = body !== undefined && opts.read ? { signal: readDeadline() } : {};
+    const res = await api(path, body === undefined ? {} : { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), ...signal });
     if (!res.ok) {
       const b = (await res.json().catch(() => ({}))) as { error?: string; detail?: string };
-      return { ok: false, message: explain(b.error ?? `http_${res.status}`, b.detail) };
+      const kind = failKindOf(res.status);
+      const message = res.status === 404 || res.status === 403 || res.status >= 500 ? failCopy(kind) : explain(b.error ?? '', b.detail);
+      return { ok: false, kind, message };
     }
     return { ok: true, value: (await res.json()) as T };
   } catch {
-    return { ok: false, message: UNREACHABLE };
+    return { ok: false, kind: 'failed', message: UNREACHABLE };
   }
 }
-export const searchLibrary = (api: Api, f: Filters) => loadJson<{ results: SearchResult[] }>(api, '/api/v1/search', searchBody(f));
-export const browseLibrary = (api: Api, f: Filters, cursor: string | null = null) => loadJson<BrowsePage>(api, '/api/v1/browse', browseBody(f, cursor));
+export const searchLibrary = (api: Api, f: Filters) => loadJson<{ results: SearchResult[] }>(api, '/api/v1/search', searchBody(f), { read: true });
+export const browseLibrary = (api: Api, f: Filters, cursor: string | null = null) => loadJson<BrowsePage>(api, '/api/v1/browse', browseBody(f, cursor), { read: true });
 export const loadFacets = (api: Api) => loadJson<Facets>(api, '/api/v1/facets');
 
 const PERIOD_WORDS: Record<Period, string> = { any: '', week: ' this week', month: ' this month', '30d': ' in the last 30 days', custom: ' between those dates' };

@@ -1,7 +1,6 @@
 // apps/web/src/lib/kit/index.ts
 /** The kit: the suite design system's first instance (operator direction A). Import from `$kit`. */
 export { default as Button } from './Button.svelte';
-export { default as Field } from './Field.svelte';
 export { default as Tabs } from './Tabs.svelte';
 export { default as Toolbar, type ToolbarItem } from './Toolbar.svelte';
 export { default as Icon, type IconName } from './Icon.svelte';

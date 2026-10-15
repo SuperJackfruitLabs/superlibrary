@@ -13,7 +13,7 @@
 <button bind:this={button} type="button" class="suite-switcher" aria-expanded={open} aria-controls={panelId} onclick={() => (menus.open = open ? null : panelId)}>
   <span>Products</span>
 </button>
-<div bind:this={panel} id={panelId} class="suite-shell-menu suite-panel" hidden={!open} role="group" aria-label={PARENT.name}>
+<div bind:this={panel} id={panelId} class="suite-shell-menu suite-panel vk-pop" data-state={open ? 'open' : 'closed'} hidden={!open} role="group" aria-label={PARENT.name}>
   <p class="suite-head">{PARENT.name}</p>
   <ul class="suite-list">
     {#each products.filter((p) => p.url) as p (p.key)}

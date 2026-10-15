@@ -42,12 +42,13 @@ describe('Studio: the library as a dashboard', () => {
     for (const td of table.querySelectorAll('td')) { expect(td.getAttribute('role')).toBe('cell'); expect(td.getAttribute('data-label')).not.toBeNull(); }
   });
 
-  it('no tiles while the first page loads, none on an error, and only Shown and Filters on while searching', async () => {
+  it('while the first page loads the tiles hold their place with a dash, never 0 (catch-up S5)', async () => {
     let release!: () => void;
     ctl.hold = new Promise<void>((r) => { release = r; });
     c = mount(Page, { target: document.body });
     await settle();
-    expect(document.querySelector('.sl-tiles')).toBeNull();
+    const values = [...document.querySelectorAll('.sl-tiles .sl-tile')].map((t) => `${t.querySelector('dt')!.textContent}=${t.querySelector('dd')!.textContent}`);
+    expect(values).toEqual(['Shown=–', 'Filters on=0', 'Approved=–', 'Completed=–', 'In progress=–', 'Superseded=–', 'Rejected=–', 'Failed=–', 'Abandoned=–']);
     ctl.hold = null;
     release();
     await settle();

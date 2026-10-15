@@ -2,6 +2,7 @@
 import { ITEM_ID, type EmbedGrant, type ItemSummary, type VersionSummary, type View } from '@superlibrary/contract';
 import { formatBytes, visibilityWords, type MountOptions, type ShareInfo } from '@superlibrary/embed';
 import type { Me } from './api';
+import { FAILED_COPY, MISSING_COPY } from './loading';
 
 type Api = (path: string, init?: RequestInit) => Promise<Response>;
 
@@ -32,7 +33,7 @@ export type ItemRead =
   | { state: 'ok'; item: ItemSummary; versions: VersionSummary[] }
   /** GET answers 410 `expired`; the uploader or an owner may still keep it (PATCH works until it is swept). */
   | { state: 'expired' }
-  | { state: 'refused'; code: string };
+  | { state: 'refused'; code: string; status?: number };
 
 export async function readItem(api: Api, itemId: string): Promise<ItemRead> {
   // A route parameter is whatever was typed: anything but an item id is not found, unasked.
@@ -40,7 +41,7 @@ export async function readItem(api: Api, itemId: string): Promise<ItemRead> {
   const res = await api(`/api/v1/items/${itemId}`);
   if (!res.ok) {
     const code = await codeOf(res);
-    return res.status === 410 && code === 'expired' ? { state: 'expired' } : { state: 'refused', code };
+    return res.status === 410 && code === 'expired' ? { state: 'expired' } : { state: 'refused', code, status: res.status };
   }
   const body = (await res.json()) as { item: ItemSummary; versions: VersionSummary[] };
   return { state: 'ok', item: body.item, versions: body.versions };
@@ -89,7 +90,7 @@ export const kindWords = (view: View) => KIND_WORDS[view];
 /** What an item is, in words (the library's rows and the item page's Details say the same). */
 export const ITEM_KIND_WORD = { artifact: 'Artifact', 'work-record': 'Work record' } as const;
 /** The sentence for a library that could not be asked. */
-export const UNREACHABLE = 'The library could not be reached. Check your connection and try again.';
+export const UNREACHABLE = FAILED_COPY;
 
 export interface Row { label: string; value: string; note?: string; mono?: boolean; copy?: boolean }
 
@@ -135,7 +136,7 @@ export function versionRows(v: VersionSummary): Row[] {
 }
 
 const WORDS: Record<string, string> = {
-  revoked: 'This was revoked.', expired: 'This has expired.', not_found: 'Nothing here, or you cannot see it.', name_taken: 'A collection with that name already exists.',
+  revoked: 'This was revoked.', expired: 'This has expired.', not_found: MISSING_COPY, forbidden: MISSING_COPY, name_taken: 'A collection with that name already exists.',
   not_permitted: 'Only the person who uploaded it, or an owner of the workspace, may do that.',
   sign_in_required: 'Sign in again to do that.',
 };
@@ -148,7 +149,7 @@ export function explain(code: string, detail?: string): string {
     if (detail === 'a reason of 3 to 500 characters is required') return 'Say why, in at least 3 characters.';
     return detail ? `That was not accepted: ${detail}.` : 'That was not accepted.';
   }
-  return WORDS[code] ?? `Something went wrong (${code}).`;
+  return WORDS[code] ?? 'Something went wrong. Try again.';
 }
 
 export interface Ask { title: string; message: string; action: string; reason?: boolean }

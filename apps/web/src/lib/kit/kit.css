@@ -20,6 +20,8 @@
 .kit-tabs a { display: inline-flex; align-items: center; gap: 6px; min-height: var(--vk-target-min); padding: 0 var(--vk-space-3); border: 1px solid var(--vk-color-line); border-radius: var(--vk-radius-pill); color: inherit; text-decoration: none; }
 .kit-tabs a[aria-current='page'] { border-color: var(--o, var(--vk-color-primary)); box-shadow: inset 0 0 0 1px var(--o, var(--vk-color-primary)); }
 .count { color: var(--vk-color-muted); font-variant-numeric: tabular-nums; }
+/* A tab count holds the width of three digits, so a dash turning into the number does not widen (or wrap) the tabs. */
+.kit-tabs .count { display: inline-block; min-width: 3ch; text-align: center; }
 
 .kit-toolbar-wrap { container-type: inline-size; }
 .kit-toolbar { display: flex; flex-wrap: wrap; gap: var(--vk-space-1); }
@@ -110,4 +112,12 @@
   .suite-shell { grid-template-columns: 1fr auto; }
   .suite-shell-nav { grid-column: 1 / -1; grid-row: 2; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .suite-shell-nav a { justify-content: center; padding: 0 var(--vk-space-1); }
+}
+/* The narrowest phones (360 px): the header row and the four nav links fit inside the 16 px gutters (catch-up S8). */
+@media (max-width: 380px) {
+  .suite-shell { column-gap: var(--vk-space-2); }
+  .suite-shell-nav { gap: 2px; }
+  .suite-shell-nav a { min-width: 0; padding-inline: 0; font-size: 0.875rem; }
+  .suite-shell-account { padding-inline: var(--vk-space-2); }
+  .suite-shell-end { gap: var(--vk-space-1); }
 }

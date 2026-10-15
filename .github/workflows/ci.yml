@@ -11,6 +11,7 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -25,7 +26,9 @@ jobs:
       - run: pnpm test
 
   e2e:
+    # The whole suite (Chromium and WebKit, the seeded loading, fit and motion specs) takes about 15 minutes locally.
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     env:
       WRANGLER_SEND_METRICS: 'false'
     steps:
@@ -64,6 +67,7 @@ jobs:
     needs: [test, e2e]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     concurrency: { group: deploy-api, cancel-in-progress: false }
     environment: { name: production, url: https://app.superlibrary.dev/api/health }
     env:
@@ -98,6 +102,7 @@ jobs:
     needs: [test, e2e]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     concurrency: { group: deploy-content, cancel-in-progress: false }
     environment: { name: content }
     env:
@@ -133,6 +138,7 @@ jobs:
     needs: [test, e2e, deploy-api]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     concurrency: { group: deploy-web, cancel-in-progress: false }
     environment: { name: web, url: https://app.superlibrary.dev }
     steps:

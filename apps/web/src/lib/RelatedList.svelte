@@ -4,6 +4,8 @@
   import OutcomeBadge from '$kit/OutcomeBadge.svelte';
   import { outcomeVar } from '$kit/outcome';
   import { api } from '$lib/session.svelte';
+  import Skeleton from '$lib/sections/Skeleton.svelte';
+  import { readDeadline } from '$lib/loading';
 
   /** `onfound` hears how many were found (a closed enclosure's summary); it is not called while looking or when it failed. */
   let { itemId, onfound }: { itemId: string; onfound?: (count: number) => void } = $props();
@@ -14,7 +16,7 @@
     const id = itemId;
     let live = true;
     phase = 'loading';
-    api('/api/v1/related', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ itemId: id, limit: 5 }) })
+    api('/api/v1/related', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ itemId: id, limit: 5 }), signal: readDeadline() })
       .then(async (res) => {
         if (!live) return;
         if (!res.ok) { phase = 'failed'; return; }
@@ -30,9 +32,9 @@
 </script>
 
 {#if phase === 'loading'}
-  <p class="muted" role="status">Looking for related work…</p>
+  <Skeleton label="Looking for related work" rows={2} rowHeight={56} />
 {:else if phase === 'failed'}
-  <p class="muted">Related items could not be loaded.</p>
+  <p class="muted">Couldn't load related items.</p>
 {:else if items.length === 0}
   <p class="muted">Nothing related found yet.</p>
 {:else}

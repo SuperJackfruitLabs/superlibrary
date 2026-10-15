@@ -17,12 +17,14 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
   reporter: 'list',
-  use: { baseURL: 'http://localhost:5173', trace: 'on-first-retry' },
+  // Reduced motion for every spec (no test waits on an animation), except the motion specs, which turn it off themselves.
+  // `contextOptions.reducedMotion`, not `use.reducedMotion`: the latter does not reach the contexts here.
+  use: { baseURL: 'http://localhost:5173', trace: 'on-first-retry', contextOptions: { reducedMotion: 'reduce' } },
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'], channel: process.env.PW_CHANNEL || undefined, launchOptions: { executablePath: process.env.PW_CHROMIUM || undefined } } },
     {
       name: 'webkit',
-      testMatch: /(security|phone|responsive)\.spec\.ts$/,
+      testMatch: /(security|phone|responsive|motion|fit)\.spec\.ts$/,
       // WebKit cannot resolve `itm-<hex>.localhost` itself; e2e/loopback-proxy.mjs does it, loopback only.
       use: { ...devices['Desktop Safari'], proxy: { server: 'http://127.0.0.1:8799' }, launchOptions: { executablePath: process.env.PW_WEBKIT || undefined } },
     },

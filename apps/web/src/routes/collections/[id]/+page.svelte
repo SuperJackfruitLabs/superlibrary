@@ -2,22 +2,22 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
-  import Button from '$kit/Button.svelte';
   import ConfirmDialog from '$kit/ConfirmDialog.svelte';
   import Toast from '$kit/Toast.svelte';
   import { LAYOUTS } from '$lib/layouts/registry';
   import { CollectionModel } from '$lib/screens/collections.svelte';
   import VibeLayout from '$lib/vibe/VibeLayout.svelte';
+  import LoadFailed from '$lib/sections/LoadFailed.svelte';
+  import Skeleton from '$lib/sections/Skeleton.svelte';
   const model = new CollectionModel(() => page.params.id ?? '', (href) => goto(href));
 </script>
 
 <svelte:head><title>{model.c ? model.c.name : 'Collection'} · Superlibrary</title></svelte:head>
 {#if model.notice}<Toast message={model.notice} onclose={() => model.dismissNotice()} />{/if}
-{#if model.error}
-  <p class="error" role="alert">{model.error}</p>
-  <p><Button href="/collections">All collections</Button></p>
+{#if model.error && model.failKind}
+  <LoadFailed heading kind={model.failKind} message={model.error} onretry={() => model.retry()} back={{ href: '/collections', label: 'All collections' }} />
 {:else if !model.c}
-  <p class="muted" role="status">Loading…</p>
+  <Skeleton label="Loading the collection" rows={7} />
 {:else}
   <VibeLayout layouts={LAYOUTS.collection} {model} />
 {/if}

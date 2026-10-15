@@ -23,7 +23,7 @@ describe('item helpers', () => {
     expect(parseVersion('3')).toBe(3);
     for (const bad of ['0', '-1', 'x', '1.5', undefined]) expect(parseVersion(bad)).toBeUndefined();
     expect(explain('revoked')).toBe('This was revoked.');
-    expect(explain('not_found')).toBe('Nothing here, or you cannot see it.');
+    expect(explain('not_found')).toBe("This doesn't exist or isn't shared with you.");
   });
 });
 
@@ -83,8 +83,8 @@ describe('reading the item', () => {
   });
   it('an expired item is its own state (its uploader or an owner may still keep it), read from the 410 body', async () => {
     expect(await readItem(async () => json({ error: 'expired' }, 410), ITEM.id)).toEqual({ state: 'expired' });
-    expect(await readItem(async () => json({ error: 'revoked' }, 410), ITEM.id)).toEqual({ state: 'refused', code: 'revoked' });
-    expect(await readItem(async () => new Response('<html>', { status: 502 }), ITEM.id)).toEqual({ state: 'refused', code: 'http_502' });
+    expect(await readItem(async () => json({ error: 'revoked' }, 410), ITEM.id)).toEqual({ state: 'refused', code: 'revoked', status: 410 });
+    expect(await readItem(async () => new Response('<html>', { status: 502 }), ITEM.id)).toEqual({ state: 'refused', code: 'http_502', status: 502 });
   });
 });
 
@@ -140,7 +140,8 @@ describe('what the person is told', () => {
     expect(explain('not_permitted')).toBe('Only the person who uploaded it, or an owner of the workspace, may do that.');
     expect(explain('invalid', 'expiresAt must be in the future')).toBe('Choose a date after today.');
     expect(explain('invalid', 'reason must be a string of at most 500 characters')).toBe('That was not accepted: reason must be a string of at most 500 characters.');
-    expect(explain('teapot')).toBe('Something went wrong (teapot).');
+    expect(explain('teapot')).toBe('Something went wrong. Try again.');
+    expect(explain('not_found')).toBe("This doesn't exist or isn't shared with you.");
   });
 });
 

@@ -13,9 +13,9 @@
   <thead role="rowgroup"><tr role="row">{#each COLS as h, i (h)}<th role="columnheader" scope="col">{#if i === 0}<span class="visually-hidden">{h}</span>{:else}{h}{/if}</th>{/each}</tr></thead>
   <!-- svelte-ignore a11y_no_redundant_roles -->
   <tbody role="rowgroup">
-    {#each rows as r (r.id)}
+    {#each rows as r, i (r.id)}
       <!-- svelte-ignore a11y_no_redundant_roles -->
-      <tr class="result" role="row" style:--o={outcomeVar(r.outcome)}>
+      <tr class="result vk-enter" role="row" style:--i={i} style:--o={outcomeVar(r.outcome)}>
         <td role="cell" data-label="Status"><span class="sl-led" class:sl-led--live={r.outcome === 'in-progress'} aria-hidden="true"></span></td>
         <td role="cell" data-label="Title"><a class="result-link" href={`/a/${r.id}`}>{r.title}</a></td>
         <td role="cell" data-label="Outcome"><OutcomeBadge outcome={r.outcome} /></td>

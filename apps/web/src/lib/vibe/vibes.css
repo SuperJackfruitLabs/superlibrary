@@ -44,3 +44,8 @@
 [data-vibe="quiet"] .suite-shell-nav a[aria-current='page'] { box-shadow: none; color: var(--vk-color-text); font-weight: 700; }
 [data-vibe="quiet"] .kit-button:not(.kit-button--primary):not(.kit-button--danger), [data-vibe="quiet"] button:not([class]) { box-shadow: inset 0 0 0 2px var(--vk-color-text); }
 [data-vibe="quiet"] .kit-tabs a { border-radius: var(--vk-radius-sm); }
+@media (max-width: 380px) {
+  /* Studio's raised bar keeps the 16 px page gutter; inside it, a tighter inset and smaller capitals so the row fits at 360 px. */
+  [data-vibe="studio"] .suite-shell { padding-inline: var(--vk-space-2); column-gap: var(--vk-space-2); }
+  [data-vibe="studio"] .suite-shell-nav a { font-size: 0.6875rem; letter-spacing: 0; }
+}

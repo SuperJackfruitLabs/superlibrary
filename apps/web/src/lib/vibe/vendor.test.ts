@@ -17,9 +17,16 @@ describe('vibekit is vendored', () => {
   });
 
   it('the tarball is the one whose checksum is recorded', () => {
-    const tgz = readFileSync(join(WEB, 'vendor', 'vibekit-0.0.1.tgz'));
-    const recorded = readFileSync(join(WEB, 'vendor', 'vibekit-0.0.1.tgz.sha256'), 'utf8').trim().split(/\s+/)[0];
+    const tgz = readFileSync(join(WEB, 'vendor', 'vibekit-0.0.12.tgz'));
+    const recorded = readFileSync(join(WEB, 'vendor', 'vibekit-0.0.12.tgz.sha256'), 'utf8').trim().split(/\s+/)[0];
     expect(createHash('sha256').update(tgz).digest('hex')).toBe(recorded);
+  });
+
+  it('is 0.0.12: the motion module and the skeleton tokens the app uses', async () => {
+    const pkg = JSON.parse(readFileSync(join(WEB, 'node_modules', '@superjackfruit', 'vibekit', 'package.json'), 'utf8')) as { version: string };
+    expect(pkg.version).toBe('0.0.12');
+    const motion = await import('@superjackfruit/vibekit/motion');
+    expect(typeof motion.countUp).toBe('function');
   });
 
   it('ships the stylesheets the app imports', () => {
@@ -28,7 +35,7 @@ describe('vibekit is vendored', () => {
 
   it('the retired fonts are gone', () => {
     const pkg = JSON.parse(readFileSync(join(WEB, 'package.json'), 'utf8')) as { dependencies: Record<string, string> };
-    expect(pkg.dependencies['@superjackfruit/vibekit']).toBe('file:./vendor/vibekit-0.0.1.tgz');
+    expect(pkg.dependencies['@superjackfruit/vibekit']).toBe('file:./vendor/vibekit-0.0.12.tgz');
     expect(Object.keys(pkg.dependencies).filter((d) => d.includes('ibm-plex'))).toEqual([]);
   });
 });

@@ -34,3 +34,15 @@ describe('createApi', () => {
     expect(heads[2]!.get('x-dev-principal')).toBeNull();
   });
 });
+
+describe('createApi deadlines', () => {
+  it('a read that never answers is aborted (catch-up S1/S2), a write is not', async () => {
+    const signals: (AbortSignal | null | undefined)[] = [];
+    const fetchFn = (async (_u: string, init: RequestInit) => { signals.push(init.signal); return ok(); }) as never;
+    const api = createApi({ plane: () => null, token: async () => null, onUnauthorized: () => {}, dev: true, fetchFn });
+    await api('/api/v1/me');
+    await api('/api/v1/collections', { method: 'POST', body: '{}' });
+    expect(signals[0]).toBeInstanceOf(AbortSignal);
+    expect(signals[1]).toBeUndefined();
+  });
+});

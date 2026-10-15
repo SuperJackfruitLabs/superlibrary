@@ -30,7 +30,9 @@ const manifest = () => JSON.parse(readFileSync(join(STATIC, 'manifest.webmanifes
 describe('installable', () => {
   it('app.html links the favicons, the manifest and the iOS home-screen tags', () => {
     expect(html).toContain('<link rel="icon" href="/favicon.ico" sizes="any" />');
-    expect(html).toContain('<link rel="icon" type="image/svg+xml" href="/favicon.svg" />');
+    expect(html).toContain('<link rel="icon" type="image/svg+xml" href="/brand/favicon.svg" />');
+    for (const n of [16, 32, 48]) expect(html).toContain(`<link rel="icon" type="image/png" sizes="${n}x${n}" href="/brand/favicon-${n}.png" />`);
+    expect(html).toContain('<meta property="og:image" content="https://app.superlibrary.dev/brand/og.png" />');
     expect(html).toContain('<link rel="manifest" href="/manifest.webmanifest" />');
     expect(html).toContain('<link rel="apple-touch-icon" href="/apple-touch-icon.png" />');
     expect(html).toContain('<meta name="apple-mobile-web-app-capable" content="yes" />');
@@ -50,7 +52,7 @@ describe('installable', () => {
     expect(m.short_name).toBeTruthy();
     expect(m.background_color).toMatch(/^#[0-9a-f]{6}$/);
     expect(m.theme_color).toMatch(/^#[0-9a-f]{6}$/);
-    for (const [sizes, purpose] of [['192x192', 'any'], ['512x512', 'any'], ['512x512', 'maskable']]) {
+    for (const [sizes, purpose] of [['192x192', 'any'], ['512x512', 'any'], ['192x192', 'maskable'], ['512x512', 'maskable']]) {
       expect(m.icons?.some((i) => i.sizes === sizes && (i.purpose ?? 'any') === purpose && i.type === 'image/png'), `${sizes} ${purpose}`).toBe(true);
     }
   });
@@ -65,16 +67,27 @@ describe('installable', () => {
     }
   });
 
-  it('favicon.ico holds 16, 32 and 48px images; favicon.svg is the mark in coral on the dark tile', () => {
+  it('favicon.ico holds 16, 32 and 48px images; the icons are the translucent-v2 coral mark, copied unchanged from the pack', () => {
     const ico = readFileSync(join(STATIC, 'favicon.ico'));
     expect(ico.readUInt16LE(2)).toBe(1); // type 1: icon
     const count = ico.readUInt16LE(4);
     const sizes = Array.from({ length: count }, (_, i) => ico[6 + i * 16] || 256).sort((a, b) => a - b);
     expect(sizes).toEqual([16, 32, 48]);
-    const svg = readFileSync(join(STATIC, 'favicon.svg'), 'utf8');
-    expect(svg).toContain('fill="#ff7a59"');
-    expect(svg).toMatch(/<rect width="32" height="32" rx="7" fill="#0f1118"\/>/);
-    expect(svg.match(/<rect x=/g)).toHaveLength(3);
+    const svg = readFileSync(join(STATIC, 'brand', 'favicon.svg'), 'utf8');
+    expect(svg).toContain('aria-label="Superlibrary favicon"');
+    expect(svg).toContain('#FC744B');   // the pack's coral gradient
+    for (const n of [16, 32, 48]) expect(png(readFileSync(join(STATIC, 'brand', `favicon-${n}.png`))).width).toBe(n);
+    expect(readFileSync(join(STATIC, 'brand', 'README.md'), 'utf8')).toContain('translucent-v2, 2026-10-14');
+  });
+
+  it('leaves no file of the old mark behind', () => {
+    for (const f of ['favicon.svg', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png']) expect(existsSync(join(STATIC, f)), f).toBe(false);
+    expect(existsSync(join(WEB, 'scripts', 'render-icons.sh'))).toBe(false);
+    expect(readFileSync(join(WEB, 'src', 'lib', 'Mark.svelte'), 'utf8')).not.toContain('rotate(-20');   // the old three spines
+  });
+
+  it('the link preview image is 1200x630', () => {
+    expect(png(readFileSync(join(STATIC, 'brand', 'og.png')))).toMatchObject({ width: 1200, height: 630 });
   });
 
   it('Cloudflare is told the manifest and favicon.ico media types', () => {

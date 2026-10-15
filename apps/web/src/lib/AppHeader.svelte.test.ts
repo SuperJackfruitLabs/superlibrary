@@ -17,16 +17,16 @@ describe('the app header', () => {
     const mark = home.querySelector('svg[data-testid="superlibrary-mark"]')!;
     expect(mark).not.toBeNull();
     expect(mark.getAttribute('aria-hidden')).toBe('true');
-    expect(mark.querySelectorAll('rect')).toHaveLength(3);
+    expect(mark.querySelectorAll('g[mask] > path')).toHaveLength(4);   // the pack's four pages
     expect(home.textContent?.trim()).toBe('Superlibrary');
   });
 
-  it('the mark draws the same three spines as the favicon', () => {
+  it('the mark draws the same pages as the favicon (translucent-v2)', () => {
     open();
-    const fav = readFileSync(join(__dirname, '..', '..', 'static', 'favicon.svg'), 'utf8');
-    const fromFavicon = [...fav.matchAll(/<rect (x="[^/]*?)\/>/g)].map((m) => m[1]!.trim());
-    const inHeader = [...document.querySelectorAll('[data-testid="superlibrary-mark"] rect')].map((r) => [...r.attributes].map((a) => `${a.name}="${a.value}"`).join(' '));
-    expect(inHeader).toEqual(fromFavicon);
+    const fav = readFileSync(join(__dirname, '..', '..', 'static', 'brand', 'favicon.svg'), 'utf8');
+    const inHeader = [...document.querySelectorAll('[data-testid="superlibrary-mark"] g[mask] > path')].map((p) => p.getAttribute('d')!);
+    expect(inHeader).toHaveLength(4);
+    for (const d of inHeader) expect(fav, d.slice(0, 20)).toContain(`d="${d}"`);
   });
 
   it('the nav reads Library, Outcomes, Collections, Upload', () => {

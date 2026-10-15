@@ -78,7 +78,7 @@ test('an item address that is not an item id is not found, and the API is not as
   const asked: string[] = [];
   page.on('request', (r) => { if (r.url().includes('/api/v1/items/')) asked.push(r.url()); });
   await page.goto('/a/not-an-item');
-  await expect(page.getByText('Nothing here, or you cannot see it.')).toBeVisible();
+  await expect(page.getByText("This doesn't exist or isn't shared with you.")).toBeVisible();
   expect(asked).toEqual([]);
 });
 

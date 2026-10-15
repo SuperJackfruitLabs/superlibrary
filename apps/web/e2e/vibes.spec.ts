@@ -44,6 +44,7 @@ for (const vibe of VIBES_E2E) {
           await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
           // The app polls, so the network never idles: wait until nothing says it is still loading.
           await expect(page.locator('[role="status"]', { hasText: /^(Loading…|Connecting…|Looking for related work…)$/ })).toHaveCount(0);
+          await expect(page.locator('[aria-busy="true"]')).toHaveCount(0);
           // At phone width Paper's enclosures start closed: open what a person can open, so its controls are measured too.
           if (width === 390) await openEnclosures(page);
           // The item page's Collection picker fills in after the page paints; measure once it has.
@@ -75,6 +76,7 @@ for (const vibe of VIBES_E2E) {
           await page.goto(path);
           await expect(page.locator('h1').first()).toBeVisible();
           await expect(page.locator('[role="status"]', { hasText: /^(Loading…|Connecting…|Looking for related work…)$/ })).toHaveCount(0);
+          await expect(page.locator('[aria-busy="true"]')).toHaveCount(0);
           await expectNoSideways(page, `${vibe}/${theme} ${name} ${width}px`);
         }
         await context.close();
@@ -95,6 +97,7 @@ for (const [phase, time] of [['dusk', '2026-10-11T18:10:00'], ['night', '2026-10
       await page.goto(path);
       await expect(page.locator('h1').first()).toBeVisible();
       await expect(page.locator('[role="status"]', { hasText: /^(Loading…|Connecting…|Looking for related work…)$/ })).toHaveCount(0);
+          await expect(page.locator('[aria-busy="true"]')).toHaveCount(0);
       const axe = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).exclude('iframe.sl-frame').analyze();
       expect(axe.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`), `paper/light ${phase} ${name}`).toEqual([]);
     }
@@ -140,6 +143,7 @@ for (const [phase, time] of [['dusk', '2026-10-11T18:10:00'], ['night', '2026-10
     await expect(page.locator('h1').first()).toBeVisible();
     await expect(page.locator('.vk-sky')).toHaveAttribute('data-phase', phase);
     await expect(page.locator('[role="status"]', { hasText: /^(Loading…|Connecting…)$/ })).toHaveCount(0);
+    await expect(page.locator('[aria-busy="true"]')).toHaveCount(0);
     await axe('home');
     await page.locator('.vk-sky').getByRole('link', { name: 'Upload' }).focus();
     await page.keyboard.press('Shift+Tab'); await page.keyboard.press('Tab');   // keyboard focus, so :focus-visible applies

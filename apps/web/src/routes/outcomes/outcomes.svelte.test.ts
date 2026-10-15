@@ -55,4 +55,29 @@ describe('the outcomes page', () => {
     await settle();
     expect(document.body.textContent).toContain('Item 2');
   });
+  it('while loading: a skeleton in aria-busy, a dash in every tab, and no "nothing" or 0 (catch-up S3/S5)', async () => {
+    let release!: () => void;
+    const held = new Promise<void>((r) => { release = r; });
+    browse = () => { throw new Error('unused'); };
+    const real = browse;
+    let first = true;
+    browse = (n) => (first ? (first = false, held.then(() => Response.json({ items: [item(1)], next: null, counts })) as unknown as Response) : real(n));
+    c = mount(Page, { target: document.body });
+    await settle();
+    expect(document.querySelector('[aria-busy="true"][data-skeleton]')).not.toBeNull();
+    const tabs = [...document.querySelectorAll<HTMLAnchorElement>('nav[aria-label="Outcome"] a')].map((a) => a.textContent!.replace(/\s+/g, ' ').trim());
+    expect(tabs).toEqual(['Everything –', 'Approved –', 'Completed –', 'In progress –', 'Superseded –', 'Rejected –', 'Failed –', 'Abandoned –']);
+    expect(document.body.textContent).not.toMatch(/Nothing|\b0 items?\b/);
+    release();
+    await settle();
+    expect(document.querySelector('[data-skeleton]')).toBeNull();
+    expect(document.body.textContent).toContain('Item 1');
+  });
+  it('a failed read says it could not load, never that there is nothing (S4)', async () => {
+    browse = () => Response.json({ error: 'internal' }, { status: 500 });
+    c = mount(Page, { target: document.body });
+    await settle();
+    expect(document.body.textContent).toContain("Couldn't load — try again.");
+    expect(document.body.textContent).not.toMatch(/Nothing|internal|500/);
+  });
 });

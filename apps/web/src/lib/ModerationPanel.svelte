@@ -47,7 +47,7 @@
     if (!by) { replaceError = 'Paste a Superlibrary link or an item id (itm_…).'; return; }
     if (by === item.id) { replaceError = 'An item cannot replace itself.'; return; }
     const r = await readItem(api, by).catch(() => null);
-    if (!r || r.state !== 'ok') { replaceError = 'Nothing here, or you cannot see it.'; return; }
+    if (!r || r.state !== 'ok') { replaceError = "This doesn't exist or isn't shared with you."; return; }
     ask(opener, askSupersede(item.title, r.item.title), async () => {
       const err = await supersede(api, item.id, by);
       if (!err) { replacement = ''; onchanged(`Marked as superseded by “${r.item.title}”.`); }

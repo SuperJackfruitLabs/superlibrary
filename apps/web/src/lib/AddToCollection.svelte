@@ -4,6 +4,7 @@
   import Button from '$kit/Button.svelte';
   import { api } from '$lib/session.svelte';
   import { addToCollection, listCollections } from '$lib/collections';
+  import Skeleton from '$lib/sections/Skeleton.svelte';
 
   /** `onlisted` hears how many collections there are to add to, or null when the list could not be loaded. */
   let { itemId, onlisted }: { itemId: string; onlisted?: (count: number | null) => void } = $props();
@@ -34,7 +35,10 @@
 </script>
 
 <div class="sl-collect">
-  {#if loadError}
+  {#if !loaded}
+    <!-- Holds the picker's place while the list loads, so the sections below do not jump when it lands. -->
+    <Skeleton label="Loading collections" rows={1} rowHeight={76} />
+  {:else if loadError}
     <p class="error" role="alert">{loadError}</p>
     <button type="button" onclick={load}>Try again</button>
   {:else if loaded && list.length === 0}

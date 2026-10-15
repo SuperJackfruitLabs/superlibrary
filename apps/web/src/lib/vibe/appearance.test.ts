@@ -70,7 +70,7 @@ describe('the appearance setting', () => {
     vi.spyOn(Document.prototype, 'cookie', 'set').mockImplementation(function (this: Document, v: string) { writes.push(v); desc.set!.call(this, v); });
     stop = initAppearance(document, noon);
     localStorage.setItem(OLD_THEME_KEY, 'light');
-    setAppearance({ vibe: 'paper', theme: 'dark', timeStrength: 'strong', useLocation: false });
+    setAppearance({ vibe: 'paper', theme: 'dark', timeStrength: 'strong', useLocation: false, accents: {} });
     expect(attrs().vibe).toBe('paper');
     expect(attrs().theme).toBe('dark');
     expect(look.theme).toBe('dark');

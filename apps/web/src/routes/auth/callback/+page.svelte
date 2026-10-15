@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { beginSignIn, completeSignIn, suppressAutoSignIn } from '$lib/auth/org-plane';
-  import { currentPlane, initSession, refreshMe, session } from '$lib/session.svelte';
+  import { currentPlane, initSession, planeReady, refreshMe, session } from '$lib/session.svelte';
   import { safeReturnTo } from '$lib/return-to';
 
   let message = $state('Signing you in…');
@@ -10,7 +10,7 @@
 
   onMount(async () => {
     try {
-      if (!currentPlane()) await initSession();
+      if (!(await planeReady())) await initSession();
       const p = currentPlane();
       if (!p) { failed = true; message = 'This deployment has no sign-in service configured.'; return; }
       const { returnTo, interactive } = await completeSignIn(new URLSearchParams(window.location.search), p);

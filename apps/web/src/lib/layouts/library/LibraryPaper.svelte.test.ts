@@ -18,7 +18,7 @@ describe('Paper: the library as a front page', () => {
     await settle();
     expect(document.querySelector('.sl-masthead h1')!.textContent).toBe('Library');
     expect(document.querySelector('.sl-paper-side details.filters')).not.toBeNull();
-    expect(document.querySelector('.sl-paper-side [role="status"]')).not.toBeNull();
+    expect(document.querySelector('.sl-paper-side .sl-status')).not.toBeNull();
     const list = document.querySelector('ul.results--index[aria-label="Library"]')!;
     expect(list.querySelectorAll(':scope > li')).toHaveLength(2);
     expect(list.querySelector('blockquote.snippet')!.textContent).toBe('A caption for search');

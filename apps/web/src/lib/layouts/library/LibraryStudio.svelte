@@ -10,11 +10,13 @@
   import Tiles from '$lib/sections/Tiles.svelte';
   import { look } from '$lib/vibe/appearance.svelte';
   import { readout } from '$lib/vibe/copy';
+  import { PENDING_COUNT } from '$lib/loading';
   let { model }: { model: LibraryModel } = $props();
   const tiles = $derived([
-    { key: 'Shown', value: `${model.rows.length}${model.next ? '+' : ''}` },
+    { key: 'Shown', value: model.refreshing ? PENDING_COUNT : `${model.rows.length}${model.next ? '+' : ''}` },
     { key: 'Filters on', value: String(model.activeCount) },
-    ...(model.searching || !model.counts ? [] : OUTCOME_ORDER.map((o) => ({ key: OUTCOME_WORDS[o], value: String(model.counts![o] ?? 0), tone: outcomeVar(o) }))),
+    // While the first page loads the tiles hold their place with a dash (never 0, never a jump when they land).
+    ...(model.searching ? [] : OUTCOME_ORDER.map((o) => ({ key: OUTCOME_WORDS[o], value: !model.counts || model.refreshing ? PENDING_COUNT : String(model.counts[o] ?? 0), tone: outcomeVar(o) }))),
   ]);
 </script>
 
@@ -23,7 +25,7 @@
   {#if look.appearance.timeStrength !== 'off'}<p class="sl-readout" aria-hidden="true"><span class="sl-led sl-led--sun"></span>{readout(look.now, look.phase)}</p>{/if}
   <Button variant="primary" href="/upload">Upload</Button>
 </div>
-{#if !model.error && !model.refreshing}<Tiles label="Summary" {tiles} />{/if}
+{#if !model.error}<Tiles label="Summary" {tiles} />{/if}
 <div class="sl-studio-bar">
   <SearchForm {model} />
   <FilterBar filters={model.filters} facets={model.facets} onchange={(f) => void model.setFilters(f)} openFrom={1024} />
