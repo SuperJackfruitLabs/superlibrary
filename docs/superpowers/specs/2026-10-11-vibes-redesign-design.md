@@ -310,7 +310,7 @@ below the top of the `h1` on desktop and 170px on a phone (today's e2e budget, n
 **Paper**: a letter with enclosures (column max 720px, the viewer full width).
 1. Letterhead: a top row with the kicker `p.sl-kicker` "Superlibrary · Artifact" (or "Work record") and
    "Upload a new version" as a secondary button on the right; then `h1` in Newsreader; then a byline
-   `p.item-meta`: portrait Face (agent maker) + "From <Created by words>" + outcome word + `vN (latest)` +
+   `p.item-meta`: portrait Face (agent maker) + "Created by <Created by words>" + outcome word + `vN (latest)` +
    visibility + `deleted on <date>`. (The button sits above the title so the content still starts
    within the title budget.)
 2. The viewer framed as a sheet (1px rule, surface background), then the frame-error block.
