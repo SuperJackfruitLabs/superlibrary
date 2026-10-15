@@ -7,7 +7,9 @@ import { flag, oneLine, positionals } from './args.ts';
 import { getItem, revoke, upload } from './artifacts.ts';
 import { collect, scope, search } from './library.ts';
 
-const VERSION = '0.0.1';
+/** Set by `bun build --define SULI_VERSION=…` in the release workflow; any other build reports `dev`. */
+declare const SULI_VERSION: string | undefined;
+const VERSION: string = typeof SULI_VERSION === 'string' ? SULI_VERSION : 'dev';
 
 function fail(message: string): never {
   process.stderr.write(`suli: ${oneLine(message)}\n`);

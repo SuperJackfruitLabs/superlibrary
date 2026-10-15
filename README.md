@@ -11,6 +11,24 @@ Design: [docs/superpowers/specs/2026-10-09-superlibrary-design.md](docs/superpow
 Part of [Super Jackfruit Labs](https://superjackfruit.com). Signs in through
 [accounts.superjackfruit.com](https://accounts.superjackfruit.com).
 
+## Install
+
+`suli` (also installed as `superlibrary`) is the command-line client. It installs as one binary,
+with no sudo, into `~/.local/bin`:
+
+```bash
+curl -fsSL https://github.com/SuperJackfruitLabs/superlibrary/releases/latest/download/install.sh | bash
+```
+
+- `VERSION=v0.0.1 bash` pins a release tag; the default is the latest release.
+- `BIN_DIR=/some/dir` installs somewhere other than `~/.local/bin`.
+- The installer refuses to install a download whose SHA-256 it cannot verify against the release's `SHA256SUMS`.
+
+Then `suli login`: one sign-in, and you approve the code in any browser, so it works over SSH.
+It also works in a Claude Code cloud session: run the installer, then `suli login`.
+
+(Releases are built by `.github/workflows/release.yml` when a `v*` tag is pushed.)
+
 ## Run it locally
 
 ```bash

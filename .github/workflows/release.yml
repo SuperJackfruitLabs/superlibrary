@@ -1,0 +1,87 @@
+name: Release suli
+
+# A tag publishes the suli CLI binaries, SHA256SUMS and the installer. The app (API, content
+# Worker, web) deploys continuously from main (see ci.yml); nothing in production waits on a tag.
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release (e.g. v0.0.1)'
+        required: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish suli
+    # GitHub only: the release is published with gh and GitHub's token.
+    if: github.server_url == 'https://github.com'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # One job builds every target (bun cross-compiles), so a release is all four binaries or none.
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+      - uses: oven-sh/setup-bun@v2
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # A release must not be the first place a break is noticed.
+      - name: Typecheck and test the CLI
+        run: |
+          pnpm --filter @superlibrary/cli typecheck
+          pnpm --filter @superlibrary/cli test
+      - name: Resolve the tag
+        id: tag
+        run: echo "name=${{ github.event.inputs.tag || github.ref_name }}" >> "$GITHUB_OUTPUT"
+      - name: Build every published target
+        env:
+          TAG: ${{ steps.tag.outputs.name }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          # Keep in step with the platform detection in scripts/install.sh.
+          for target in darwin-arm64 darwin-x64 linux-x64 linux-arm64; do
+            bun build \
+              --compile \
+              --minify \
+              --define SULI_VERSION="\"${TAG}\"" \
+              --target="bun-${target}" \
+              packages/cli/src/index.ts \
+              --outfile "dist/suli-${target}"
+          done
+          ls -lh dist/
+      # A binary whose --define silently failed would ship reporting `dev`.
+      - name: Verify the linux-x64 binary reports its version
+        env:
+          TAG: ${{ steps.tag.outputs.name }}
+        run: |
+          set -euo pipefail
+          got="$(./dist/suli-linux-x64 version)"
+          echo "$got"
+          case "$got" in
+            "suli ${TAG} "*) ;;
+            *) echo "::error::binary reports '${got}', expected version ${TAG}"; exit 1 ;;
+          esac
+      - name: Checksums
+        working-directory: dist
+        run: sha256sum suli-* > SHA256SUMS && cat SHA256SUMS
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.tag.outputs.name }}
+        run: |
+          set -euo pipefail
+          # An existing release is filled in, not recreated, so a re-run keeps edited notes.
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --title "$TAG" --generate-notes
+          fi
+          gh release upload "$TAG" dist/suli-* dist/SHA256SUMS scripts/install.sh --clobber

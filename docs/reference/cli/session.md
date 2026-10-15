@@ -34,7 +34,7 @@ suli help upload
 
 ## `suli version`
 
-Prints the version, platform and architecture. Sends nothing.
+Prints `suli <version> <platform>/<arch>`. A release binary reports its release tag (for example v0.0.1); a build from source reports `dev`. Sends nothing.
 
 ```sh
 suli version
