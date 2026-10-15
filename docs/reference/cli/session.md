@@ -56,6 +56,40 @@ suli version
 suli version
 ```
 
+## `suli skill`
+
+Prints SKILL.md, the guide an agent reads to use suli, stamped with this binary’s version. It is built into the binary, so it always matches the verbs it ships with. `suli skill install` instead writes `<dir>/superlibrary-items/SKILL.md` (staged beside it, then renamed, so a reader never sees half a file); it overwrites only that one file, so it is safe to repeat. Sends nothing.
+
+```sh
+suli skill [<install>] [--dir <dir>]
+```
+
+| argument | meaning |
+|---|---|
+| `<install>` | Write the skill into a skills directory instead of printing it (optional) |
+
+| flag | type | default | meaning |
+|---|---|---|---|
+| `--dir <dir>` | path | ~/.claude/skills | With `install`: the skills directory to write into |
+
+**Who may run it**
+
+- Local: sends no credential to Superlibrary.
+
+**Prints** the SKILL.md text; with `install`, the path written (with --json, `{ "path": … }`).
+
+**Exit status** `0` on success. `1` when:
+
+- with `install`: the directory cannot be written
+
+**Example**
+
+```sh
+suli skill
+suli skill install
+suli skill install --dir ./.claude/skills
+```
+
 ## `suli login`
 
 Finds the sign-in service from the server (`/.well-known/oauth-protected-resource`) and runs its device flow: open the printed link, confirm the code, and suli keeps a device credential of its own. Every command after that exchanges it for a token that lives five minutes, without a browser.

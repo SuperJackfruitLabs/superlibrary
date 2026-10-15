@@ -8,8 +8,11 @@
 #   BIN_DIR           where to install; default: ~/.local/bin
 #   SULI_RELEASE_BASE TEST-ONLY: replaces the release download URL, so the installer can be
 #                     exercised against a local server. Not for users.
+#   SKILL_DIR         also install the agent skill there (`suli skill install --dir "$SKILL_DIR"`),
+#                     e.g. ~/.claude/skills; omitted by default
 #
-# Installs one binary under two names, `suli` and `superlibrary`. Never asks for sudo.
+# Installs one binary under two names, `suli` and `superlibrary`. Never asks for sudo. A different
+# program already at either name is refused, never overwritten; an earlier suli install is replaced.
 
 set -euo pipefail
 
@@ -32,6 +35,20 @@ case "$arch" in
   *) err "suli publishes no binary for ${arch}." ;;
 esac
 asset="suli-${os}-${arch}"
+
+# --- refuse to clobber a stranger ----------------------------------------------
+# Ours = a symlink to our own suli, or a program that identifies itself as `suli <version> ...`.
+is_ours() {
+  [ -L "$1" ] && [ "$(readlink "$1")" = "${BIN_DIR}/suli" ] && return 0
+  [ -f "$1" ] && [ -x "$1" ] && case "$("$1" version 2>/dev/null || true)" in "suli "*) return 0 ;; esac
+  return 1
+}
+for name in suli superlibrary; do
+  if [ -e "${BIN_DIR}/${name}" ] || [ -L "${BIN_DIR}/${name}" ]; then
+    is_ours "${BIN_DIR}/${name}" \
+      || err "${BIN_DIR}/${name} already exists and is not a suli install; refusing to overwrite it. Move it aside or choose another BIN_DIR."
+  fi
+done
 
 # --- release ----------------------------------------------------------------
 if [ -n "${SULI_RELEASE_BASE:-}" ]; then
@@ -79,6 +96,14 @@ mv -f "${BIN_DIR}/.suli.incoming.$$" "${BIN_DIR}/suli"
 ln -sf "${BIN_DIR}/suli" "${BIN_DIR}/superlibrary"
 
 printf 'Installed %s\n' "$("${BIN_DIR}/suli" version)"
+
+if [ -n "${SKILL_DIR:-}" ]; then
+  if "${BIN_DIR}/suli" skill install --dir "$SKILL_DIR" 2>/dev/null; then
+    :
+  else
+    printf 'Note: this suli (%s) has no skill verb, so the skill was not installed. The CLI is fine; install a newer release for the skill.\n' "$tag" >&2
+  fi
+fi
 
 # shellcheck disable=SC2016  # $PATH here is literal text for the reader to type
 case ":${PATH}:" in

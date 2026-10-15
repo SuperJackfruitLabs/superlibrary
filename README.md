@@ -27,6 +27,10 @@ curl -fsSL https://github.com/SuperJackfruitLabs/superlibrary/releases/latest/do
 Then `suli login`: one sign-in, and you approve the code in any browser, so it works over SSH.
 It also works in a Claude Code cloud session: run the installer, then `suli login`.
 
+To give an agent the skill too: `SKILL_DIR=~/.claude/skills bash` on the installer (or run `suli skill install` afterwards).
+The skill is built into the binary, so it always matches the verbs of the suli that wrote it.
+An existing different program named `suli` or `superlibrary` is refused, never overwritten.
+
 (Releases are built by `.github/workflows/release.yml` when a `v*` tag is pushed.)
 
 ## Run it locally

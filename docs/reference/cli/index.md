@@ -15,6 +15,7 @@ suli help <verb>
 |---|---|
 | [`suli help`](session.md#suli-help) | Every command, or one in full |
 | [`suli version`](session.md#suli-version) | The version of suli |
+| [`suli skill`](session.md#suli-skill) | Print or install the agent skill |
 | [`suli login`](session.md#suli-login) | Sign in from this terminal |
 | [`suli logout`](session.md#suli-logout) | Forget this terminal’s credential |
 | [`suli whoami`](session.md#suli-whoami) | Who you are signed in as |

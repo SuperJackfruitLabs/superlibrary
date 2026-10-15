@@ -16,7 +16,10 @@ const os = process.platform === 'darwin' ? 'darwin' : 'linux';
 const arch = process.arch === 'arm64' ? 'arm64' : 'x64';
 const ASSET = `suli-${os}-${arch}`;
 
-const fake = (v: string) => `#!/bin/sh\necho "suli ${v} ${os}/${arch}"\n`;
+const fake = (v: string, skill = false) =>
+  skill
+    ? `#!/bin/sh\nif [ "$1" = skill ] && [ "$2" = install ]; then mkdir -p "$4/superlibrary-items"; echo "SKILL ${v}" > "$4/superlibrary-items/SKILL.md"; exit 0; fi\necho "suli ${v} ${os}/${arch}"\n`
+    : `#!/bin/sh\nif [ "$1" = skill ]; then echo "suli: unknown command: skill" >&2; exit 1; fi\necho "suli ${v} ${os}/${arch}"\n`;
 const sha = (s: string) => createHash('sha256').update(s).digest('hex');
 
 let server: Server;
@@ -38,8 +41,8 @@ afterEach(async () => {
   for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
 });
 
-function release(v: string, opts: { sums?: boolean; digest?: string; asset?: boolean } = {}) {
-  const bin = fake(v);
+function release(v: string, opts: { sums?: boolean; digest?: string; asset?: boolean; skill?: boolean } = {}) {
+  const bin = fake(v, opts.skill);
   if (opts.asset !== false) files[ASSET] = bin;
   if (opts.sums !== false) files['SHA256SUMS'] = `${opts.digest ?? sha(bin)}  ${ASSET}\nffff  suli-other-arch\n`;
 }
@@ -51,9 +54,9 @@ function binDir(): string {
 }
 
 // Async: the server lives in this process, so a sync spawn would deadlock the curl inside the script.
-function run(bin: string): Promise<{ status: number; stdout: string; stderr: string }> {
+function run(bin: string, extra: Record<string, string> = {}): Promise<{ status: number; stdout: string; stderr: string }> {
   return new Promise((done) => {
-    const p = spawn(INSTALLER, [], { env: { ...process.env, BIN_DIR: bin, SULI_RELEASE_BASE: base } });
+    const p = spawn(INSTALLER, [], { env: { ...process.env, BIN_DIR: bin, SULI_RELEASE_BASE: base, ...extra } });
     let stdout = '', stderr = '';
     p.stdout.on('data', (c) => (stdout += c));
     p.stderr.on('data', (c) => (stderr += c));
@@ -113,13 +116,43 @@ describe('install.sh', () => {
     expect(existsSync(join(bin, 'suli'))).toBe(false);
   });
 
-  it('replaces a different file already at the target, as supi does (the verified download wins)', async () => {
+  it('refuses a different file already at suli, and leaves it alone', async () => {
     release('v1.0.0');
     const bin = binDir();
-    writeFileSync(join(bin, 'suli'), 'someone else\'s program');
+    writeFileSync(join(bin, 'suli'), "someone else's program");
     const r = await run(bin);
+    expect(r.status).not.toBe(0);
+    expect(r.stderr).toContain('refusing to overwrite');
+    expect(readFileSync(join(bin, 'suli'), 'utf8')).toBe("someone else's program");
+    expect(existsSync(join(bin, 'superlibrary'))).toBe(false);
+  });
+
+  it('refuses a different file already at superlibrary, installing nothing', async () => {
+    release('v1.0.0');
+    const bin = binDir();
+    writeFileSync(join(bin, 'superlibrary'), "someone else's program");
+    const r = await run(bin);
+    expect(r.status).not.toBe(0);
+    expect(r.stderr).toContain('superlibrary already exists');
+    expect(readFileSync(join(bin, 'superlibrary'), 'utf8')).toBe("someone else's program");
+    expect(existsSync(join(bin, 'suli'))).toBe(false);
+  });
+
+  it('with SKILL_DIR, installs the skill using the fresh binary', async () => {
+    release('v1.0.0', { skill: true });
+    const bin = binDir(), sk = binDir();
+    const r = await run(bin, { SKILL_DIR: sk });
     expect(r.status).toBe(0);
-    expect(readFileSync(join(bin, 'suli'), 'utf8')).toBe(fake('v1.0.0'));
+    expect(readFileSync(join(sk, 'superlibrary-items', 'SKILL.md'), 'utf8')).toBe('SKILL v1.0.0\n');
+  });
+
+  it('with SKILL_DIR and an old binary without the verb, notes it and still succeeds', async () => {
+    release('v1.0.0');
+    const bin = binDir(), sk = binDir();
+    const r = await run(bin, { SKILL_DIR: sk });
+    expect(r.status).toBe(0);
+    expect(r.stderr).toContain('no skill verb');
+    expect(existsSync(join(sk, 'superlibrary-items'))).toBe(false);
   });
 
   it('does not touch an existing install when the new download fails verification', async () => {
