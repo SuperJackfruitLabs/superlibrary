@@ -32,7 +32,7 @@ describe('installable', () => {
     expect(html).toContain('<link rel="icon" href="/favicon.ico" sizes="any" />');
     expect(html).toContain('<link rel="icon" type="image/svg+xml" href="/brand/favicon.svg" />');
     for (const n of [16, 32, 48]) expect(html).toContain(`<link rel="icon" type="image/png" sizes="${n}x${n}" href="/brand/favicon-${n}.png" />`);
-    expect(html).toContain('<meta property="og:image" content="/brand/og.png" />');
+    expect(html).toContain('<meta property="og:image" content="https://app.superlibrary.dev/brand/og.png" />');
     expect(html).toContain('<link rel="manifest" href="/manifest.webmanifest" />');
     expect(html).toContain('<link rel="apple-touch-icon" href="/apple-touch-icon.png" />');
     expect(html).toContain('<meta name="apple-mobile-web-app-capable" content="yes" />');
