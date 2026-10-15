@@ -123,7 +123,7 @@ select { border: 2px solid var(--vk-color-faint); border-radius: var(--vk-radius
 .sl-skeleton { display: flex; flex-direction: column; min-width: 0; margin-block: var(--vk-space-3); }
 .sl-skeleton:not(.sl-skeleton--on) > * { visibility: hidden; }
 .sl-skeleton__row { display: flex; flex-direction: column; justify-content: center; gap: 8px; box-sizing: border-box; padding-block: var(--vk-space-2); }
-.sl-sk { display: block; position: relative; overflow: hidden; height: 0.9em; border-radius: var(--vk-radius-sm); background: color-mix(in oklch, var(--vk-color-line) 70%, transparent); }
+.sl-sk { display: block; position: relative; overflow: hidden; height: 0.9em; border-radius: var(--vk-radius-sm); background: var(--vk-color-line); }
 .sl-sk--meta { width: 38%; height: 0.65em; }
 .sl-sk--title { height: 1.6em; }
 .sl-sk--frame { height: min(60vh, 480px); margin-block: var(--vk-space-4); border-radius: var(--vk-radius-md); }
@@ -132,10 +132,7 @@ select { border: 2px solid var(--vk-color-faint); border-radius: var(--vk-radius
 .sl-skeleton__slow { display: block; margin-top: var(--vk-space-2); color: var(--vk-color-muted); }
 :where([data-vibe='daylight']) .sl-sk { border-radius: var(--vk-radius-pill); }
 :where([data-vibe='daylight']) .sl-sk--frame { border-radius: var(--vk-radius-md); }
-@media (prefers-reduced-motion: no-preference) {
-  :where([data-vibe='daylight']):not([data-motion='reduce']) .sl-sk::after { content: ''; position: absolute; inset: 0; translate: -100% 0; background: linear-gradient(90deg, transparent, color-mix(in oklch, var(--vk-color-surface) 70%, transparent), transparent); animation: sl-shimmer 1600ms linear infinite; }
-}
-@keyframes sl-shimmer { to { translate: 100% 0; } }
+:where([data-vibe='daylight']) .sl-sk::after { content: ''; position: absolute; inset: 0; translate: -100% 0; background: linear-gradient(90deg, transparent, color-mix(in oklch, var(--vk-color-surface) 70%, transparent), transparent); animation: vk-motion-shimmer calc(1600ms * var(--vk-motion-scale)) linear infinite; }
 :where([data-vibe='paper']) .sl-sk { height: 1.4em; border-radius: 0; background: none; border-bottom: 1px solid var(--vk-color-line); }
 :where([data-vibe='paper']) .sl-sk--meta { display: none; }
 :where([data-vibe='paper']) .sl-sk--frame { border: 1px solid var(--vk-color-line); }
@@ -161,5 +158,13 @@ main:focus { outline: none; }
 main h1[tabindex='-1']:focus { outline: none; }
 /* The viewer holds the embed's first height (its toolbar and a 480 px frame) from the first frame, so the sections
    below do not jump when the frame mounts, nor when a short document reports a smaller height (catch-up S5). */
-.viewer { min-height: 540px; }
-.sl-sk--frame { height: 540px; }
+.viewer { min-height: 580px; }
+.sl-sk--frame { height: 580px; }
+
+/* Motion (vibekit 0.0.12 motion.css; every duration scales by --vk-motion-scale, 0 under reduced motion or data-motion="reduce").
+   Dialogs pop in over a fading backdrop; an opened <details> rises in; a busy button carries vibekit's busy bar. */
+.modal-backdrop { animation: vk-motion-fade-in var(--vk-d-base) var(--vk-ease-standard) backwards; }
+.modal { animation: vk-motion-pop-in var(--vk-d-base) var(--vk-ease-enter) backwards; }
+:where([data-vibe="quiet"]) .modal { animation-name: vk-motion-fade-in; }
+details[open] > :not(summary) { animation: vk-motion-rise-in var(--vk-d-base) var(--vk-ease-enter) backwards; }
+:where([data-vibe="quiet"]) details[open] > :not(summary) { animation-name: vk-motion-fade-in; }

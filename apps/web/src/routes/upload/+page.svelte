@@ -137,7 +137,7 @@
     <details><summary>Show the files</summary><ul class="paths">{#each files.slice(0, 200) as f (f.path)}<li><code>{f.path}</code></li>{/each}{#if files.length > 200}<li>…and {files.length - 200} more</li>{/if}</ul></details>
   {/if}
   {#if message}<p class="error" role="alert">{message}</p>{/if}
-  <button class="primary" type="submit" disabled={busy || files.length === 0}>{busy ? (progress ?? 'Uploading…') : 'Upload'}</button>
+  <button class="vk-button vk-button--primary kit-button kit-button--primary" type="submit" aria-busy={busy} disabled={busy || files.length === 0}>{busy ? (progress ?? 'Uploading…') : 'Upload'}</button>
 </form>
 {#if refused?.findings}
   <section class="secrets" aria-labelledby="secrets">
@@ -147,7 +147,7 @@
     <p>Remove the secret and upload again. If it is not a live secret, say why and upload anyway; your name and reason are recorded.</p>
     <form class="stack" onsubmit={override}>
       <label class="field">Reason <input name="reason" bind:value={reason} required maxlength="500" autocomplete="off" /></label>
-      <button type="submit" disabled={busy || reason.trim() === ''}>{busy ? (progress ?? 'Uploading…') : 'Upload anyway'}</button>
+      <button class="vk-button vk-button--secondary kit-button kit-button--secondary" type="submit" aria-busy={busy} disabled={busy || reason.trim() === ''}>{busy ? (progress ?? 'Uploading…') : 'Upload anyway'}</button>
     </form>
   </section>
 {/if}

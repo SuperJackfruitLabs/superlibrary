@@ -10,7 +10,8 @@
   import '$lib/layouts/quiet.css';
   import '$lib/vibe/vibes.css';
   import { onDestroy, onMount, tick } from 'svelte';
-  import { afterNavigate, goto } from '$app/navigation';
+  import { afterNavigate, goto, onNavigate } from '$app/navigation';
+  import { vkNavigate } from '@superjackfruit/vibekit/motion';
   import { page } from '$app/state';
   import AppHeader from '$lib/AppHeader.svelte';
   import SuiteFooter from '$kit/SuiteFooter.svelte';
@@ -58,6 +59,9 @@
   // After a client navigation to another page, focus goes to the page's h1 (or main), so a screen
   // reader starts at the new page and Tab starts from the top of it (catch-up S9). A filter change
   // on the same page keeps focus where it is.
+  // The page content fades and rises in on a route change (a View Transition where supported, a fade otherwise; nothing under reduced motion).
+  onNavigate((n) => { if (n.from?.url.pathname !== n.to?.url.pathname) return vkNavigate(n); });
+
   afterNavigate(async ({ type, from, to }) => {
     loadingStatus.say('');
     if (type === 'enter' || !from || !to || from.url.pathname === to.url.pathname) return;
@@ -126,7 +130,7 @@
   <a class="sl-skip" href="#main">Skip to content</a>
   <div class="shell">
     <AppHeader me={session.me} onsignout={logOut} />
-    <main id="main" tabindex="-1">{@render children()}</main>
+    <main id="main" class="vk-page" tabindex="-1">{@render children()}</main>
     <!-- The screen's one polite status line: what is loading (or what a search found); the slow line shows in the skeleton. -->
     <p class="visually-hidden" role="status" data-load-status>{loadingStatus.slow ? SLOW_COPY : loadingStatus.label}</p>
     <SuiteFooter />

@@ -24,7 +24,7 @@
   <div class="suite-shell-end">
     {#if suite}<div class="suite-shell-suite" data-slot="suite-switcher">{@render suite()}</div>{/if}
     <button bind:this={button} type="button" class="suite-shell-account" aria-expanded={open} aria-controls={menuId} onclick={() => (menus.open = open ? null : menuId)}>{account.label}</button>
-    <div bind:this={menu} id={menuId} class="suite-shell-menu" hidden={!open} role="group" aria-label={account.label}>
+    <div bind:this={menu} id={menuId} class="suite-shell-menu vk-pop" data-state={open ? 'open' : 'closed'} hidden={!open} role="group" aria-label={account.label}>
       {#if account.detail}<p class="suite-shell-detail">{account.detail}</p>{/if}
       <button type="button" class="kit-button suite-shell-appearance" onclick={() => { menus.open = null; if (button) onappearance?.(button); }}>Appearance</button>
       <button type="button" class="kit-button suite-shell-signout" onclick={() => { menus.open = null; onsignout(); }}>Sign out</button>

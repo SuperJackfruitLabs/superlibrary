@@ -8,8 +8,8 @@
 </script>
 
 <ul class="results results--index" role="list" aria-label={label}>
-  {#each rows as r (r.id)}
-    <li class="result" style:--o={outcomeVar(r.outcome)}>
+  {#each rows as r, i (r.id)}
+    <li class="result vk-enter" style:--i={i} style:--o={outcomeVar(r.outcome)}>
       <a class="result-link" href={`/a/${r.id}`}><span class="result-title">{r.title}</span></a>
       <p class="sl-byline">{#if r.maker}<span class="result-face" aria-hidden="true"><Face id={r.maker.id} label={r.maker.label} mood={moodOf(r.outcome)} size={24} /></span>{/if}<span>{r.line}</span></p>
       <p class="result-meta"><OutcomeBadge outcome={r.outcome} />{#if r.visibility}<span>{r.visibility}</span>{/if}</p>

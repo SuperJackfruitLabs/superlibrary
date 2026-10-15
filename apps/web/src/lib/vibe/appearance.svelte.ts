@@ -52,12 +52,13 @@ function saveCookie(doc: Document, a: Appearance): void {
 /** The model: what the page should look like. Updated at once, never inside a view transition. */
 function decide(a: Appearance, now: Date): Record<string, string> {
   const phase = phaseFor(a, now);
-  const attrs = htmlAttributes(a, phase);
+  // The product names itself so its accent (vibekit 0.0.12: the product colour unless the person chose another) applies.
+  const attrs = htmlAttributes(a, phase, 'superlibrary');
   look.appearance = a;
   look.phase = phase;
   look.theme = attrs['data-theme'];
   look.now = now;
-  return attrs;
+  return { ...attrs };
 }
 
 /** The DOM: the data-* attributes on <html>, and the browser chrome colour. */

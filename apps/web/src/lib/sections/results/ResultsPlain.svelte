@@ -5,8 +5,8 @@
 </script>
 
 <ul class="results results--plain" role="list" aria-label={label}>
-  {#each rows as r (r.id)}
-    <li class="result">
+  {#each rows as r, i (r.id)}
+    <li class="result vk-enter" style:--i={i}>
       <a class="result-link" href={`/a/${r.id}`}><span class="result-title">{r.title}</span></a>
       <p class="sl-facts-line">Outcome: <OutcomeBadge outcome={r.outcome} />. {r.line}.{#if r.visibility}{' '}Visible to: {r.visibility}.{/if}</p>
       {#if r.snippet}<p class="snippet">{r.snippet}</p>{/if}
