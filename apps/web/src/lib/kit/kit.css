@@ -113,3 +113,11 @@
   .suite-shell-nav { grid-column: 1 / -1; grid-row: 2; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .suite-shell-nav a { justify-content: center; padding: 0 var(--vk-space-1); }
 }
+/* The narrowest phones (360 px): the header row and the four nav links fit inside the 16 px gutters (catch-up S8). */
+@media (max-width: 380px) {
+  .suite-shell { column-gap: var(--vk-space-2); }
+  .suite-shell-nav { gap: 2px; }
+  .suite-shell-nav a { min-width: 0; padding-inline: 0; font-size: 0.875rem; }
+  .suite-shell-account { padding-inline: var(--vk-space-2); }
+  .suite-shell-end { gap: var(--vk-space-1); }
+}

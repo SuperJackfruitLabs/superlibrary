@@ -168,3 +168,8 @@ main h1[tabindex='-1']:focus { outline: none; }
 :where([data-vibe="quiet"]) .modal { animation-name: vk-motion-fade-in; }
 details[open] > :not(summary) { animation: vk-motion-rise-in var(--vk-d-base) var(--vk-ease-enter) backwards; }
 :where([data-vibe="quiet"]) details[open] > :not(summary) { animation-name: vk-motion-fade-in; }
+/* Long text (catch-up S6): a title, heading, file name or tag is whatever a person or an agent typed, a 120-character
+   word included. Titles and headings break anywhere; everything else a person wrote breaks a word only when it must. */
+h1, h2, h3, .title, .result-title, .sl-enclosure-title, .kit-tabs a, code { overflow-wrap: anywhere; }
+main, .suite-shell-menu, .modal { overflow-wrap: break-word; }
+main :is(p, li, dd, dt, td, th, small, span, label, a) { min-width: 0; }

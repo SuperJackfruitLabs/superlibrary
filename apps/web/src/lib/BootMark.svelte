@@ -1,6 +1,6 @@
 <script lang="ts">
-  /** The mark on the boot and sign-in screens: large, decorative beside the words. */
-  import Mark from '$lib/Mark.svelte';
+  /** The mark on the boot screen: the pack's animated artwork, played once per session (LogoMotion's rules). */
+  import LogoMotion from '$lib/LogoMotion.svelte';
 </script>
 
-<Mark class="mark-hero" />
+<LogoMotion size={72} playIntro />
