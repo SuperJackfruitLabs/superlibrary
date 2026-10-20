@@ -1,21 +1,21 @@
 ---
 title: Embed
-description: Mount Superlibrary's artifact viewer in another product's page with @superlibrary/embed. The host's duties, the options, the frame protocol, and which origins may embed it.
+description: Mount SuperLibrary's artifact viewer in another product's page with @superlibrary/embed. The host's duties, the options, the frame protocol, and which origins may embed it.
 ---
 
-`@superlibrary/embed` mounts Superlibrary's viewer in a host page. The artifact renders in a
+`@superlibrary/embed` mounts SuperLibrary's viewer in a host page. The artifact renders in a
 sandboxed frame on the content origin; the toolbar around it lives in the host page.
 
 :::caution[Allowed origins]
 Framing is allowed only from origins listed in configuration. The shipped configuration lists
-SuperJackfruit's own Superpipeline app (`https://app.superpipeline.dev`) and AgentPod console
-(`https://console.agentpod.dev`), besides Superlibrary's own app. Another host has to be added to
+SuperJackfruit's own SuperPipeline app (`https://app.superpipeline.dev`) and AgentPod console
+(`https://console.agentpod.dev`), besides SuperLibrary's own app. Another host has to be added to
 both lists; see [Allowed origins](#allowed-origins).
 :::
 
 The package is not published to npm. A product in another repository vendors a build: `pnpm
 --filter @superlibrary/embed bundle` writes `dist/superlibrary-embed.js`, one ES module, and its
-types. Record the Superlibrary commit and each file's SHA-256 beside the copy.
+types. Record the SuperLibrary commit and each file's SHA-256 beside the copy.
 
 ## Mounting
 
@@ -46,7 +46,7 @@ view.destroy();
    with the signed-in person's token, so the API checks that person's access. Never a shared or
    service token.
 2. **Be allowed.** The host's origin must be in the content Worker's `FRAME_ANCESTORS` and the
-   API's `EMBED_HOSTS`, and its web client must be allowed to request the Superlibrary audience
+   API's `EMBED_HOSTS`, and its web client must be allowed to request the SuperLibrary audience
    from the account service.
 
 ## The toolbar
@@ -59,7 +59,7 @@ view.destroy();
 | **Theme** | System, Light or Dark, remembered on this device |
 | **Download** | Single-file versions only |
 | **Full screen** | The whole embed, as a modal dialog; Escape or the same button exits |
-| **Open in new window** | The item in the Superlibrary app |
+| **Open in new window** | The item in the SuperLibrary app |
 | **Share** | Who can see the item, in words; widening to the workspace for a person allowed to; copy the app link. There are no public links. |
 
 Below 640 px of width, the secondary controls move into a labelled **More** panel. No control is

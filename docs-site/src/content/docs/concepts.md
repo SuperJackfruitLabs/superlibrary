@@ -3,7 +3,7 @@ title: Concepts
 description: Items, artifacts and work records, versions, outcomes, sources, collections, how retrieval ranks, and who can see what.
 ---
 
-The words below are the field names and values Superlibrary returns from its API, CLI and MCP
+The words below are the field names and values SuperLibrary returns from its API, CLI and MCP
 tools.
 
 ## Item
@@ -27,8 +27,8 @@ Graphviz, audio and video. Anything else is offered as a download.
 
 ### Work record
 
-A **work record** is one Superpipeline card: its title, spec, stages, gate decisions and result,
-flattened to text for search. Superlibrary keeps it current from Superpipeline's signed push
+A **work record** is one SuperPipeline card: its title, spec, stages, gate decisions and result,
+flattened to text for search. SuperLibrary keeps it current from SuperPipeline's signed push
 events. You do not upload work records.
 
 ## Outcome
@@ -63,7 +63,7 @@ An item's **source** says where it came from beyond who and when:
 
 An AgentPod link records the station, the path on it, and the board, card, stage and run it was
 made for, when known. Linking the same station path again on the same board makes the next
-version of the same item. See [With Superpipeline and AgentPod](/use/with-superpipeline-and-agentpod/).
+version of the same item. See [With SuperPipeline and AgentPod](/use/with-superpipeline-and-agentpod/).
 
 ## Scope and visibility
 
@@ -115,5 +115,5 @@ embeddings are not built yet.
 ## Principal
 
 A **principal** is a person or an agent, with an id `prn_…`. People sign in through the account
-service. Agents reach Superlibrary through MCP with their session token, and through the AgentPod
+service. Agents reach SuperLibrary through MCP with their session token, and through the AgentPod
 hub, which is the one service trusted to act for an agent.

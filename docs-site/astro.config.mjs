@@ -7,7 +7,7 @@ export default defineConfig({
   site: 'https://docs.superlibrary.dev',
   integrations: [
     starlight({
-      title: 'Superlibrary',
+      title: 'SuperLibrary',
       description:
         'The memory of the stack: what agents make and what work has been done, labelled with how each turned out, for agents to consult and people to browse.',
       // /llms.txt, /llms-full.txt and /llms-small.txt, for agents reading these docs. The
@@ -15,10 +15,10 @@ export default defineConfig({
       // and <details> but keeps every page too, since nothing here is noise.
       plugins: [
         starlightLlmsTxt({
-          projectName: 'Superlibrary',
+          projectName: 'SuperLibrary',
           description:
-            'Superlibrary is the memory of the stack. It keeps artifacts (uploaded or agent-linked ' +
-            'files and folders, versioned) and work records (Superpipeline cards), each labelled with ' +
+            'SuperLibrary is the memory of the stack. It keeps artifacts (uploaded or agent-linked ' +
+            'files and folders, versioned) and work records (SuperPipeline cards), each labelled with ' +
             'an outcome: approved, completed, in-progress, superseded, rejected, failed or abandoned. ' +
             'Uploads pass path rules, size limits and a secret scan. Search fuses full-text and vector ' +
             'results and ranks by outcome, within what the caller may see. People use the web app and ' +
@@ -26,8 +26,8 @@ export default defineConfig({
             'API and an embeddable viewer. It runs on Cloudflare Workers, signs in through the ' +
             'SuperJackfruit account service, and is MIT licensed.',
           optionalLinks: [
-            { label: 'Superlibrary', url: 'https://superlibrary.dev', description: 'The product site.' },
-            { label: 'Source', url: 'https://github.com/SuperJackfruitLabs/superlibrary', description: 'The Superlibrary repository on GitHub.' },
+            { label: 'SuperLibrary', url: 'https://superlibrary.dev', description: 'The product site.' },
+            { label: 'Source', url: 'https://github.com/SuperJackfruitLabs/superlibrary', description: 'The SuperLibrary repository on GitHub.' },
           ],
         }),
       ],
@@ -54,7 +54,7 @@ export default defineConfig({
         { tag: 'meta', attrs: { property: 'og:image', content: 'https://docs.superlibrary.dev/og.png' } },
         { tag: 'meta', attrs: { property: 'og:image:width', content: '1200' } },
         { tag: 'meta', attrs: { property: 'og:image:height', content: '630' } },
-        { tag: 'meta', attrs: { property: 'og:image:alt', content: 'Superlibrary — the memory of the stack' } },
+        { tag: 'meta', attrs: { property: 'og:image:alt', content: 'SuperLibrary — the memory of the stack' } },
         { tag: 'meta', attrs: { name: 'twitter:image', content: 'https://docs.superlibrary.dev/og.png' } },
       ],
       social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/SuperJackfruitLabs/superlibrary' }],
@@ -64,7 +64,7 @@ export default defineConfig({
         {
           label: 'Start',
           items: [
-            { label: 'What Superlibrary is', slug: 'what-it-is' },
+            { label: 'What SuperLibrary is', slug: 'what-it-is' },
             { label: 'Install', slug: 'install' },
             { label: 'Concepts', slug: 'concepts' },
           ],
@@ -76,7 +76,7 @@ export default defineConfig({
             { label: 'Uploading', slug: 'use/uploading' },
             { label: 'Search', slug: 'use/search' },
             { label: 'Collections', slug: 'use/collections' },
-            { label: 'With Superpipeline and AgentPod', slug: 'use/with-superpipeline-and-agentpod' },
+            { label: 'With SuperPipeline and AgentPod', slug: 'use/with-superpipeline-and-agentpod' },
             { label: 'Retention and operations', slug: 'use/retention-and-operations' },
           ],
         },

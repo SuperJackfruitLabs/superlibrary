@@ -22,14 +22,14 @@ interface Props {
 const { title, description, canonical: hasCanonical = true } = Astro.props;
 const canonical = new URL(Astro.url.pathname, Astro.site).href;
 const image = new URL('/og.png', Astro.site).href;
-const imageAlt = 'Superlibrary — the memory of the stack';
+const imageAlt = 'SuperLibrary — the memory of the stack';
 ---
 
 {hasCanonical && <link rel="canonical" href={canonical} />}
 <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 
 <meta property="og:type" content="website" />
-<meta property="og:site_name" content="superlibrary" />
+<meta property="og:site_name" content="SuperLibrary" />
 <meta property="og:title" content={title} />
 <meta property="og:description" content={description} />
 {hasCanonical && <meta property="og:url" content={canonical} />}

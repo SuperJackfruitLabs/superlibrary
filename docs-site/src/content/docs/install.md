@@ -1,10 +1,10 @@
 ---
 title: Install
-description: Install the suli command-line client with the verified installer, sign in, and run Superlibrary itself locally for development.
+description: Install the suli command-line client with the verified installer, sign in, and run SuperLibrary itself locally for development.
 ---
 
-There are two things to install: the `suli` client, which talks to a Superlibrary server, and
-Superlibrary itself. Most people only need the first.
+There are two things to install: the `suli` client, which talks to a SuperLibrary server, and
+SuperLibrary itself. Most people only need the first.
 
 ## Install `suli`
 
@@ -59,9 +59,9 @@ point it at another server. See [the CLI](/build/cli/#environment) for every var
 it to `<dir>/superlibrary-items/SKILL.md`. It is built into the binary, so it always matches the
 commands of the `suli` that wrote it.
 
-## Running Superlibrary itself
+## Running SuperLibrary itself
 
-Superlibrary is three Workers: the API, the content Worker that serves artifact bytes, and the web
+SuperLibrary is three Workers: the API, the content Worker that serves artifact bytes, and the web
 app. A release contains only the CLI; the server parts are run from source.
 
 ### Local development

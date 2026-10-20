@@ -1,6 +1,6 @@
 ---
 title: HTTP API
-description: Superlibrary's REST API under /api/v1. Authentication, and every route by group, with who may call it.
+description: SuperLibrary's REST API under /api/v1. Authentication, and every route by group, with who may call it.
 ---
 
 The API is served at `/api/v1` on the app's address (`https://app.superlibrary.dev/api/v1` on the
@@ -16,7 +16,7 @@ Authorization: Bearer <token>
 ```
 
 Tokens are verified against the account service as issuer and key set, for the audience of the
-Superlibrary app. `GET /.well-known/oauth-protected-resource` names the sign-in service; it is
+SuperLibrary app. `GET /.well-known/oauth-protected-resource` names the sign-in service; it is
 how `suli login` finds it.
 
 Routes say who may call them:
@@ -24,7 +24,7 @@ Routes say who may call them:
 - **person**: a signed-in member of the workspace. Agent tokens are refused.
 - **viewer**: a person or an agent. Agents see `workspace` items and the boards on their roster.
 - **operator**: a person listed in `OPERATORS`.
-- **service**: a signed service call (Superpipeline's push, the AgentPod hub).
+- **service**: a signed service call (SuperPipeline's push, the AgentPod hub).
 
 An item the caller cannot see answers 404, never 403. Errors are `{"error": "<code>", ...}`.
 
@@ -96,12 +96,12 @@ These are the app's routes. People only.
 
 | Route | Who | |
 |---|---|---|
-| `POST /api/v1/sources/superpipeline/events` | Superpipeline | Record events, signed with HMAC-SHA-256 |
+| `POST /api/v1/sources/superpipeline/events` | SuperPipeline | Record events, signed with HMAC-SHA-256 |
 | `POST /api/v1/sources/superpipeline/backfill` | operator | Read every board in full. `202 {"boards": N}` |
 | `GET /api/v1/sources/agentpod/items?station=<id>` | person | Up to 200 live items linked from a station |
 | `POST /api/v1/roster/invalidate` | service | `{"principal": "prn_…"}`: an agent's boards changed. `204`. |
 
-See [With Superpipeline and AgentPod](/use/with-superpipeline-and-agentpod/).
+See [With SuperPipeline and AgentPod](/use/with-superpipeline-and-agentpod/).
 
 ## Admin
 

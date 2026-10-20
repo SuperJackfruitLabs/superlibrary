@@ -2,9 +2,9 @@
 
 [![CI](https://github.com/SuperJackfruitLabs/superlibrary/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/SuperJackfruitLabs/superlibrary/actions/workflows/ci.yml)
 
-**The memory of the stack.** Superlibrary keeps what agents make and what work has been done — artifacts and Superpipeline work history, labelled with how each turned out — and lets agents consult it before they work and people browse it.
+**The memory of the stack.** SuperLibrary keeps what agents make and what work has been done — artifacts and SuperPipeline work history, labelled with how each turned out — and lets agents consult it before they work and people browse it.
 
-Status: phases 1 (Core), 2 (Sources), 3 (Retrieval) and 4 (the library app) live: upload, view and embed artifacts; Superpipeline work history and AgentPod links arrive as items; agents reach it over MCP once their sessions are given the Superlibrary server, and people through the web app (search and browse with filters, item pages with provenance, versions and related work, collections, views by outcome, moderation) and the API. The web app comes in the four suite vibes (Daylight, Paper, Studio, Quiet) on vibekit 0.0.12. Plans: docs/superpowers/plans/.
+Status: phases 1 (Core), 2 (Sources), 3 (Retrieval) and 4 (the library app) live: upload, view and embed artifacts; SuperPipeline work history and AgentPod links arrive as items; agents reach it over MCP once their sessions are given the SuperLibrary server, and people through the web app (search and browse with filters, item pages with provenance, versions and related work, collections, views by outcome, moderation) and the API. The web app comes in the four suite vibes (Daylight, Paper, Studio, Quiet) on vibekit 0.0.12. Plans: docs/superpowers/plans/.
 
 Design: [docs/superpowers/specs/2026-10-09-superlibrary-design.md](docs/superpowers/specs/2026-10-09-superlibrary-design.md).
 
@@ -98,8 +98,8 @@ Secrets (set with `wrangler secret put`, never in the repo):
 | Secret | What it is for |
 | --- | --- |
 | `HUB_SERVICE_PRINCIPAL` | The one service principal (the AgentPod hub) trusted to act for an agent and to say where a linked file came from. |
-| `SERVICE_CREDENTIALS` | Superlibrary's own service credentials per organization, used to obtain tokens for calling Superpipeline and the hub (roster). |
-| `PUSH_SIGNING_KEY` | Signs and verifies the Superpipeline push subscription, so only Superpipeline can post record events. At least 32 characters. |
+| `SERVICE_CREDENTIALS` | SuperLibrary's own service credentials per organization, used to obtain tokens for calling SuperPipeline and the hub (roster). |
+| `PUSH_SIGNING_KEY` | Signs and verifies the SuperPipeline push subscription, so only SuperPipeline can post record events. At least 32 characters. |
 | `OPERATORS` | Space-separated principal ids (`prn_...`) allowed to use the admin routes and the backfill. |
 
 ## Moving the embedder
@@ -126,7 +126,7 @@ Notes:
 - Both are plain Astro with their own npm lockfiles, outside the pnpm workspace. `npm ci && npm run dev` in either.
 - `scripts/deploy-sites.sh [landing|docs|all]` builds and deploys them as Cloudflare Workers with static assets, from the operator's machine with an existing `wrangler login`. Each `wrangler.jsonc` declares its custom domain.
 - `node scripts/check-docs-claims.mjs` fails when a page names an `/api/v1` route or MCP tool that `apps/api` does not define, or a docs page lacks its title or description. CI runs it with the docs build.
-- Public claims follow the Superlibrary section of sjl-marketing's claims ledger (`foundation/products.md`, SL-01 onward).
+- Public claims follow the SuperLibrary section of sjl-marketing's claims ledger (`foundation/products.md`, SL-01 onward).
 
 ## License
 

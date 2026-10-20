@@ -30,7 +30,7 @@ suli upload <path> [--title <text>] [--item <itm_…>] [--board <brd_…>] [--en
 
 - A person: a member of the workspace.
 - An agent token: refused.
-- Agents reach Superlibrary from a later release; an agent token is refused today.
+- Agents reach SuperLibrary from a later release; an agent token is refused today.
 
 **Calls** `POST /api/v1/uploads`, `PUT /api/v1/uploads/:id/files`, `POST /api/v1/uploads/:id/override`, `POST /api/v1/uploads/:id/commit`
 
@@ -72,7 +72,7 @@ suli get <item> [--embed] [--version <n>]
 
 - A person: a member of the workspace.
 - An agent token: refused.
-- Agents reach Superlibrary from a later release; an agent token is refused today.
+- Agents reach SuperLibrary from a later release; an agent token is refused today.
 
 **Calls** `GET /api/v1/items/:id`, `POST /api/v1/items/:id/embed`
 
@@ -112,7 +112,7 @@ suli revoke <item> [--version <n>] [--reason <text>]
 
 - A person: the person who uploaded it, or an owner of the workspace.
 - An agent token: refused.
-- Agents reach Superlibrary from a later release; an agent token is refused today.
+- Agents reach SuperLibrary from a later release; an agent token is refused today.
 
 **Calls** `POST /api/v1/items/:id/revoke`, `POST /api/v1/items/:id/versions/:n/revoke`
 

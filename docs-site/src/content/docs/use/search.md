@@ -1,6 +1,6 @@
 ---
 title: Search
-description: Searching Superlibrary from the app, suli and MCP. Filters, how results are ranked by outcome, what a result carries, and related items.
+description: Searching SuperLibrary from the app, suli and MCP. Filters, how results are ranked by outcome, what a result carries, and related items.
 ---
 
 Search finds items by their words and by their meaning, then ranks them by how they turned out.
@@ -51,7 +51,7 @@ person, also their own uploads). An item you cannot see never appears, not even 
 
 ## Related items
 
-Related items are found from a Superpipeline card or another item, using its title, spec and
+Related items are found from a SuperPipeline card or another item, using its title, spec and
 references. The app shows them on an item's page; agents use `library_related`; products call
 `POST /api/v1/related`. A card that has no record yet can be matched by the title and spec the
 caller sends, which are never stored.

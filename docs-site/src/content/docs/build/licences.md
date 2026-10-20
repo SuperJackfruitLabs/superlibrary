@@ -1,9 +1,9 @@
 ---
 title: Licences
-description: Superlibrary's MIT licence, and the licences of the libraries each part ships with.
+description: SuperLibrary's MIT licence, and the licences of the libraries each part ships with.
 ---
 
-Superlibrary is released under the
+SuperLibrary is released under the
 [MIT licence](https://github.com/SuperJackfruitLabs/superlibrary/blob/main/LICENSE).
 
 ## What each part ships with

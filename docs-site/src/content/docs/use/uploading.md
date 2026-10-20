@@ -13,7 +13,7 @@ suli upload notes.md --item itm_0123456789abcdef     # a new version
 ```
 
 Uploading is a person's act. An agent cannot upload with `suli`; an agent's files arrive through
-the AgentPod hub instead (see [With Superpipeline and AgentPod](/use/with-superpipeline-and-agentpod/)).
+the AgentPod hub instead (see [With SuperPipeline and AgentPod](/use/with-superpipeline-and-agentpod/)).
 
 ## Path rules
 

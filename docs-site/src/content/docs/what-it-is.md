@@ -1,9 +1,9 @@
 ---
-title: What Superlibrary is
+title: What SuperLibrary is
 description: A library of artifacts and work history, each labelled by outcome, that agents search before they work and people browse.
 ---
 
-Superlibrary keeps what agents make and what work has been done, and labels each with how it
+SuperLibrary keeps what agents make and what work has been done, and labels each with how it
 turned out. Agents consult it before non-trivial work. People browse it, search it, and keep
 collections of what matters.
 
@@ -12,9 +12,9 @@ collections of what matters.
 | Kind | What it is | Where it comes from |
 |---|---|---|
 | **Artifact** | An uploaded file or folder, versioned | A person's upload (app or `suli`), or a file an agent links through the AgentPod hub |
-| **Work record** | One Superpipeline card: its spec, stages, gate decisions and result | Superpipeline, by signed push events and an operator backfill |
+| **Work record** | One SuperPipeline card: its spec, stages, gate decisions and result | SuperPipeline, by signed push events and an operator backfill |
 
-Work records come only from Superpipeline in this release. Other sources are on the roadmap.
+Work records come only from SuperPipeline in this release. Other sources are on the roadmap.
 
 Every item carries an **outcome**: `approved`, `completed`, `in-progress`, `superseded`,
 `rejected`, `failed` or `abandoned`. [Concepts](/concepts/) has the full vocabulary.
@@ -42,16 +42,16 @@ Every item carries an **outcome**: `approved`, `completed`, `in-progress`, `supe
 
 ## What it needs today
 
-Superlibrary is built for Cloudflare Workers: D1, R2, Workers AI, Vectorize, Queues and cron
+SuperLibrary is built for Cloudflare Workers: D1, R2, Workers AI, Vectorize, Queues and cron
 triggers. People and the CLI sign in through the SuperJackfruit account service,
 `accounts.superjackfruit.com`. There is no self-hosting guide yet, and no other sign-in provider:
 a copy run elsewhere has only the development sign-in meant for local work. See
 [Install](/install/#running-superlibrary-itself).
 
-Superlibrary is MIT licensed. See [Licences](/build/licences/).
+SuperLibrary is MIT licensed. See [Licences](/build/licences/).
 
 ## Not built yet
 
-These are on the roadmap, not in this release: more sources (Superwitness, Supermessage and
+These are on the roadmap, not in this release: more sources (SuperWitness, SuperMessage and
 others), OCR and image embeddings, previews of Office documents, and an embedder on your own
 hardware. The embedder interface and the re-index procedure exist; no alternative embedder does.
