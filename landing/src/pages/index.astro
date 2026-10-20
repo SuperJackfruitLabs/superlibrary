@@ -2,45 +2,29 @@
 /**
  * superlibrary.dev — the public page.
  *
- * One page, no framework, no scripts. Its job is to explain the product to somebody who
- * typed the domain, and then send them to the docs, the CLI or the source.
+ * One page, no framework, one tiny theme script. Its job is to say what SuperLibrary is to
+ * somebody who typed the domain, and send them to the docs.
  *
- * This directory is deliberately outside the pnpm workspace and has its own npm lockfile,
- * as superwitness's landing does: nothing here should share a dependency tree with the
- * Workers or the web app.
+ * This directory is deliberately outside the pnpm workspace and has its own npm lockfile.
  *
  * Every claim on this page is a `verified` or `limited` entry in sjl-marketing's ledger
- * (foundation/products.md, ## SuperLibrary, SL-01…SL-11), and each limited claim keeps its
- * caveat on the page — see "Where it runs today". If a claim changes there, change it here.
+ * (foundation/products.md, ## SuperLibrary), and each limited claim keeps its caveat in the
+ * same section. The repository is private: no Source link, no licence line and no install
+ * command that would 404 until it is public (SL-12). The shared frame adds the claims list,
+ * the suite links and the version, so this page does not repeat them.
  *
- * Every label in the hero is real. The hero is an ItemSummary (packages/contract/src/model.ts):
- *   id            itm_ + 16 hex
- *   kind          'artifact' | 'work-record'
- *   outcome       one of OUTCOMES: approved, completed, rejected, failed, abandoned,
- *                 superseded, in-progress
- *   scope         'workspace' | 'board:brd_' + 16 hex
- *   latestVersion, source, caption
- * The related rows are what library_related returns for it. The MCP tool names are the three
- * apps/api registers; the CLI line is the README's installer.
- *
- * Colours and faces are listed once, in `:root` below; docs-site/src/styles/theme.css uses
- * the same values. The coral is the mark's own; it is spent on the outcome of a piece of
- * work — the thing the library exists to remember — and on actions.
+ * The hero is an invented example ItemSummary (packages/contract/src/model.ts); its labels
+ * are real field names and values. The MCP tool names are the three apps/api registers.
  */
 import Mark from '../components/Mark.astro';
 import ShareMeta from '../components/ShareMeta.astro';
 
 const DOCS = 'https://docs.superlibrary.dev';
-const REPO = 'https://github.com/SuperJackfruitLabs/superlibrary';
-const VERSION = 'v0.0.1'; // the latest release tag; bump with each release
-const TITLE = 'SuperLibrary — the memory of the stack';
+const APP = 'https://app.superlibrary.dev';
+const VERSION = 'v0.0.1'; // the latest release tag, as the ledger states it; bump with each release
+const TITLE = 'SuperLibrary — what agents made, and how it turned out';
 const DESCRIPTION =
-  'SuperLibrary keeps what agents make and what work has been done, labelled with how each turned out, so agents can look before they work and people can find it again. MIT licensed.';
-
-// Must equal the README's install section and the docs site's install page.
-const install = `curl -fsSL ${REPO}/releases/latest/download/install.sh | bash`;
-
-const outcomes = ['approved', 'completed', 'in-progress', 'rejected', 'failed', 'abandoned', 'superseded'];
+  'SuperLibrary keeps the files agents make and the record of finished work, each labelled with its outcome, so people and agents can search for what worked before.';
 ---
 
 <!doctype html>
@@ -58,6 +42,10 @@ const outcomes = ['approved', 'completed', 'in-progress', 'rejected', 'failed', 
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,600;1,6..72,500&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
     />
+    <script is:inline>
+      try { var t = localStorage.getItem('theme'); } catch (e) {}
+      document.documentElement.dataset.theme = t === 'light' || t === 'dark' ? t : (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+    </script>
     <style>
       /* Contrast (WCAG 2.x), measured on the grounds they sit on:
            dark   coral-text #ffb59d on #15100e 11.1:1 · body #f3ebe6 · muted #a3958d 6.5:1
@@ -74,8 +62,17 @@ const outcomes = ['approved', 'completed', 'in-progress', 'rejected', 'failed', 
         --mono: 'IBM Plex Mono', ui-monospace, monospace;
         color-scheme: dark light;
       }
+      :root[data-theme="light"] {
+          --bg: #fbf7f3; --surface: #ffffff; --inset: #f4ece6; --line: rgba(29,23,20,.1);
+          --text: #1d1714; --muted: #6b5d55; --coral: #f2704e; --coral-text: #b8442a;
+          --coral-tint: rgba(242,112,78,.14); --btn: #b8442a; --btn-ink: #ffffff; --code: #3d342f;
+          --ok: #1f7a4d; --ok-tint: rgba(31,122,77,.1); --no: #a8322f; --no-tint: rgba(168,50,47,.08);
+          color-scheme: light;
+      }
+      :root[data-theme="dark"] { color-scheme: dark; }
+      /* no script: follow the system */
       @media (prefers-color-scheme: light) {
-        :root {
+        :root:not([data-theme]) {
           --bg: #fbf7f3; --surface: #ffffff; --inset: #f4ece6; --line: rgba(29,23,20,.1);
           --text: #1d1714; --muted: #6b5d55; --coral: #f2704e; --coral-text: #b8442a;
           --coral-tint: rgba(242,112,78,.14); --btn: #b8442a; --btn-ink: #ffffff; --code: #3d342f;
@@ -105,25 +102,38 @@ const outcomes = ['approved', 'completed', 'in-progress', 'rejected', 'failed', 
       nav a:hover { color: var(--text); }
       nav .ver { font-family: var(--mono); font-size: 12.5px; padding: 2px 8px; border: 1px solid var(--line); border-radius: 999px; }
 
+      #theme { background: none; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); font: 500 13px var(--sans); padding: 4px 10px; cursor: pointer; }
+      #theme:hover { color: var(--text); border-color: var(--coral); }
+      #theme:focus-visible { outline: 2px solid var(--coral); outline-offset: 3px; }
+      ol.steps { list-style: none; counter-reset: s; margin: 32px 0 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px; }
+      ol.steps li { counter-increment: s; margin: 0; padding: 0; min-width: 0; }
+      ol.steps li::before { content: counter(s, decimal-leading-zero); display: block; font-family: var(--mono); font-size: 12px; color: var(--coral-text); }
+      ol.steps h3 { font-family: var(--display); font-weight: 600; font-size: 18px; margin: 10px 0 6px; }
+      ol.steps p { margin: 0; color: var(--muted); font-size: 15.5px; }
+      .prose p { margin: 0 0 14px; max-width: 680px; }
+      .prose code, .sub code { font-family: var(--mono); font-size: .88em; }
+      figcaption { margin-top: 12px; font-size: 13px; color: var(--muted); text-align: center; position: relative; z-index: 1; }
+
       /* ── hero ── */
-      .hero .wrap { display: grid; grid-template-columns: 1.05fr 1fr; gap: 56px; align-items: center; padding-top: 56px; padding-bottom: 88px; }
+      .hero .wrap { display: grid; grid-template-columns: minmax(0, 1fr) 500px; gap: 56px; align-items: center; min-height: calc(100svh - 108px); padding-top: 56px; padding-bottom: 72px; }
       .hero .wrap > * { min-width: 0; }
-      h1 { font-family: var(--display); font-weight: 600; font-size: clamp(2.7rem, 6vw, 4.5rem); line-height: 1.02; letter-spacing: -0.02em; margin: 0 0 22px; text-wrap: balance; }
+      h1 { font-family: var(--display); font-weight: 600; font-size: clamp(40px, 4.6vw, 60px); line-height: 1.04; letter-spacing: -0.02em; margin: 0; max-width: 12ch; text-wrap: balance; }
       h1 em { font-style: italic; font-weight: 500; color: var(--coral-text); }
-      .lede { color: var(--muted); font-size: 1.1rem; margin: 0 0 30px; max-width: 32em; }
+      .lede { color: var(--muted); font-family: var(--sans); font-size: 18px; line-height: 1.55; margin: 20px 0 28px; max-width: 34em; }
       .cta { display: flex; gap: 12px; flex-wrap: wrap; }
-      .btn { display: inline-flex; align-items: center; border-radius: 8px; padding: 11px 19px; font-size: 15px; font-weight: 600; text-decoration: none; border: 1px solid transparent; transition: filter .15s, border-color .15s; }
+      .btn { display: inline-flex; align-items: center; height: 46px; border-radius: 10px; padding: 0 20px; font: 600 15px var(--sans); text-decoration: none; border: 1px solid transparent; transition: filter .15s, border-color .15s; }
       .btn-primary { background: var(--btn); color: var(--btn-ink); }
       .btn-primary:hover { filter: brightness(1.06); }
-      .btn-ghost { border-color: var(--line); color: var(--text); }
+      .btn-ghost { background: transparent; border-color: var(--line); color: var(--text); }
       .btn-ghost:hover { border-color: var(--coral); }
 
       /* the item card: this page's signature */
       .hero { overflow-x: clip; }
-      .card-wrap { position: relative; margin: 0; }
+      .card-wrap { position: relative; margin: 0; width: 500px; max-width: 100%; }
+      .card-wrap figcaption { margin-top: 10px; font: 12px var(--mono); color: var(--muted); }
       .card-wrap::before { content: ''; position: absolute; inset: -40px -30px; z-index: 0; pointer-events: none; background: radial-gradient(closest-side, var(--coral-tint), transparent 75%); opacity: .6; }
       .item { position: relative; z-index: 1; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; box-shadow: 0 24px 48px -24px rgba(0,0,0,.45); font-size: 14px; }
-      @media (prefers-color-scheme: light) { .item { box-shadow: 0 24px 48px -28px rgba(29,23,20,.22); } }
+      [data-theme="light"] .item { box-shadow: 0 24px 48px -28px rgba(29,23,20,.22); }
       .item-head { padding: 16px 18px 12px; border-bottom: 1px solid var(--line); }
       .item-head .ttl { font-family: var(--display); font-weight: 600; font-size: 21px; letter-spacing: -0.01em; line-height: 1.25; }
       .item-head .id { font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
@@ -141,11 +151,23 @@ const outcomes = ['approved', 'completed', 'in-progress', 'rejected', 'failed', 
       .o-ok { color: var(--ok); font-family: var(--mono); font-size: 12px; }
       .o-no { color: var(--no); font-family: var(--mono); font-size: 12px; }
 
+      /* hero moment: plays once when .item gets .playing (script below the figure); resting state is the markup */
+      @keyframes sl-rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+      @keyframes sl-flip { 0% { transform: rotateX(0); } 50% { transform: rotateX(90deg); } 51% { transform: rotateX(-90deg); } 100% { transform: rotateX(0); } }
+      @keyframes sl-slide { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: none; } }
+      .item.playing .item-head, .item.playing .row { animation: sl-rise .32s ease-out backwards; animation-delay: calc(600ms + var(--i, 0) * 150ms); }
+      .item.playing .row:nth-child(1) { --i: 1; } .item.playing .row:nth-child(2) { --i: 2; } .item.playing .row:nth-child(3) { --i: 3; }
+      .item.playing .row:nth-child(4) { --i: 4; } .item.playing .row:nth-child(5) { --i: 5; }
+      .item.playing .js-outcome { display: inline-block; animation: sl-flip .4s ease-out 1.85s both; }
+      .item.playing .related { animation: sl-rise .3s ease-out 2.4s backwards; }
+      .item.playing .related li { animation: sl-slide .35s ease-out backwards; animation-delay: calc(2.5s + var(--i, 0) * 140ms); }
+      .item.playing .related li + li { --i: 1; }
+
       /* ── bands ── */
       section.band { border-top: 1px solid var(--line); }
-      section.band .wrap { padding-top: 68px; padding-bottom: 68px; }
+      section.band .wrap { padding-top: 88px; padding-bottom: 88px; }
       .n { display: block; font-family: var(--mono); font-size: 12px; letter-spacing: .12em; color: var(--muted); margin-bottom: 10px; }
-      h2 { font-family: var(--display); font-weight: 600; font-size: clamp(1.7rem, 3.2vw, 2.3rem); line-height: 1.12; letter-spacing: -0.015em; margin: 0 0 14px; text-wrap: balance; }
+      h2 { font-family: var(--display); font-weight: 600; font-size: clamp(28px, 3vw, 36px); line-height: 1.15; letter-spacing: -0.015em; margin: 0 0 12px; text-wrap: balance; }
       .sub { color: var(--muted); margin: 0; max-width: 62ch; font-size: 1.05rem; }
       .split { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; align-items: center; }
       .split > * { min-width: 0; }
@@ -156,12 +178,12 @@ const outcomes = ['approved', 'completed', 'in-progress', 'rejected', 'failed', 
       .cell .field { margin-top: auto; padding-top: 12px; font-family: var(--mono); font-size: 12px; color: var(--muted); border-top: 1px dashed var(--line); }
       .outcomes { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 26px; }
       .outcomes .pill { font-size: 13px; padding: 4px 10px; }
-      pre, .codeline { font-family: var(--mono); font-size: 13px; line-height: 1.75; color: var(--code); background: var(--inset); border: 1px solid var(--line); border-radius: 10px; margin: 0; padding: 14px 16px; overflow-x: auto; max-width: 100%; }
+      pre, .codeline { font-family: var(--mono); font-size: 13px; line-height: 1.75; color: var(--code); background: var(--inset); border: 1px solid var(--line); border-radius: 10px; margin: 0; padding: 14px 16px; overflow-x: auto; max-width: min(100%, 760px); }
       .codeline { display: block; margin-top: 22px; word-spacing: .1em; }
       pre .p { color: var(--muted); user-select: none; }
-      ul.facts { list-style: none; margin: 22px 0 0; padding: 0; display: grid; gap: 10px; }
-      ul.facts li { position: relative; padding-left: 22px; }
-      ul.facts li::before { content: ''; position: absolute; left: 2px; top: .62em; width: 8px; height: 8px; border: 1.5px solid var(--coral); border-radius: 50%; }
+      ul.facts { list-style: none; margin: 22px 0 0; padding: 0; display: grid; gap: 10px; max-width: 680px; }
+      ul.facts li { position: relative; padding-left: 0; }
+      ul.facts li::before { content: ''; position: absolute; left: -14px; top: .62em; width: 8px; height: 8px; border: 1.5px solid var(--coral); border-radius: 50%; }
       ul.facts code { font-family: var(--mono); font-size: .88em; }
       .more { display: inline-block; margin-top: 14px; font-size: 15px; color: var(--coral-text); text-decoration: none; font-weight: 500; }
       .more:hover { text-decoration: underline; text-underline-offset: 3px; }
@@ -175,14 +197,15 @@ const outcomes = ['approved', 'completed', 'in-progress', 'rejected', 'failed', 
       .colophon { display: inline-flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 12.5px; }
 
       @media (max-width: 899px) {
-        .hero .wrap { grid-template-columns: 1fr; gap: 44px; padding-top: 32px; padding-bottom: 64px; }
+        .hero .wrap { grid-template-columns: 1fr; gap: 44px; min-height: auto; padding-top: 40px; padding-bottom: 56px; }
+        .card-wrap { width: 100%; }
         .split { grid-template-columns: 1fr; gap: 32px; }
-        .grid { grid-template-columns: 1fr; }
+        .grid, ol.steps { grid-template-columns: 1fr; }
+        section.band .wrap { padding-top: 64px; padding-bottom: 64px; }
       }
       @media (max-width: 480px) {
-        .wrap { padding: 0 16px; }
+        .wrap { padding: 0 24px; }
         nav { gap: 14px; }
-        section.band .wrap { padding-top: 52px; padding-bottom: 52px; }
         .item dl, .item-head, .related { padding-left: 14px; padding-right: 14px; }
       }
       @media (max-width: 360px) { .brand .name { font-size: 19px; } nav .ver { display: none; } }
@@ -198,28 +221,28 @@ const outcomes = ['approved', 'completed', 'in-progress', 'rejected', 'failed', 
         </a>
         <nav aria-label="Primary">
           <a href={DOCS}>Docs</a>
-          <a href={REPO}>Source</a>
-          <a class="ver" href={`${REPO}/releases/tag/${VERSION}`}>{VERSION}</a>
+          <span class="ver">{VERSION}</span>
+          <button id="theme" type="button" aria-label="Switch light and dark theme">Theme</button>
         </nav>
       </div>
     </header>
 
     <main>
-      <div class="hero">
+      <section class="hero">
         <div class="wrap">
           <div>
-            <h1>The memory <em>of the stack</em>.</h1>
+            <h1>Find what agents made, and <em>whether it worked.</em></h1>
             <p class="lede">
-              SuperLibrary keeps what agents make and what work has been done, each labelled with how it
-              turned out. Agents look before they work; people find it again.
+              SuperLibrary keeps the files agents make and the record of finished work, each labelled with
+              its outcome, and lets people and agents search them.
             </p>
             <div class="cta">
-              <a class="btn btn-primary" href={DOCS}>Read the docs</a>
-              <a class="btn btn-ghost" href={REPO}>Source</a>
+              <a class="btn btn-primary" href={`${DOCS}/install/`}>Get started</a>
+              <a class="btn btn-ghost" href={DOCS}>Docs</a>
             </div>
           </div>
 
-          <figure class="card-wrap" aria-label="An example library item">
+          <figure class="card-wrap">
             <div class="item">
               <div class="item-head">
                 <div class="ttl">Pricing page copy, final</div>
@@ -227,7 +250,7 @@ const outcomes = ['approved', 'completed', 'in-progress', 'rejected', 'failed', 
               </div>
               <dl>
                 <div class="row"><dt>kind</dt><dd><span class="pill">artifact</span></dd></div>
-                <div class="row"><dt>outcome</dt><dd><span class="pill coral">approved</span></dd></div>
+                <div class="row"><dt>outcome</dt><dd><span class="pill coral js-outcome">approved</span></dd></div>
                 <div class="row"><dt>scope</dt><dd><span class="pill">board:brd_9a41…</span></dd></div>
                 <div class="row"><dt>version</dt><dd><span class="pill">3</span></dd></div>
                 <div class="row"><dt>source</dt><dd><span class="pill">superpipeline</span></dd></div>
@@ -240,109 +263,106 @@ const outcomes = ['approved', 'completed', 'in-progress', 'rejected', 'failed', 
                 </ul>
               </div>
             </div>
+            <figcaption>Example item with invented data. The field names and outcomes are the real ones.</figcaption>
+            <script is:inline>
+              (function () {
+                if (!window.matchMedia || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+                var item = document.currentScript.parentNode.querySelector('.item');
+                var badge = item && item.querySelector('.js-outcome');
+                if (!badge || !('IntersectionObserver' in window)) return;
+                var io = new IntersectionObserver(function (es) {
+                  if (!es[0].isIntersecting) return;
+                  io.disconnect();
+                  badge.textContent = 'in-progress'; badge.classList.remove('coral');
+                  item.classList.add('playing');
+                  setTimeout(function () { badge.textContent = 'approved'; badge.classList.add('coral'); }, 2050);
+                  setTimeout(function () { item.classList.remove('playing'); }, 3300);
+                }, { threshold: 0.3 });
+                io.observe(item);
+              })();
+            </script>
           </figure>
         </div>
-      </div>
+      </section>
 
-      <section class="band" aria-labelledby="o">
+      <section class="band" aria-labelledby="how">
         <div class="wrap">
-          <span class="n">01</span>
-          <h2 id="o">Everything is labelled with how it turned out</h2>
-          <p class="sub">
-            Files agents produce are kept as artifacts, and the history of a piece of work as a work
-            record. Every item carries one of seven outcomes, so "what worked last time" is a question
-            with an answer.
+          <h2 id="how">How it works</h2>
+          <ol class="steps">
+            <li>
+              <h3>Work comes in, labelled</h3>
+              <p>
+                Files are uploaded as artifacts, versioned. Each item carries one of seven outcomes: approved,
+                completed, in-progress, superseded, rejected, failed or abandoned. Work records come only from
+                SuperPipeline, and only once it is connected with a signing key and credentials.
+              </p>
+            </li>
+            <li>
+              <h3>Uploads are checked</h3>
+              <p>
+                Every upload is scanned for common key formats and size limits before it is kept; a refusal names
+                the file and line, and an override needs a written reason. It is pattern matching, not a guarantee
+                that no secret gets through.
+              </p>
+            </li>
+            <li>
+              <h3>Search ranks by outcome</h3>
+              <p>
+                Full-text and vector search run together. Approved and completed work ranks first; rejected and
+                failed work ranks lower but still shows. You only see boards you are on and workspace-wide items.
+                Search is text only for now.
+              </p>
+            </li>
+          </ol>
+        </div>
+      </section>
+
+      <section class="band" aria-labelledby="use">
+        <div class="wrap prose">
+          <h2 id="use">What it's like to use</h2>
+          <p>
+            Say an agent is about to write a pricing page. Before it starts, it calls <code>library_search</code>
+            through SuperLibrary's MCP server and finds the approved final copy. <code>library_related</code> shows
+            the draft that was rejected and the card that completed the work, so it starts from what was accepted
+            and knows what was turned down.
           </p>
-          <div class="outcomes">{outcomes.map((o) => <span class="pill">{o}</span>)}</div>
-        </div>
-      </section>
-
-      <section class="band" aria-labelledby="s">
-        <div class="wrap">
-          <span class="n">02</span>
-          <h2 id="s">Search that ranks by outcome, and hides nothing</h2>
-          <div class="grid">
-            <div class="cell">
-              <h3>Words and meaning</h3>
-              <p>Full-text and vector search together, so an exact phrase and a loose description both find it.</p>
-              <span class="field">hybrid retrieval</span>
-            </div>
-            <div class="cell">
-              <h3>Approved first</h3>
-              <p>Work that was approved ranks above work that wasn't. Failures still appear, so the lesson isn't lost.</p>
-              <span class="field">outcome-aware ranking</span>
-            </div>
-            <div class="cell">
-              <h3>Only what you may see</h3>
-              <p>Results are filtered to the boards and workspace the caller can see, for people and agents alike.</p>
-              <span class="field">scope</span>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section class="band" aria-labelledby="a">
-        <div class="wrap">
-          <span class="n">03</span>
-          <h2 id="a">Agents look before they work</h2>
-          <p class="sub">
-            An MCP server gives an agent three read-only tools: search the library, open an item, and find
-            the work related to it. Agents read; people decide what is kept.
-          </p>
-          <code class="codeline">library_search · library_get · library_related</code>
-        </div>
-      </section>
-
-      <section class="band" aria-labelledby="k">
-        <div class="wrap split">
-          <div>
-            <span class="n">04</span>
-            <h2 id="k">Safe to keep</h2>
-            <p class="sub">An agent's output can carry a token it should never have printed. SuperLibrary checks before it keeps.</p>
-          </div>
-          <ul class="facts">
-            <li>Every upload is scanned for secrets, and refused if it holds one. An override needs a written reason.</li>
-            <li>Size limits on every file and every upload.</li>
-            <li>Files are served from a separate content domain, through short-lived signed links.</li>
-            <li>Items embed in other pages with <code>@superlibrary/embed</code>.</li>
-          </ul>
-        </div>
-      </section>
-
-      <section class="band" aria-labelledby="w">
-        <div class="wrap">
-          <span class="n">05</span>
-          <h2 id="w">Work history arrives by itself</h2>
-          <p class="sub">
-            Connected to <a href="https://superpipeline.dev">SuperPipeline</a>, finished cards arrive as work
-            records with their outcome, through signed events and a backfill for what came before. Files on
-            an <a href="https://agentpod.dev">AgentPod</a> station can be linked in as items too.
+          <p class="muted">
+            The MCP server has three read-only tools: <code>library_search</code>, <code>library_get</code> and
+            <code>library_related</code>. An agent needs a session token from your organization's sign-in and has
+            to be given the server. Agents can still add files, through <code>suli upload</code>, under the same
+            secret scan as anyone else.
           </p>
         </div>
       </section>
 
-      <section class="band" aria-labelledby="c">
-        <div class="wrap">
-          <span class="n">06</span>
-          <h2 id="c">One command-line client: <span class="mono">suli</span></h2>
-          <p class="sub">
-            One binary, installed without sudo, checked against the release's SHA-256 sums. It carries an
-            agent skill built in, so the skill always matches the commands of the <span class="mono">suli</span> that wrote it.
+      <section class="band" aria-labelledby="run">
+        <div class="wrap prose">
+          <h2 id="run">Run it yourself</h2>
+          <p>
+            SuperLibrary runs as a hosted service at <a href={APP}>app.superlibrary.dev</a>. You sign in with an
+            account on the Super Jackfruit Labs account service; that sign-in is the only way in today.
           </p>
-          <pre aria-label="Install suli" style="margin-top:22px"><code><span class="p">$ </span>{install}{'\n'}<span class="p">$ </span>suli login</code></pre>
+          <p>
+            The command-line client, <code>suli</code>, is one binary for macOS (Apple silicon and Intel) and
+            Linux (x64 and arm64), released as {VERSION}. Its installer needs no sudo and checks every download
+            against the release's SHA-256 sums. The source and releases are private for now, so the public
+            installer command does not work yet; it becomes public with the repository.
+            <code>suli login</code> signs in through the same account service, and <code>suli skill install</code>
+            gives an agent a skill that matches its commands.
+          </p>
           <a class="more" href={`${DOCS}/install/`}>Install guide →</a>
         </div>
       </section>
 
       <section class="band" aria-labelledby="r">
         <div class="wrap">
-          <span class="n">07</span>
           <h2 id="r">Where it runs today</h2>
           <ul class="facts">
-            <li>Cloudflare Workers, with D1, R2, Workers AI, Vectorize and Queues. Local development needs no Cloudflare account.</li>
-            <li>People sign in through Super Jackfruit Labs accounts; there is no other sign-in provider yet.</li>
-            <li>SuperPipeline and AgentPod connections need those products and their service credentials.</li>
-            <li>MIT licensed. There is no self-hosting guide yet.</li>
+            <li>Only on Cloudflare Workers (D1, R2, Workers AI, Vectorize, Queues). There is no self-hosting guide, and the configuration names SJL's own domains.</li>
+            <li>Sign-in goes through SJL's account service; a self-hosted copy has no other sign-in provider yet.</li>
+            <li>The viewer can be embedded with <code>@superlibrary/embed</code>, but only on pages from origins in its configuration, which today are SJL's own.</li>
+            <li>Work records need SuperPipeline; linked station files need an AgentPod hub. Neither arrives without that setup.</li>
+            <li>The source is private. It will be published later; until then there is no licence to point to.</li>
           </ul>
         </div>
       </section>
@@ -351,15 +371,21 @@ const outcomes = ['approved', 'completed', 'in-progress', 'rejected', 'failed', 
     <footer>
       <div class="wrap">
         <span class="fnav">
-          <a href={DOCS}>Documentation</a>
-          <a href={REPO}>GitHub</a>
+          <a href={DOCS}>Docs</a>
           <a href="https://superjackfruit.com">Super Jackfruit Labs</a>
-          <a href="https://superpipeline.dev">SuperPipeline</a>
-          <a href="https://agentpod.dev">AgentPod</a>
-          <a href="https://superwitness.dev">SuperWitness</a>
         </span>
-        <span class="colophon"><Mark size={16} /> SuperLibrary · MIT</span>
+        <span class="colophon"><Mark size={16} /> SuperLibrary</span>
       </div>
     </footer>
+    <script is:inline>
+      (function () {
+        var b = document.getElementById('theme'), h = document.documentElement;
+        b.addEventListener('click', function () {
+          var t = h.dataset.theme === 'light' ? 'dark' : 'light';
+          h.dataset.theme = t;
+          try { localStorage.setItem('theme', t); } catch (e) {}
+        });
+      })();
+    </script>
   </body>
 </html>

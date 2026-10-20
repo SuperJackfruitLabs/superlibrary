@@ -22,7 +22,7 @@ interface Props {
 const { title, description, canonical: hasCanonical = true } = Astro.props;
 const canonical = new URL(Astro.url.pathname, Astro.site).href;
 const image = new URL('/og.png', Astro.site).href;
-const imageAlt = 'SuperLibrary — the memory of the stack';
+const imageAlt = 'SuperLibrary — what agents made, and how it turned out';
 ---
 
 {hasCanonical && <link rel="canonical" href={canonical} />}
