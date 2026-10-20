@@ -115,21 +115,22 @@ const DESCRIPTION =
       figcaption { margin-top: 12px; font-size: 13px; color: var(--muted); text-align: center; position: relative; z-index: 1; }
 
       /* ── hero ── */
-      .hero .wrap { display: grid; grid-template-columns: 1.05fr 1fr; gap: 56px; align-items: center; padding-top: 56px; padding-bottom: 88px; }
+      .hero .wrap { display: grid; grid-template-columns: minmax(0, 1fr) 500px; gap: 56px; align-items: center; min-height: calc(100svh - 108px); padding-top: 56px; padding-bottom: 72px; }
       .hero .wrap > * { min-width: 0; }
-      h1 { font-family: var(--display); font-weight: 600; font-size: clamp(2.7rem, 6vw, 4.5rem); line-height: 1.02; letter-spacing: -0.02em; margin: 0 0 22px; text-wrap: balance; }
+      h1 { font-family: var(--display); font-weight: 600; font-size: clamp(40px, 4.6vw, 60px); line-height: 1.04; letter-spacing: -0.02em; margin: 0; max-width: 12ch; text-wrap: balance; }
       h1 em { font-style: italic; font-weight: 500; color: var(--coral-text); }
-      .lede { color: var(--muted); font-size: 1.1rem; margin: 0 0 30px; max-width: 32em; }
+      .lede { color: var(--muted); font-family: var(--sans); font-size: 18px; line-height: 1.55; margin: 20px 0 28px; max-width: 34em; }
       .cta { display: flex; gap: 12px; flex-wrap: wrap; }
-      .btn { display: inline-flex; align-items: center; border-radius: 8px; padding: 11px 19px; font-size: 15px; font-weight: 600; text-decoration: none; border: 1px solid transparent; transition: filter .15s, border-color .15s; }
+      .btn { display: inline-flex; align-items: center; height: 46px; border-radius: 10px; padding: 0 20px; font: 600 15px var(--sans); text-decoration: none; border: 1px solid transparent; transition: filter .15s, border-color .15s; }
       .btn-primary { background: var(--btn); color: var(--btn-ink); }
       .btn-primary:hover { filter: brightness(1.06); }
-      .btn-ghost { border-color: var(--line); color: var(--text); }
+      .btn-ghost { background: transparent; border-color: var(--line); color: var(--text); }
       .btn-ghost:hover { border-color: var(--coral); }
 
       /* the item card: this page's signature */
       .hero { overflow-x: clip; }
-      .card-wrap { position: relative; margin: 0; }
+      .card-wrap { position: relative; margin: 0; width: 500px; max-width: 100%; }
+      .card-wrap figcaption { margin-top: 10px; font: 12px var(--mono); color: var(--muted); }
       .card-wrap::before { content: ''; position: absolute; inset: -40px -30px; z-index: 0; pointer-events: none; background: radial-gradient(closest-side, var(--coral-tint), transparent 75%); opacity: .6; }
       .item { position: relative; z-index: 1; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; box-shadow: 0 24px 48px -24px rgba(0,0,0,.45); font-size: 14px; }
       [data-theme="light"] .item { box-shadow: 0 24px 48px -28px rgba(29,23,20,.22); }
@@ -184,7 +185,8 @@ const DESCRIPTION =
       .colophon { display: inline-flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 12.5px; }
 
       @media (max-width: 899px) {
-        .hero .wrap { grid-template-columns: 1fr; gap: 44px; padding-top: 32px; padding-bottom: 64px; }
+        .hero .wrap { grid-template-columns: 1fr; gap: 44px; min-height: auto; padding-top: 40px; padding-bottom: 56px; }
+        .card-wrap { width: 100%; }
         .split { grid-template-columns: 1fr; gap: 32px; }
         .grid, ol.steps { grid-template-columns: 1fr; }
       }
@@ -214,12 +216,11 @@ const DESCRIPTION =
     </header>
 
     <main>
-      <div class="hero">
+      <section class="hero">
         <div class="wrap">
           <div>
-            <h1>SuperLibrary</h1>
+            <h1>Find what agents made, and <em>whether it worked.</em></h1>
             <p class="lede">
-              <strong style="color:var(--text)">Find what agents made last time, and whether it worked.</strong>
               SuperLibrary keeps the files agents make and the record of finished work, each labelled with
               its outcome, and lets people and agents search them.
             </p>
@@ -253,7 +254,7 @@ const DESCRIPTION =
             <figcaption>Example item with invented data. The field names and outcomes are the real ones.</figcaption>
           </figure>
         </div>
-      </div>
+      </section>
 
       <section class="band" aria-labelledby="how">
         <div class="wrap">
