@@ -120,6 +120,14 @@ Notes:
 - An idle slot whose `dims` is NULL is treated as 1024-d on first use, so an embedder with any other dimension is refused (`400 dimension_mismatch`) until step 2 has recorded the new dims.
 - After a swap, the old slot must drain before the next re-index: one daily reconcile removes what it still holds. A re-index started earlier answers `409 slot_not_drained`.
 
+## The sites
+
+- `landing/` is [superlibrary.dev](https://superlibrary.dev); `docs-site/` is [docs.superlibrary.dev](https://docs.superlibrary.dev) (Starlight, with `/llms.txt`).
+- Both are plain Astro with their own npm lockfiles, outside the pnpm workspace. `npm ci && npm run dev` in either.
+- `scripts/deploy-sites.sh [landing|docs|all]` builds and deploys them as Cloudflare Workers with static assets, from the operator's machine with an existing `wrangler login`. Each `wrangler.jsonc` declares its custom domain.
+- `node scripts/check-docs-claims.mjs` fails when a page names an `/api/v1` route or MCP tool that `apps/api` does not define, or a docs page lacks its title or description. CI runs it with the docs build.
+- Public claims follow the Superlibrary section of sjl-marketing's claims ledger (`foundation/products.md`, SL-01 onward).
+
 ## License
 
-Proprietary until a license is chosen.
+MIT. See [LICENSE](LICENSE).
