@@ -172,3 +172,28 @@ jobs:
           mkdir -p "$RUNNER_TEMP/wrangler-cwd"
           cd "$RUNNER_TEMP/wrangler-cwd"
           "$GITHUB_WORKSPACE/apps/api/node_modules/.bin/wrangler" pages deploy "$GITHUB_WORKSPACE/apps/web/build" --project-name=superlibrary-web --branch=main
+  # superlibrary.dev and docs.superlibrary.dev: build only. They deploy from the operator's
+  # machine (scripts/deploy-sites.sh), so CI holds no Cloudflare token for them. npm, scoped
+  # to each directory, because both sit outside the pnpm workspace with their own lockfiles.
+  landing:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm ci
+        working-directory: landing
+      - run: npm run build
+        working-directory: landing
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm ci
+        working-directory: docs-site
+      - run: npm run build
+        working-directory: docs-site
+      # Every route, MCP tool and frontmatter field the pages name must exist in apps/api.
+      - run: node scripts/check-docs-claims.mjs

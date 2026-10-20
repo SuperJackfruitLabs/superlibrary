@@ -148,7 +148,7 @@ suli collect show "week 41"
 
 ## `suli collect add`
 
-Any member may add an item they can see. While it is in a collection, an artifact is not deleted by the 30-day sweep.
+Any member may add an item they can see. While it is in a collection, an artifact is exempt from retention: a deployment that enforces it deletes artifacts nothing refers to after 30 days, and the shipped configuration only reports them.
 
 ```sh
 suli collect add <collection> <item> [--note <text>]

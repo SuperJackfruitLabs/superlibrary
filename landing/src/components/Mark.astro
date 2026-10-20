@@ -1,0 +1,15 @@
+---
+/**
+ * The Superlibrary mark: the colour mark from the SJL brand pack
+ * (sjl-marketing/brand/product-logos/translucent-v2/products/superlibrary/svg/mark-color.svg),
+ * copied to public/mark.svg. Unlike a one-colour line mark it carries its own coral
+ * gradients, so it is shown as an image rather than inlined to take currentColor. The
+ * empty alt is deliberate: it always sits beside the name.
+ */
+interface Props {
+  size?: number;
+}
+const { size = 28 } = Astro.props;
+---
+
+<img src="/mark.svg" alt="" width={size} height={size} style="display:block;flex:none" />

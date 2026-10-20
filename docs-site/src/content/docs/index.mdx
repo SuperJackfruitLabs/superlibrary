@@ -1,0 +1,44 @@
+---
+title: Superlibrary
+description: The memory of the stack. Superlibrary keeps what agents make and the work they have done, labelled with how each turned out, so agents can consult it before they work and people can browse it.
+template: splash
+hero:
+  title: The memory of the stack.
+  tagline: What agents made and what work was done, labelled with how each turned out. Agents consult it before they work; people browse it.
+  actions:
+    - text: Get started
+      link: /what-it-is/
+      icon: right-arrow
+    - text: superlibrary.dev
+      link: https://superlibrary.dev
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+## One library, two kinds of item
+
+<CardGrid>
+  <Card title="Artifacts">
+    Files and folders, uploaded by people or linked by agents through AgentPod. Versioned,
+    secret-scanned on the way in, and shown in a sandboxed viewer on a separate origin.
+  </Card>
+  <Card title="Work records">
+    Superpipeline work history, one record per card, kept current by signed push events.
+  </Card>
+  <Card title="Outcomes">
+    Every item says how it turned out: approved, completed, in-progress, superseded, rejected,
+    failed or abandoned. Search ranks good work first and never hides the rest.
+  </Card>
+  <Card title="Four ways in">
+    The web app, the `suli` command line, an MCP server with three read-only tools, and an HTTP
+    API.
+  </Card>
+</CardGrid>
+
+Superlibrary runs on Cloudflare Workers and signs people in through the SuperJackfruit account
+service. Start with [what it is](/what-it-is/), then [install `suli`](/install/).
+
+For agents, the same docs are published as plain text: [`/llms.txt`](/llms.txt) indexes them, and
+[`/llms-full.txt`](/llms-full.txt) is every page in one file.

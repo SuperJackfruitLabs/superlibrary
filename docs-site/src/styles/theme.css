@@ -1,0 +1,96 @@
+/*
+ * The docs wear the landing page's identity.
+ *
+ * Without this file the docs are Starlight's stock blue on system fonts, so following
+ * "Read the docs" from superlibrary.dev would feel like leaving for somebody else's site.
+ * Every value below is one of the landing page's tokens (`landing/src/pages/index.astro`,
+ * `:root`), expressed as the seven-step gray ramp plus accent triple that Starlight derives
+ * everything else from — so no component needs restyling. The coral is the mark's own
+ * (sjl-marketing/brand/product-logos, translucent-v2); the grays lean warm to sit with it.
+ *
+ * `html:root` rather than `:root` is load-bearing: this file can be bundled ahead of
+ * Starlight's own props.css, and at equal specificity Starlight's defaults would win
+ * with a build that succeeds and a page that looks untouched. supermessage's docs met
+ * exactly that.
+ *
+ * Contrast (WCAG 2.x), measured on the grounds each pair actually sits on:
+ *   dark   links #ffb59d on #15100e 11.1:1 · body #d6ccc6 12.0:1 · muted #a3958d 6.5:1 ·
+ *          active sidebar item #3a160c on #ffb59d 9.5:1 · hero button #15100e on
+ *          #ffb59d 11.1:1 · note aside accent #ffb59d on #3a160c 9.5:1
+ *   light  links #b8442a on #fbf7f3 5.1:1 (5.4:1 on the white nav) · body #3d342f 11.4:1 ·
+ *          muted #6b5d55 5.9:1 · active sidebar item #fff on #b8442a 5.4:1 · hero button
+ *          #fff on #b8442a 5.4:1 · note aside accent #6e2414 on #fbe1d6 8.7:1
+ * The brand coral #f2704e is 2.7:1 on the light ground, so it is never text: it lives in
+ * the mark and in rules. Light-theme accent text never sits on the coral tint (4.3:1);
+ * the aside uses accent-high there instead.
+ */
+html:root {
+  /* dark — the default, as on the landing page */
+  --sl-color-white: #f3ebe6; /* text */
+  --sl-color-gray-1: #f3ebe6; /* text */
+  --sl-color-gray-2: #d6ccc6; /* between text and muted */
+  --sl-color-gray-3: #a3958d; /* muted */
+  --sl-color-gray-4: #5e524c; /* between muted and line */
+  --sl-color-gray-5: #2e2522; /* line */
+  --sl-color-gray-6: #1d1714; /* surface */
+  --sl-color-gray-7: #191311; /* between surface and ground */
+  --sl-color-black: #15100e; /* ground */
+
+  /* In dark, Starlight sets text on an accent fill in accent-low (the active sidebar
+     item), so it is a coral so deep it reads as ink: 9.5:1 on accent-high. */
+  --sl-color-accent-low: #3a160c;
+  --sl-color-accent: #f2704e; /* the mark's coral */
+  --sl-color-accent-high: #ffb59d; /* link text: a lighter coral, 11.1:1 on the ground */
+
+  --sl-font: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+  --sl-font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', monospace;
+  --sl-font-display: 'Newsreader', Georgia, serif;
+}
+
+html:root[data-theme='light'] {
+  --sl-color-white: #1d1714; /* text */
+  --sl-color-gray-1: #2b231f; /* between text and muted */
+  --sl-color-gray-2: #3d342f; /* body */
+  --sl-color-gray-3: #6b5d55; /* muted */
+  --sl-color-gray-4: #a0928a; /* between muted and line */
+  --sl-color-gray-5: #e8ddd6; /* line */
+  --sl-color-gray-6: #f4ece6; /* inset */
+  --sl-color-gray-7: #ffffff; /* surface */
+  --sl-color-black: #fbf7f3; /* ground */
+
+  /* The deep coral: link text on every page, 5.1:1 on the ground. The landing page uses
+     the same value. */
+  --sl-color-accent-low: #fbe1d6;
+  --sl-color-accent: #b8442a;
+  --sl-color-accent-high: #6e2414;
+
+  /* Text on a filled coral (the active sidebar item, the skip link) is white: 5.4:1. */
+  --sl-color-text-invert: #ffffff;
+}
+
+/* The splash page's primary button sets its text in --sl-color-black, which in light is
+   the ground; white matches the landing page's button and the active sidebar item. */
+html:root[data-theme='light'] .sl-link-button.primary,
+html:root[data-theme='light'] .sl-link-button.primary:hover {
+  color: #ffffff;
+}
+
+/* Notes are coral rather than Starlight's blue, so the docs have one accent. The tint is
+   accent-low and the accent text is accent-high in both themes (ratios above). */
+.starlight-aside--note {
+  --sl-color-asides-text-accent: var(--sl-color-accent-high);
+  --sl-color-asides-border: var(--sl-color-accent);
+  background-color: var(--sl-color-accent-low);
+}
+
+/* The display face on headings and the site title, as on the landing page: a book face,
+   for a library. Body text stays IBM Plex Sans. */
+.site-title,
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--sl-font-display);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}

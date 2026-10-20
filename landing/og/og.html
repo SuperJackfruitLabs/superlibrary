@@ -1,0 +1,31 @@
+<!doctype html>
+<!-- The link preview, 1200×630. Rendered to ../public/og.png — see README.md. The mark is
+     ../public/mark.svg, the brand pack's colour mark. -->
+<meta charset="utf-8" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,600;1,6..72,500&family=IBM+Plex+Sans:wght@400&family=IBM+Plex+Mono:wght@500&display=swap" />
+<style>
+  html, body { margin: 0; }
+  body {
+    width: 1200px; height: 630px; box-sizing: border-box; padding: 76px 92px 72px;
+    background: #15100e; color: #f3ebe6; font-family: 'IBM Plex Sans', sans-serif;
+    display: flex; flex-direction: column; justify-content: space-between; position: relative; overflow: hidden;
+  }
+  body::before {
+    content: ''; position: absolute; right: -180px; top: -200px; width: 720px; height: 720px;
+    background: radial-gradient(closest-side, rgba(242,112,78,.16), transparent 72%);
+  }
+  .brand { display: flex; align-items: center; gap: 22px; font: 600 42px 'Newsreader', serif; letter-spacing: -0.01em; position: relative; }
+  h1 { font: 600 80px/1.02 'Newsreader', serif; letter-spacing: -0.02em; margin: 0 0 22px; }
+  h1 em { font-style: italic; font-weight: 500; color: #ffb59d; }
+  p { font-size: 26px; line-height: 1.45; color: #a3958d; margin: 0; max-width: 30em; }
+  .foot { font: 500 24px 'IBM Plex Mono', monospace; color: #a3958d; position: relative; }
+</style>
+<div class="brand">
+  <img src="../public/mark.svg" width="96" height="96" alt="" />
+  Superlibrary
+</div>
+<div>
+  <h1>The memory <em>of the stack</em>.</h1>
+  <p>What agents make and what work has been done, labelled with how each turned out.</p>
+</div>
+<div class="foot">superlibrary.dev</div>
