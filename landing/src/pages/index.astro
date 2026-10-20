@@ -151,6 +151,18 @@ const DESCRIPTION =
       .o-ok { color: var(--ok); font-family: var(--mono); font-size: 12px; }
       .o-no { color: var(--no); font-family: var(--mono); font-size: 12px; }
 
+      /* hero moment: plays once when .item gets .playing (script below the figure); resting state is the markup */
+      @keyframes sl-rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+      @keyframes sl-flip { 0% { transform: rotateX(0); } 50% { transform: rotateX(90deg); } 51% { transform: rotateX(-90deg); } 100% { transform: rotateX(0); } }
+      @keyframes sl-slide { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: none; } }
+      .item.playing .item-head, .item.playing .row { animation: sl-rise .32s ease-out backwards; animation-delay: calc(600ms + var(--i, 0) * 150ms); }
+      .item.playing .row:nth-child(1) { --i: 1; } .item.playing .row:nth-child(2) { --i: 2; } .item.playing .row:nth-child(3) { --i: 3; }
+      .item.playing .row:nth-child(4) { --i: 4; } .item.playing .row:nth-child(5) { --i: 5; }
+      .item.playing .js-outcome { display: inline-block; animation: sl-flip .4s ease-out 1.85s both; }
+      .item.playing .related { animation: sl-rise .3s ease-out 2.4s backwards; }
+      .item.playing .related li { animation: sl-slide .35s ease-out backwards; animation-delay: calc(2.5s + var(--i, 0) * 140ms); }
+      .item.playing .related li + li { --i: 1; }
+
       /* ── bands ── */
       section.band { border-top: 1px solid var(--line); }
       section.band .wrap { padding-top: 88px; padding-bottom: 88px; }
@@ -238,7 +250,7 @@ const DESCRIPTION =
               </div>
               <dl>
                 <div class="row"><dt>kind</dt><dd><span class="pill">artifact</span></dd></div>
-                <div class="row"><dt>outcome</dt><dd><span class="pill coral">approved</span></dd></div>
+                <div class="row"><dt>outcome</dt><dd><span class="pill coral js-outcome">approved</span></dd></div>
                 <div class="row"><dt>scope</dt><dd><span class="pill">board:brd_9a41…</span></dd></div>
                 <div class="row"><dt>version</dt><dd><span class="pill">3</span></dd></div>
                 <div class="row"><dt>source</dt><dd><span class="pill">superpipeline</span></dd></div>
@@ -252,6 +264,23 @@ const DESCRIPTION =
               </div>
             </div>
             <figcaption>Example item with invented data. The field names and outcomes are the real ones.</figcaption>
+            <script is:inline>
+              (function () {
+                if (!window.matchMedia || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+                var item = document.currentScript.parentNode.querySelector('.item');
+                var badge = item && item.querySelector('.js-outcome');
+                if (!badge || !('IntersectionObserver' in window)) return;
+                var io = new IntersectionObserver(function (es) {
+                  if (!es[0].isIntersecting) return;
+                  io.disconnect();
+                  badge.textContent = 'in-progress'; badge.classList.remove('coral');
+                  item.classList.add('playing');
+                  setTimeout(function () { badge.textContent = 'approved'; badge.classList.add('coral'); }, 2050);
+                  setTimeout(function () { item.classList.remove('playing'); }, 3300);
+                }, { threshold: 0.3 });
+                io.observe(item);
+              })();
+            </script>
           </figure>
         </div>
       </section>
