@@ -61,8 +61,8 @@ Set with `wrangler secret put`, never in the repository.
 | Secret | What it is for |
 |---|---|
 | `HUB_SERVICE_PRINCIPAL` | The one service principal, the AgentPod hub, trusted to act for an agent and to say where a linked file came from. |
-| `SERVICE_CREDENTIALS` | Superlibrary's own service credentials per organization, for calling Superpipeline and the hub. |
-| `PUSH_SIGNING_KEY` | Signs and verifies Superpipeline's push subscription. At least 32 characters. |
+| `SERVICE_CREDENTIALS` | SuperLibrary's own service credentials per organization, for calling SuperPipeline and the hub. |
+| `PUSH_SIGNING_KEY` | Signs and verifies SuperPipeline's push subscription. At least 32 characters. |
 | `OPERATORS` | Space-separated principal ids (`prn_…`) allowed to use the admin routes and the backfill. |
 
 ## Health

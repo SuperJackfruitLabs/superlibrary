@@ -61,7 +61,7 @@ suli collect list
 
 - A person: a member of the workspace.
 - An agent token: refused.
-- Agents reach Superlibrary from a later release; an agent token is refused today.
+- Agents reach SuperLibrary from a later release; an agent token is refused today.
 
 **Calls** `GET /api/v1/collections`
 
@@ -97,7 +97,7 @@ suli collect create <name> [--description <text>]
 
 - A person: a member of the workspace.
 - An agent token: refused.
-- Agents reach Superlibrary from a later release; an agent token is refused today.
+- Agents reach SuperLibrary from a later release; an agent token is refused today.
 
 **Calls** `POST /api/v1/collections`
 
@@ -130,7 +130,7 @@ suli collect show <collection>
 
 - A person: a member of the workspace.
 - An agent token: refused.
-- Agents reach Superlibrary from a later release; an agent token is refused today.
+- Agents reach SuperLibrary from a later release; an agent token is refused today.
 
 **Calls** `GET /api/v1/collections`, `GET /api/v1/collections/:id`
 
@@ -168,7 +168,7 @@ suli collect add <collection> <item> [--note <text>]
 
 - A person: a member of the workspace.
 - An agent token: refused.
-- Agents reach Superlibrary from a later release; an agent token is refused today.
+- Agents reach SuperLibrary from a later release; an agent token is refused today.
 
 **Calls** `GET /api/v1/collections`, `POST /api/v1/collections/:id/items`
 
@@ -202,7 +202,7 @@ suli collect remove <collection> <item>
 
 - A person: a member of the workspace.
 - An agent token: refused.
-- Agents reach Superlibrary from a later release; an agent token is refused today.
+- Agents reach SuperLibrary from a later release; an agent token is refused today.
 
 **Calls** `GET /api/v1/collections`, `DELETE /api/v1/collections/:id/items/:item`
 
@@ -235,7 +235,7 @@ suli scope <item> <scope>
 
 - A person: the person who uploaded it, or an owner of the workspace.
 - An agent token: refused.
-- Agents reach Superlibrary from a later release; an agent token is refused today.
+- Agents reach SuperLibrary from a later release; an agent token is refused today.
 
 **Calls** `POST /api/v1/items/:id/scope`
 

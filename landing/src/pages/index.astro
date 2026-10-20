@@ -10,7 +10,7 @@
  * Workers or the web app.
  *
  * Every claim on this page is a `verified` or `limited` entry in sjl-marketing's ledger
- * (foundation/products.md, ## Superlibrary, SL-01…SL-11), and each limited claim keeps its
+ * (foundation/products.md, ## SuperLibrary, SL-01…SL-11), and each limited claim keeps its
  * caveat on the page — see "Where it runs today". If a claim changes there, change it here.
  *
  * Every label in the hero is real. The hero is an ItemSummary (packages/contract/src/model.ts):
@@ -33,9 +33,9 @@ import ShareMeta from '../components/ShareMeta.astro';
 const DOCS = 'https://docs.superlibrary.dev';
 const REPO = 'https://github.com/SuperJackfruitLabs/superlibrary';
 const VERSION = 'v0.0.1'; // the latest release tag; bump with each release
-const TITLE = 'Superlibrary — the memory of the stack';
+const TITLE = 'SuperLibrary — the memory of the stack';
 const DESCRIPTION =
-  'Superlibrary keeps what agents make and what work has been done, labelled with how each turned out, so agents can look before they work and people can find it again. MIT licensed.';
+  'SuperLibrary keeps what agents make and what work has been done, labelled with how each turned out, so agents can look before they work and people can find it again. MIT licensed.';
 
 // Must equal the README's install section and the docs site's install page.
 const install = `curl -fsSL ${REPO}/releases/latest/download/install.sh | bash`;
@@ -192,9 +192,9 @@ const outcomes = ['approved', 'completed', 'in-progress', 'rejected', 'failed', 
   <body>
     <header>
       <div class="wrap">
-        <a class="brand" href="/" aria-label="Superlibrary home">
+        <a class="brand" href="/" aria-label="SuperLibrary home">
           <Mark size={30} />
-          <span class="name">Superlibrary</span>
+          <span class="name">SuperLibrary</span>
         </a>
         <nav aria-label="Primary">
           <a href={DOCS}>Docs</a>
@@ -210,7 +210,7 @@ const outcomes = ['approved', 'completed', 'in-progress', 'rejected', 'failed', 
           <div>
             <h1>The memory <em>of the stack</em>.</h1>
             <p class="lede">
-              Superlibrary keeps what agents make and what work has been done, each labelled with how it
+              SuperLibrary keeps what agents make and what work has been done, each labelled with how it
               turned out. Agents look before they work; people find it again.
             </p>
             <div class="cta">
@@ -298,7 +298,7 @@ const outcomes = ['approved', 'completed', 'in-progress', 'rejected', 'failed', 
           <div>
             <span class="n">04</span>
             <h2 id="k">Safe to keep</h2>
-            <p class="sub">An agent's output can carry a token it should never have printed. Superlibrary checks before it keeps.</p>
+            <p class="sub">An agent's output can carry a token it should never have printed. SuperLibrary checks before it keeps.</p>
           </div>
           <ul class="facts">
             <li>Every upload is scanned for secrets, and refused if it holds one. An override needs a written reason.</li>
@@ -314,7 +314,7 @@ const outcomes = ['approved', 'completed', 'in-progress', 'rejected', 'failed', 
           <span class="n">05</span>
           <h2 id="w">Work history arrives by itself</h2>
           <p class="sub">
-            Connected to <a href="https://superpipeline.dev">Superpipeline</a>, finished cards arrive as work
+            Connected to <a href="https://superpipeline.dev">SuperPipeline</a>, finished cards arrive as work
             records with their outcome, through signed events and a backfill for what came before. Files on
             an <a href="https://agentpod.dev">AgentPod</a> station can be linked in as items too.
           </p>
@@ -341,7 +341,7 @@ const outcomes = ['approved', 'completed', 'in-progress', 'rejected', 'failed', 
           <ul class="facts">
             <li>Cloudflare Workers, with D1, R2, Workers AI, Vectorize and Queues. Local development needs no Cloudflare account.</li>
             <li>People sign in through Super Jackfruit Labs accounts; there is no other sign-in provider yet.</li>
-            <li>Superpipeline and AgentPod connections need those products and their service credentials.</li>
+            <li>SuperPipeline and AgentPod connections need those products and their service credentials.</li>
             <li>MIT licensed. There is no self-hosting guide yet.</li>
           </ul>
         </div>
@@ -354,11 +354,11 @@ const outcomes = ['approved', 'completed', 'in-progress', 'rejected', 'failed', 
           <a href={DOCS}>Documentation</a>
           <a href={REPO}>GitHub</a>
           <a href="https://superjackfruit.com">Super Jackfruit Labs</a>
-          <a href="https://superpipeline.dev">Superpipeline</a>
+          <a href="https://superpipeline.dev">SuperPipeline</a>
           <a href="https://agentpod.dev">AgentPod</a>
-          <a href="https://superwitness.dev">Superwitness</a>
+          <a href="https://superwitness.dev">SuperWitness</a>
         </span>
-        <span class="colophon"><Mark size={16} /> Superlibrary · MIT</span>
+        <span class="colophon"><Mark size={16} /> SuperLibrary · MIT</span>
       </div>
     </footer>
   </body>

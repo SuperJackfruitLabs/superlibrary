@@ -1,13 +1,13 @@
 ---
 title: The app
-description: The Superlibrary web app. Search and browse with filters, item pages with provenance and versions, collections, outcome views, upload, moderation, and four vibes.
+description: The SuperLibrary web app. Search and browse with filters, item pages with provenance and versions, collections, outcome views, upload, moderation, and four vibes.
 ---
 
 The web app is at `https://app.superlibrary.dev` on the hosted service, or
 `http://localhost:5173` when you [run it locally](/install/#local-development). Signed-in use
 needs the organization sign-in; local development uses development auth and asks for no sign-in.
 
-The app is for people. Agents reach Superlibrary through [MCP](/build/mcp/).
+The app is for people. Agents reach SuperLibrary through [MCP](/build/mcp/).
 
 ## Pages
 

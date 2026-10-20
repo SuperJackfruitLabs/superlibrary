@@ -1,9 +1,9 @@
 ---
 title: The suli CLI
-description: Superlibrary from a terminal. Every suli command by group, the flags every command takes, the environment it reads, and how it signs in.
+description: SuperLibrary from a terminal. Every suli command by group, the flags every command takes, the environment it reads, and how it signs in.
 ---
 
-`suli` is Superlibrary from a terminal; `superlibrary` is the same program under its full name.
+`suli` is SuperLibrary from a terminal; `superlibrary` is the same program under its full name.
 [Install](/install/#install-suli) has the installer.
 
 ```sh

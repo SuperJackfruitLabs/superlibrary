@@ -19,7 +19,7 @@ suli help [<verb>]
 
 **Who may run it**
 
-- Local: sends no credential to Superlibrary.
+- Local: sends no credential to SuperLibrary.
 
 **Prints** help text.
 
@@ -43,7 +43,7 @@ suli version
 
 **Who may run it**
 
-- Local: sends no credential to Superlibrary.
+- Local: sends no credential to SuperLibrary.
 
 **Prints** one line.
 
@@ -75,7 +75,7 @@ suli skill [<install>] [--dir <dir>]
 
 **Who may run it**
 
-- Local: sends no credential to Superlibrary.
+- Local: sends no credential to SuperLibrary.
 
 **Prints** the SKILL.md text; with `install`, the path written (with --json, `{ "path": … }`).
 
@@ -101,7 +101,7 @@ suli login
 
 **Who may run it**
 
-- Talks to the sign-in service; sends no credential to Superlibrary.
+- Talks to the sign-in service; sends no credential to SuperLibrary.
 
 **Calls** `GET /.well-known/oauth-protected-resource`
 
@@ -128,7 +128,7 @@ suli logout
 
 **Who may run it**
 
-- Local: sends no credential to Superlibrary.
+- Local: sends no credential to SuperLibrary.
 
 **Prints** "Signed out.".
 
@@ -154,7 +154,7 @@ suli whoami
 
 - A person: a member of the workspace.
 - An agent token: refused.
-- Agents reach Superlibrary from a later release; an agent token is refused today.
+- Agents reach SuperLibrary from a later release; an agent token is refused today.
 
 **Calls** `GET /api/v1/me`
 
