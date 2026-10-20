@@ -2,7 +2,8 @@
 /**
  * superlibrary.dev — the public page.
  *
- * One page, no framework, one tiny theme script. Its job is to say what SuperLibrary is to
+ * One page, no framework. The shared frame (@superjackfruit/frontdoor) owns the suite bar,
+ * header, theme switch, claims and footer street. Its job is to say what SuperLibrary is to
  * somebody who typed the domain, and send them to the docs.
  *
  * This directory is deliberately outside the pnpm workspace and has its own npm lockfile.
@@ -16,7 +17,8 @@
  * The hero is an invented example ItemSummary (packages/contract/src/model.ts); its labels
  * are real field names and values. The MCP tool names are the three apps/api registers.
  */
-import Mark from '../components/Mark.astro';
+import SuiteHead from '@superjackfruit/frontdoor/components/SuiteHead.astro';
+import Frame from '@superjackfruit/frontdoor/components/Frame.astro';
 import ShareMeta from '../components/ShareMeta.astro';
 
 const DOCS = 'https://docs.superlibrary.dev';
@@ -42,10 +44,6 @@ const DESCRIPTION =
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,600;1,6..72,500&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
     />
-    <script is:inline>
-      try { var t = localStorage.getItem('theme'); } catch (e) {}
-      document.documentElement.dataset.theme = t === 'light' || t === 'dark' ? t : (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
-    </script>
     <style>
       /* Contrast (WCAG 2.x), measured on the grounds they sit on:
            dark   coral-text #ffb59d on #15100e 11.1:1 · body #f3ebe6 · muted #a3958d 6.5:1
@@ -93,18 +91,6 @@ const DESCRIPTION =
       .muted { color: var(--muted); }
       .wrap { width: 100%; max-width: 1080px; margin: 0 auto; padding: 0 24px; }
 
-      /* ── masthead ── */
-      header .wrap { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-top: 24px; padding-bottom: 24px; }
-      .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; }
-      .brand .name { font-family: var(--display); font-weight: 600; font-size: 23px; letter-spacing: -0.01em; }
-      nav { display: flex; gap: 20px; align-items: center; font-size: 15px; }
-      nav a { color: var(--muted); text-decoration: none; }
-      nav a:hover { color: var(--text); }
-      nav .ver { font-family: var(--mono); font-size: 12.5px; padding: 2px 8px; border: 1px solid var(--line); border-radius: 999px; }
-
-      #theme { background: none; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); font: 500 13px var(--sans); padding: 4px 10px; cursor: pointer; }
-      #theme:hover { color: var(--text); border-color: var(--coral); }
-      #theme:focus-visible { outline: 2px solid var(--coral); outline-offset: 3px; }
       ol.steps { list-style: none; counter-reset: s; margin: 32px 0 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px; }
       ol.steps li { counter-increment: s; margin: 0; padding: 0; min-width: 0; }
       ol.steps li::before { content: counter(s, decimal-leading-zero); display: block; font-family: var(--mono); font-size: 12px; color: var(--coral-text); }
@@ -188,13 +174,6 @@ const DESCRIPTION =
       .more { display: inline-block; margin-top: 14px; font-size: 15px; color: var(--coral-text); text-decoration: none; font-weight: 500; }
       .more:hover { text-decoration: underline; text-underline-offset: 3px; }
 
-      /* ── footer ── */
-      footer { border-top: 1px solid var(--line); }
-      footer .wrap { display: flex; justify-content: space-between; align-items: center; gap: 14px 24px; flex-wrap: wrap; padding-top: 30px; padding-bottom: 44px; font-size: 14px; color: var(--muted); }
-      footer a { color: var(--muted); text-decoration: none; }
-      footer a:hover { color: var(--text); }
-      .fnav { display: flex; gap: 6px 18px; flex-wrap: wrap; }
-      .colophon { display: inline-flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 12.5px; }
 
       @media (max-width: 899px) {
         .hero .wrap { grid-template-columns: 1fr; gap: 44px; min-height: auto; padding-top: 40px; padding-bottom: 56px; }
@@ -205,28 +184,21 @@ const DESCRIPTION =
       }
       @media (max-width: 480px) {
         .wrap { padding: 0 24px; }
-        nav { gap: 14px; }
         .item dl, .item-head, .related { padding-left: 14px; padding-right: 14px; }
       }
-      @media (max-width: 360px) { .brand .name { font-size: 19px; } nav .ver { display: none; } }
       @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
     </style>
+    <SuiteHead product="superlibrary" />
   </head>
   <body>
-    <header>
-      <div class="wrap">
-        <a class="brand" href="/" aria-label="SuperLibrary home">
-          <Mark size={30} />
-          <span class="name">SuperLibrary</span>
-        </a>
-        <nav aria-label="Primary">
-          <a href={DOCS}>Docs</a>
-          <span class="ver">{VERSION}</span>
-          <button id="theme" type="button" aria-label="Switch light and dark theme">Theme</button>
-        </nav>
-      </div>
-    </header>
-
+    <Frame
+      product="superlibrary"
+      cta={{ label: 'Get started', href: 'https://docs.superlibrary.dev/install/' }}
+      sections={[
+        { label: 'How it works', href: '#how' },
+        { label: 'Run it yourself', href: '#run' },
+      ]}
+    >
     <main>
       <section class="hero">
         <div class="wrap">
@@ -367,25 +339,7 @@ const DESCRIPTION =
         </div>
       </section>
     </main>
+    </Frame>
 
-    <footer>
-      <div class="wrap">
-        <span class="fnav">
-          <a href={DOCS}>Docs</a>
-          <a href="https://superjackfruit.com">Super Jackfruit Labs</a>
-        </span>
-        <span class="colophon"><Mark size={16} /> SuperLibrary</span>
-      </div>
-    </footer>
-    <script is:inline>
-      (function () {
-        var b = document.getElementById('theme'), h = document.documentElement;
-        b.addEventListener('click', function () {
-          var t = h.dataset.theme === 'light' ? 'dark' : 'light';
-          h.dataset.theme = t;
-          try { localStorage.setItem('theme', t); } catch (e) {}
-        });
-      })();
-    </script>
   </body>
 </html>
