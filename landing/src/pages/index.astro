@@ -10,8 +10,8 @@
  *
  * Every claim on this page is a `verified` or `limited` entry in sjl-marketing's ledger
  * (foundation/products.md, ## SuperLibrary), and each limited claim keeps its caveat in the
- * same section. The repository is private: no Source link, no licence line and no install
- * command that would 404 until it is public (SL-12). The shared frame adds the claims list,
+ * same section. The repository is public under MIT (since 2026-10-21); the frame's header
+ * links to it. The shared frame adds the claims list,
  * the suite links and the version, so this page does not repeat them.
  *
  * The hero is an invented example ItemSummary (packages/contract/src/model.ts); its labels
@@ -317,8 +317,10 @@ const DESCRIPTION =
           <p>
             The command-line client, <code>suli</code>, is one binary for macOS (Apple silicon and Intel) and
             Linux (x64 and arm64), released as {VERSION}. Its installer needs no sudo and checks every download
-            against the release's SHA-256 sums. The source and releases are private for now, so the public
-            installer command does not work yet; it becomes public with the repository.
+            against the release's SHA-256 sums.
+          </p>
+          <pre><code>curl -fsSL https://github.com/SuperJackfruitLabs/superlibrary/releases/latest/download/install.sh | bash</code></pre>
+          <p>
             <code>suli login</code> signs in through the same account service, and <code>suli skill install</code>
             gives an agent a skill that matches its commands.
           </p>
@@ -334,7 +336,7 @@ const DESCRIPTION =
             <li>Sign-in goes through SJL's account service; a self-hosted copy has no other sign-in provider yet.</li>
             <li>The viewer can be embedded with <code>@superlibrary/embed</code>, but only on pages from origins in its configuration, which today are SJL's own.</li>
             <li>Work records need SuperPipeline; linked station files need an AgentPod hub. Neither arrives without that setup.</li>
-            <li>The source is private. It will be published later; until then there is no licence to point to.</li>
+            <li>The source is on <a href="https://github.com/SuperJackfruitLabs/superlibrary">GitHub</a> under the MIT licence. Its user-interface kit and site frame ship as packaged copies that are not open-licensed yet.</li>
           </ul>
         </div>
       </section>
