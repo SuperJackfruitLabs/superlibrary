@@ -5,13 +5,14 @@
  * fixed number of statements, never one per file.
  */
 import { z } from 'zod';
-import { LIMITS, UploadCreate, checkPath, type CommitResult, type LinkSource } from '@superlibrary/contract';
+import { LIMITS, UploadCreate, UploadVerificationRequest, UploadVerificationGrant, encodePath, checkPath, type CommitResult, type LinkSource } from '@superlibrary/contract';
 import type { Env } from '../env';
 import { error, json, preflight, withCors, type Handler } from '../http';
 import { newId } from '../ids';
 import { audit } from '../audit';
 import { resolveUploader, type Uploader } from '../auth/caller';
 import { itemChanged } from '../events';
+import { contentOrigin, signContent } from '../items/sign';
 import { checkLinkSource, checkStationFile, linkSessionItem, personStationItem, type PersonStationFile } from '../sources/link';
 import { decodeText, sniff } from '../guard/sniff';
 import { scanText, scanUndecodedText } from '../guard/secrets';
@@ -347,7 +348,7 @@ async function batch(request: Request, env: Env, p: Uploader, id: string): Promi
   return r instanceof Response ? r : json({ files: r });
 }
 
-const UPLOAD = /^\/api\/v1\/uploads\/(upl_[0-9a-f]{16})(\/files|\/batch|\/override|\/commit)?$/;
+const UPLOAD = /^\/api\/v1\/uploads\/(upl_[0-9a-f]{16})(\/files|\/batch|\/override|\/commit|\/verification)?$/;
 
 /** The routes the AgentPod console calls from the browser with the person's own token (ruling RA3), and their methods. */
 function consoleMethods(pathname: string): string | null {
@@ -382,6 +383,7 @@ async function routeUpload(request: Request, env: Env, url: URL): Promise<Respon
   if (action === '/batch' && request.method === 'POST') return batch(request, env, p, id);
   if (action === '/override' && request.method === 'POST') return overrideScan(request, env, p, id);
   if (action === '/commit' && request.method === 'POST') return commit(env, p, id);
+  if (action === '/verification' && request.method === 'POST') return verification(request, env, p, id);
   return error(405, 'method_not_allowed');
 }
 
@@ -553,4 +555,42 @@ async function commit(env: Env, p: Uploader, id: string): Promise<Response> {
   // Every commit, a person's included: indexing learns of the new version (plan P10).
   await itemChanged(env, itemId, p.workspaceId, 'upserted');
   return json(await resultOf(env, itemId, version), 201);
+}
+
+/** Verify only the immutable original result of an owned upload. Existing upload ownership is
+ * authoritative; no roster, own-item visibility, delegated human, or general agent embed grant.
+ * Replay commit first when recovering incomplete publication; this endpoint does not repair it.
+ */
+async function verification(request: Request, env: Env, p: Uploader, id: string): Promise<Response> {
+  const s = await ownSession(env, p, id);
+  if (s instanceof Response) return s;
+  const body = UploadVerificationRequest.safeParse(await request.json().catch(() => null));
+  if (!body.success) return error(400, 'invalid');
+  if (s.state !== 'committed' || !s.result_item_id || !s.result_version) return error(409, 'not_committed');
+  const item = await loadItem(env, s.result_item_id);
+  if (!item || item.workspace_id !== p.workspaceId) return error(410, 'gone');
+  if (item.revoked_at) return error(410, 'revoked');
+  if (isExpired(item)) return error(410, 'expired');
+  const v = await env.DB.prepare(`SELECT entry, revoked_at, sha256, total_bytes, created_by FROM versions WHERE item_id = ? AND version = ?`)
+    .bind(s.result_item_id, s.result_version).first<{ entry: string; revoked_at: string | null; sha256: string; total_bytes: number; created_by: string }>();
+  if (!v) return error(410, 'gone');
+  if (v.created_by !== p.principalId) return error(404, 'not_found');
+  if (v.revoked_at) return error(410, 'revoked');
+  const files = (await env.DB.prepare(`SELECT path, sha256, bytes FROM version_files WHERE item_id = ? AND version = ? ORDER BY path`)
+    .bind(s.result_item_id, s.result_version).all<{ path: string; sha256: string; bytes: number }>()).results;
+  if (!files.length) return error(410, 'gone');
+  // Existing content-worker signature, manifest, expiry and revocation enforcement apply unchanged.
+  const exp = Math.min(Math.floor(Date.now() / 1000) + 60, item.expires_at ? Math.floor(Date.parse(item.expires_at) / 1000) : Infinity);
+  const token = await signContent(env, { itemId: s.result_item_id, version: s.result_version, exp, host: env.APP_URL });
+  const base = contentOrigin(env, s.result_item_id);
+  const grant = UploadVerificationGrant.parse({
+    schemaVersion: 'superlibrary-upload-verification/v1', uploadId: id,
+    itemId: s.result_item_id, version: s.result_version, sha256: v.sha256, bytes: v.total_bytes,
+    entry: v.entry, expiresAt: new Date(exp * 1000).toISOString(),
+    url: `${base}/_view?sig=${token}`,
+    downloadUrl: files.length === 1 ? `${base}/s/${token}/${encodePath(v.entry)}?download=1` : null, files,
+  });
+  await audit(env.DB, { workspaceId: p.workspaceId, actor: p.principalId, act: p.act,
+    action: 'upload.verification_granted', itemId: s.result_item_id, version: s.result_version, detail: { uploadId: id } }).run();
+  return json(grant);
 }

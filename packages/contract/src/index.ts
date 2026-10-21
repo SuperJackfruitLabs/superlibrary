@@ -12,3 +12,4 @@ export * from './work-record';
 export * from './events';
 export * from './retrieval';
 export * from './library';
+export * from './upload-verification';
