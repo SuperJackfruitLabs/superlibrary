@@ -27,6 +27,19 @@ const VERSION = 'v0.0.1'; // the latest release tag, as the ledger states it; bu
 const TITLE = 'SuperLibrary — what agents made, and how it turned out';
 const DESCRIPTION =
   'SuperLibrary keeps the files agents make and the record of finished work, each labelled with its outcome, so people and agents can search for what worked before.';
+
+const JSON_LD = {
+  '@context': 'https://schema.org',
+  '@type': 'SoftwareApplication',
+  name: 'SuperLibrary',
+  description: DESCRIPTION,
+  url: 'https://superlibrary.dev/',
+  applicationCategory: 'DeveloperApplication',
+  operatingSystem: 'macOS, Linux',
+  softwareVersion: VERSION.replace(/^v/, ''),
+  sameAs: ['https://github.com/SuperJackfruitLabs/superlibrary'],
+  publisher: { '@type': 'Organization', name: 'Super Jackfruit Labs', url: 'https://superjackfruit.com' },
+};
 ---
 
 <!doctype html>
@@ -38,6 +51,7 @@ const DESCRIPTION =
     <meta name="description" content={DESCRIPTION} />
     <meta name="theme-color" content="#15100e" />
     <ShareMeta title={TITLE} description={DESCRIPTION} />
+    <script type="application/ld+json" set:html={JSON.stringify(JSON_LD)} />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
