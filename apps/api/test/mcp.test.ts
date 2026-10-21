@@ -150,3 +150,23 @@ describe('/mcp', () => {
     });
   });
 });
+
+
+describe('MCP request resource bounds', () => {
+  it('rejects oversized requests before tool validation', async () => {
+    await withOrgPlane(async () => {
+      const t = await planeToken({ sub: AGENT, principalKind: 'agent' });
+      const r = await rpc(t, 'tools/call', { name: 'library_search', arguments: { query: 'x'.repeat(1024 * 1024) } });
+      expect(r.status).toBe(413);
+    });
+  });
+  it('bounds argument elements before validating an array', async () => {
+    await withOrgPlane(async () => {
+      const t = await planeToken({ sub: AGENT, principalKind: 'agent' });
+      const r = await rpc(t, 'tools/call', { name: 'library_search', arguments: { query: 'x', outcomes: Array(10_001).fill('completed') } });
+      const body = await r.json() as Call;
+      expect(body.result.isError).toBe(true);
+      expect(body.result.content[0]!.text).toContain('maximum of 10000 elements');
+    });
+  });
+});
