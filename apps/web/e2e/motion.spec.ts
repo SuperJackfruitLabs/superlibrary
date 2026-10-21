@@ -6,7 +6,7 @@
  */
 import { expect, test, type Browser, type Page } from '@playwright/test';
 import { seedCatchUp, type Seed } from './seed';
-import { VIBES_E2E, useAppearance, type VibeName } from './vibes';
+import { VIBES_E2E, useAppearance, waitForScreen, type VibeName } from './vibes';
 
 let seed: Seed;
 test.beforeAll(async ({ request }) => { test.setTimeout(600_000); seed = await seedCatchUp(request); });
@@ -72,8 +72,7 @@ test.describe('motion on: it settles', () => {
       const { ctx, page } = await open(browser, vibe, 'no-preference');
       for (const route of screens()) {
         await page.goto(route);
-        await expect(page.locator('main h1').first()).toBeVisible();
-        await expect(page.locator('[data-skeleton]')).toHaveCount(0, { timeout: 15_000 });
+        await waitForScreen(page);
         await expect.poll(() => finiteRunning(page), { timeout: 10_000 }).toBe(0);
         const rects = () => page.evaluate(() => [...document.querySelectorAll('main h1, main h2')].slice(0, 10).map((h) => { const r = h.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.top)]; }));
         const before = await rects();

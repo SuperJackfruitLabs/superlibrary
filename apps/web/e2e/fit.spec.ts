@@ -7,7 +7,7 @@
  */
 import { expect, test, type Page } from '@playwright/test';
 import { seedCatchUp, type Seed } from './seed';
-import { VIBES_E2E, openEnclosures, useAppearance } from './vibes';
+import { VIBES_E2E, openEnclosures, useAppearance, waitForScreen } from './vibes';
 
 let seed: Seed;
 test.beforeAll(async ({ request }) => { test.setTimeout(600_000); seed = await seedCatchUp(request); });
@@ -87,8 +87,7 @@ for (const vibe of VIBES_E2E) {
       const page = await ctx.newPage();
       for (const [label, url] of routes()) {
         await page.goto(url);
-        await expect(page.locator('main h1').first()).toBeVisible();
-        await expect(page.locator('[aria-busy="true"]')).toHaveCount(0, { timeout: 15_000 });
+        await waitForScreen(page);
         if (label !== 'library' && label !== 'outcomes') await openEnclosures(page);
         for (const m of await misfits(page)) problems.push(`${width} ${label}: ${m}`);
         if (phone) for (const m of await smallTargets(page)) problems.push(`${width} ${label}: target ${m}`);

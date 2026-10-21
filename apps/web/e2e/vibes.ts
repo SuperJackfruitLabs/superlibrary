@@ -13,11 +13,27 @@ export async function useAppearance(context: BrowserContext, vibe: VibeName, the
   await context.addCookies([{ name: 'vk_appearance', value: `${vibe}.${theme}.${strength}.0`, url: APP }]);
 }
 
+/** Measure loaded content, not a font swap or an enclosure's mount-time default. */
+export async function waitForScreen(page: Page) {
+  await expect(page.locator('main h1').first()).toBeVisible();
+  await expect(page.locator('[aria-busy="true"], [data-skeleton]')).toHaveCount(0, { timeout: 15_000 });
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+    await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+  });
+}
+
 /** Open every Paper enclosure and every <details>: what a person can open, the test opens. */
 export async function openEnclosures(page: Page) {
+  await waitForScreen(page);
   // The locator is live: each click takes one out of the set, so always click the first (`.all()` would index past the end).
   const closed = page.locator('button.sl-enclosure-toggle[aria-expanded="false"]');
-  for (let n = await closed.count(); n > 0; n--) await closed.first().click();
+  for (let n = await closed.count(); n > 0; n--) {
+    const controls = await closed.first().getAttribute('aria-controls');
+    const toggle = page.locator(`button.sl-enclosure-toggle[aria-controls=${JSON.stringify(controls)}]`);
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  }
   await expect(closed).toHaveCount(0);
   await page.evaluate(() => { for (const d of document.querySelectorAll('details')) d.open = true; });
   // Paper fades an opened enclosure in: measure what a person reads once it has settled, not a half-faded frame.
