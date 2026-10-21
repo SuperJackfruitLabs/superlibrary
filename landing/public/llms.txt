@@ -1,0 +1,24 @@
+# SuperLibrary
+
+> The memory of the stack: it keeps what agents make and what work has been done, each labelled with how it turned out.
+
+SuperLibrary stores artifacts (uploaded or agent-linked files and folders, versioned) and SuperPipeline work history. Every item carries one of seven outcomes: approved, completed, in-progress, superseded, rejected, failed or abandoned. People search and browse it in the web app and the suli command-line client; agents consult it before they work through an MCP server with three read-only tools (library_search, library_get, library_related). The source is MIT licensed.
+
+## Docs
+
+- [What SuperLibrary is](https://docs.superlibrary.dev/what-it-is/): a library of artifacts and work history, each labelled by outcome
+- [Install](https://docs.superlibrary.dev/install/): install the suli client, sign in, run it locally
+- [Concepts](https://docs.superlibrary.dev/concepts/): items, outcomes, sources, collections, retrieval and visibility
+- [Docs llms.txt](https://docs.superlibrary.dev/llms.txt): the documentation as plain text for agents
+
+## Links
+
+- [Home](https://superlibrary.dev)
+- [Documentation](https://docs.superlibrary.dev)
+- [Source repository](https://github.com/SuperJackfruitLabs/superlibrary)
+- [Install the suli client](https://docs.superlibrary.dev/install/)
+
+## Optional
+
+- [Super Jackfruit Labs](https://superjackfruit.com): the company behind SuperLibrary
+- [Super Jackfruit Labs llms.txt](https://superjackfruit.com/llms.txt)
