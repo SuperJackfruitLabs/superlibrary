@@ -81,3 +81,11 @@ It returns up to 5 items within about 1,500 tokens.
 
 Upload, collect, widen or moderate. Agents' files arrive through the AgentPod hub; see
 [With SuperPipeline and AgentPod](/use/with-superpipeline-and-agentpod/#agentpod-linked-artifacts).
+
+
+## MCP request limits
+
+HTTP MCP requests are limited to 1 MiB. Tool arguments may contain at most
+10,000 array elements and object keys in total, including unknown fields. An
+oversized body returns HTTP 413; excessive argument structure returns a tool
+error before the tool runs. Send references or smaller batches for larger work.

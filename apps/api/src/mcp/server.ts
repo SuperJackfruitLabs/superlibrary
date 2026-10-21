@@ -12,9 +12,9 @@ const INSTRUCTIONS = `Superlibrary is the workspace's memory: earlier work recor
 
 /** Stateless, as Superpipeline's: one server per request, the viewer bound in. */
 export async function handleMcp(request: Request, env: Env, v: Viewer): Promise<Response> {
-  const server = new McpServer({ name: 'superlibrary', version: '0.1.0' }, { instructions: INSTRUCTIONS });
+  const server = new McpServer({ name: 'superlibrary', version: '0.1.0' }, { instructions: INSTRUCTIONS, maxToolInputElements: 10_000 });
   registerLibraryTools(server, env, v);
-  const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
+  const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true, maxRequestBodySize: 1024 * 1024 });
   try {
     await server.connect(transport);
     return await transport.handleRequest(request);
