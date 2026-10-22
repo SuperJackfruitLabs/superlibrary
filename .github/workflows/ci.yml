@@ -24,6 +24,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
       - run: pnpm test
+      # The workflow shape (what main deploys, what a tag deploys, and the gates between).
+      - run: node --test scripts/ci-workflow.test.mjs
 
   e2e:
     # The whole suite (Chromium and WebKit, the seeded loading, fit and motion specs) takes about 15 minutes locally.
@@ -60,118 +62,9 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
-  # CLOUDFLARE_API_TOKEN is a repository-level secret: the three environments below (production,
-  # content, web) have different names and must not hold it.
-  # Continuous deploy, as Superpipeline: after test and e2e pass on main, migrate D1 and ship.
-  deploy-api:
-    needs: [test, e2e]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    concurrency: { group: deploy-api, cancel-in-progress: false }
-    environment: { name: production, url: https://app.superlibrary.dev/api/health }
-    env:
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      CLOUDFLARE_ACCOUNT_ID: 88acd85618f099112eadc9374996b9f7
-      WRANGLER_SEND_METRICS: 'false'
-    steps:
-      - uses: actions/checkout@v4
-      # Deploys can queue out of order: a run for a superseded commit must not overwrite a newer one.
-      - id: fresh
-        run: |
-          git fetch --depth=1 origin main
-          if [ "$(git rev-parse FETCH_HEAD)" = "$GITHUB_SHA" ]; then
-            echo "current=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "current=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::$GITHUB_SHA is no longer the head of main; skipping this deploy"
-          fi
-      - if: steps.fresh.outputs.current == 'true'
-        uses: pnpm/action-setup@v4
-      - if: steps.fresh.outputs.current == 'true'
-        uses: actions/setup-node@v4
-        with: { node-version: 22, cache: pnpm }
-      - if: steps.fresh.outputs.current == 'true'
-        run: pnpm install --frozen-lockfile
-      - if: steps.fresh.outputs.current == 'true'
-        run: pnpm --filter @superlibrary/api db:migrate
-      - if: steps.fresh.outputs.current == 'true'
-        run: pnpm --filter @superlibrary/api run deploy
-
-  deploy-content:
-    needs: [test, e2e]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    concurrency: { group: deploy-content, cancel-in-progress: false }
-    environment: { name: content }
-    env:
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      CLOUDFLARE_ACCOUNT_ID: 88acd85618f099112eadc9374996b9f7
-      WRANGLER_SEND_METRICS: 'false'
-    steps:
-      - uses: actions/checkout@v4
-      # Deploys can queue out of order: a run for a superseded commit must not overwrite a newer one.
-      - id: fresh
-        run: |
-          git fetch --depth=1 origin main
-          if [ "$(git rev-parse FETCH_HEAD)" = "$GITHUB_SHA" ]; then
-            echo "current=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "current=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::$GITHUB_SHA is no longer the head of main; skipping this deploy"
-          fi
-      - if: steps.fresh.outputs.current == 'true'
-        uses: pnpm/action-setup@v4
-      - if: steps.fresh.outputs.current == 'true'
-        uses: actions/setup-node@v4
-        with: { node-version: 22, cache: pnpm }
-      - if: steps.fresh.outputs.current == 'true'
-        run: pnpm install --frozen-lockfile
-      - if: steps.fresh.outputs.current == 'true'
-        run: pnpm --filter @superlibrary/content run deploy
-
-  # The SPA to Pages project superlibrary-web. wrangler runs from a neutral directory with an
-  # absolute path: Superpipeline's deploy-docs found that project detection rewrites a checkout.
-  # The wrangler is the lockfile's (installed under apps/api), not an unpinned download.
-  deploy-web:
-    needs: [test, e2e, deploy-api]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    concurrency: { group: deploy-web, cancel-in-progress: false }
-    environment: { name: web, url: https://app.superlibrary.dev }
-    steps:
-      - uses: actions/checkout@v4
-      # Deploys can queue out of order: a run for a superseded commit must not overwrite a newer one.
-      - id: fresh
-        run: |
-          git fetch --depth=1 origin main
-          if [ "$(git rev-parse FETCH_HEAD)" = "$GITHUB_SHA" ]; then
-            echo "current=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "current=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::$GITHUB_SHA is no longer the head of main; skipping this deploy"
-          fi
-      - if: steps.fresh.outputs.current == 'true'
-        uses: pnpm/action-setup@v4
-      - if: steps.fresh.outputs.current == 'true'
-        uses: actions/setup-node@v4
-        with: { node-version: 22, cache: pnpm }
-      - if: steps.fresh.outputs.current == 'true'
-        run: pnpm install --frozen-lockfile
-      - if: steps.fresh.outputs.current == 'true'
-        run: pnpm --filter @superlibrary/web build
-      - name: Deploy
-        if: steps.fresh.outputs.current == 'true'
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: 88acd85618f099112eadc9374996b9f7
-          WRANGLER_SEND_METRICS: 'false'
-        run: |
-          mkdir -p "$RUNNER_TEMP/wrangler-cwd"
-          cd "$RUNNER_TEMP/wrangler-cwd"
-          "$GITHUB_WORKSPACE/apps/api/node_modules/.bin/wrangler" pages deploy "$GITHUB_WORKSPACE/apps/web/build" --project-name=superlibrary-web --branch=main
+  # Production (API Worker + remote D1 migrations, content Worker, web) deploys from a v* tag, not
+  # from main: see deploy-production in release.yml. That job requires this workflow's push run on
+  # main for the tagged commit to have passed `test` and `e2e`, so those two job names are a contract.
   # The staging plane (workbench, estate docs/2026-10-22-workbench.md): every push to main, once the
   # unit tests pass. The key is forced to `staging-deploy`, which runs this commit's deploy/staging/deploy.sh.
   deploy-staging:
