@@ -77,9 +77,10 @@
     { "pattern": "app.superlibrary.dev/.well-known/oauth-protected-resource/mcp", "zone_name": "superlibrary.dev" }
   ],
   // The staging plane (workbench; deploy/staging/): `wrangler dev --env staging`, never deployed.
-  // Every binding is local (D1, R2, Queues persisted in the box's `state` volume) except the two
-  // with no local simulation: Workers AI and Vectorize, which reach Cloudflare ("remote": true),
-  // Vectorize on its own staging indexes. Production's top-level config above is unchanged.
+  // Every binding is local (D1 and Queues persisted in the box's `state` volume) except Workers AI and
+  // Vectorize (no local simulation; Vectorize on its own staging indexes) and R2, which the staging
+  // content Worker on Cloudflare must read: those reach Cloudflare ("remote": true).
+  // Production's top-level config above is unchanged.
   "env": {
     "staging": {
       "routes": [],
@@ -96,9 +97,8 @@
         "ORG_PLANE_JWKS_URL": "https://staging-accounts.superjackfruit.com/api/auth/jwks",
         "ORG_PLANE_AUDIENCE": "https://staging-app.superlibrary.dev",
         "APP_URL": "https://staging-app.superlibrary.dev",
-        // Item hosts need a wildcard certificate staging does not have; the content Worker runs on
-        // the box with this domain, but item origins are not reachable from outside.
-        "CONTENT_ORIGIN_TEMPLATE": "https://{label}.staging-content.superlibrary.dev",
+        // One label under production's content zone; the staging content Worker's route takes these.
+        "CONTENT_ORIGIN_TEMPLATE": "https://{label}-stg.superlibrarycontent.dev",
         "EMBED_HOSTS": "https://staging-app.superpipeline.dev https://staging-console.agentpod.dev",
         "CONSOLE_ORIGINS": "https://staging-console.agentpod.dev",
         "RETENTION_MODE": "report",
@@ -112,8 +112,8 @@
       "d1_databases": [
         { "binding": "DB", "database_name": "superlibrary-catalog-staging", "database_id": "00000000-0000-0000-0000-000000000000", "migrations_dir": "migrations" }
       ],
-      // Local. The name matches the content Worker's, which reads the same persisted bucket.
-      "r2_buckets": [{ "binding": "BLOBS", "bucket_name": "superlibrary-blobs" }],
+      // Remote: the staging content Worker on Cloudflare (apps/content env.staging) reads this bucket.
+      "r2_buckets": [{ "binding": "BLOBS", "bucket_name": "superlibrary-blobs-staging", "remote": true }],
       "ai": { "binding": "AI", "remote": true },
       "vectorize": [
         { "binding": "VEC_A", "index_name": "superlibrary-chunks-a-staging", "remote": true },

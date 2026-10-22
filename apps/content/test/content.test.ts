@@ -497,3 +497,20 @@ describe('the host toolbar drives the frame (operator)', () => {
     }
   });
 });
+
+describe('a label-suffix content domain (staging: `-stg.superlibrarycontent.dev`)', () => {
+  const stg = testEnv({ CONTENT_DOMAIN: '-stg.content.test' });
+  const at = (host: string, path: string) => worker.fetch(req(`https://${host}${path}`), stg, createExecutionContext());
+  it('serves <label>-stg hosts and refuses the plain ones', async () => {
+    await seed(ITEM, 9, { 'notes.md': MD }, 'notes.md');
+    const t = await token(ITEM, 9);
+    expect((await at(`${contentLabel(ITEM)}-stg.content.test`, `/_view?sig=${t}`)).status).toBe(200);
+    expect((await at(`${contentLabel(ITEM)}.content.test`, `/_view?sig=${t}`)).status).toBe(404);
+    expect((await at(`${contentLabel(ITEM)}.-stg.content.test`, `/_view?sig=${t}`)).status).toBe(404);
+  });
+  it('the production shape refuses a -stg host (a misrouted staging URL never opens on prod)', async () => {
+    await seed(ITEM, 9, { 'notes.md': MD }, 'notes.md');
+    const t = await token(ITEM, 9);
+    expect((await worker.fetch(req(`https://${contentLabel(ITEM)}-stg.content.test/_view?sig=${t}`), testEnv(), createExecutionContext())).status).toBe(404);
+  });
+});

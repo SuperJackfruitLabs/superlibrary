@@ -1,9 +1,9 @@
 # SuperLibrary on the staging plane (workbench), checked out at /opt/suite-staging/superlibrary.
-# Both Workers run under workerd through `wrangler dev`, sharing the `state` volume (D1, R2, Queues):
-#   superlibrary          apps/api, `--env staging` (apps/api/wrangler.jsonc), serving the SPA
-#                         (apps/web/build) as its assets; Workers AI and Vectorize are remote.
-#   superlibrary-content  apps/content (wrangler.dev.jsonc, staging values by --var). It reads the
-#                         API's bucket; item hosts need a wildcard certificate, so it is not routed.
+# The API Worker runs under workerd through `wrangler dev --env staging` (apps/api/wrangler.jsonc),
+# serving the SPA (apps/web/build) as its assets, with D1 and Queues in the `state` volume. Workers
+# AI, Vectorize and R2 are remote; R2 is superlibrary-blobs-staging, which the staging content
+# Worker reads. That Worker is not here: it runs on Cloudflare (superlibrary-content-staging, route
+# *-stg.superlibrarycontent.dev/*), deployed by deploy.sh, because item hosts need a real zone.
 # They sign in against staging-accounts and reach only other staging copies; no production secret
 # is reused. The shared edge (cloudflared on the external `suite-staging` network) routes
 # staging-app.superlibrary.dev to `superlibrary:8787`. deploy.sh installs and builds before `up`.
@@ -15,7 +15,8 @@ x-node: &node
     CI: "true"
     WRANGLER_SEND_METRICS: "false"
   env_file:
-    # CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID: the remote AI and Vectorize bindings only.
+    # CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID: the remote AI, Vectorize and R2 bindings, and the
+    # `content` tool's deploy of the staging content Worker.
     - ../../../env/cloudflare.env
   volumes:
     - ../..:/app
@@ -37,25 +38,22 @@ services:
       - "127.0.0.1:8797:8787"
     networks: [default, suite-staging]
 
-  superlibrary-content:
-    <<: *node
-    working_dir: /app/apps/content
-    restart: unless-stopped
-    command:
-      - sh
-      - -c
-      - exec node_modules/.bin/wrangler dev -c wrangler.dev.jsonc --ip 0.0.0.0 --port 8788 --persist-to /state
-        --env-file /run/secrets/content.env --show-interactive-dev-session=false
-        --var CONTENT_DOMAIN:staging-content.superlibrary.dev
-        --var "FRAME_ANCESTORS:https://staging-app.superlibrary.dev https://staging-app.superpipeline.dev https://staging-console.agentpod.dev"
-    networks: [default]
-
   # Applies D1 migrations to the persisted state. Run by deploy.sh before `up` (profile: tools).
   migrate:
     <<: *node
     working_dir: /app/apps/api
     profiles: [tools]
     command: ["node_modules/.bin/wrangler", "d1", "migrations", "apply", "DB", "--local", "--env", "staging", "--persist-to", "/state"]
+
+  # Deploys the staging content Worker on Cloudflare and sets its one secret (profile: tools).
+  content:
+    <<: *node
+    working_dir: /app/apps/content
+    profiles: [tools]
+    command:
+      - sh
+      - -c
+      - node_modules/.bin/wrangler deploy --env staging && node_modules/.bin/wrangler secret bulk /run/secrets/content.env --env staging
 
   # The three triggers in wrangler.jsonc (0 * * * *, 0 3 * * *, 30 3 * * *), fired the only way
   # workerd can be: by asking for them, once in the minute each is due (UTC).

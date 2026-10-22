@@ -22,5 +22,20 @@
   "assets": { "directory": "./viewer-dist", "binding": "VIEWER", "run_worker_first": true },
   // wrangler.dev.jsonc is this file without "routes" (a repo invariant holds them equal): under
   // `wrangler dev` a route rewrites every local host to the zone, which would 404 every itm-* host.
-  "routes": [{ "pattern": "*.superlibrarycontent.dev/*", "zone_name": "superlibrarycontent.dev" }]
+  "routes": [{ "pattern": "*.superlibrarycontent.dev/*", "zone_name": "superlibrarycontent.dev" }],
+  // The staging plane's content Worker (superlibrary-content-staging), deployed by the API's staging
+  // deploy (deploy/staging/deploy.sh). Item hosts are `<label>-stg.superlibrarycontent.dev`: one label,
+  // so Universal SSL covers them, and a route more specific than production's.
+  "env": {
+    "staging": {
+      "observability": { "enabled": false },
+      "vars": {
+        "FRAME_ANCESTORS": "https://staging-app.superlibrary.dev https://staging-app.superpipeline.dev https://staging-console.agentpod.dev",
+        "CONTENT_DOMAIN": "-stg.superlibrarycontent.dev"
+      },
+      "r2_buckets": [{ "binding": "BLOBS", "bucket_name": "superlibrary-blobs-staging" }],
+      "assets": { "directory": "./viewer-dist", "binding": "VIEWER", "run_worker_first": true },
+      "routes": [{ "pattern": "*-stg.superlibrarycontent.dev/*", "zone_name": "superlibrarycontent.dev" }]
+    }
+  }
 }
