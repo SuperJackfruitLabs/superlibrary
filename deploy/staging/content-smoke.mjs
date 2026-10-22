@@ -27,11 +27,16 @@ if (cmd === 'seed') {
   const exp = Math.floor(Date.now() / 1000) + 120;
   const sig = new Uint8Array(await crypto.subtle.sign('Ed25519', key, signingMessage({ itemId: ITEM, version: 1, exp, host: HOST })));
   const origin = `https://${contentLabel(ITEM)}-stg.superlibrarycontent.dev`;
-  const res = await fetch(`${origin}/_view?sig=${formatToken({ version: 1, exp, host: HOST, sig })}`);
+  const q = `/_view?sig=${formatToken({ version: 1, exp, host: HOST, sig })}`;
+  const res = await fetch(origin + q);
   const html = await res.text();
   // The URL is a grant; it is never printed. The status and the item's text are.
   if (res.status !== 200 || !html.includes('staging content smoke')) { console.error(`content smoke: ${origin}/_view answered ${res.status}`); process.exit(1); }
   const bare = await fetch(`${origin}/_view`);
   if (bare.status === 200) { console.error('content smoke: an unsigned /_view answered 200'); process.exit(1); }
-  console.log(`content smoke: ok (${origin}, signed 200, unsigned ${bare.status})`);
+  // Route precedence: the same grant on the production host reaches production's Worker, which holds
+  // production's key and bucket, and must refuse it. A 200 here would mean staging took prod's hosts.
+  const prod = await fetch(`https://${contentLabel(ITEM)}.superlibrarycontent.dev${q}`);
+  if (prod.status === 200) { console.error('content smoke: the production host accepted a staging grant'); process.exit(1); }
+  console.log(`content smoke: ok (${origin}: signed 200, unsigned ${bare.status}; production host refuses the grant: ${prod.status})`);
 }
