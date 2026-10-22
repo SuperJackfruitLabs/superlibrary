@@ -499,8 +499,9 @@ describe('the host toolbar drives the frame (operator)', () => {
 });
 
 describe('a label-suffix content domain (staging: `-stg.superlibrarycontent.dev`)', () => {
-  const stg = testEnv({ CONTENT_DOMAIN: '-stg.content.test' });
-  const at = (host: string, path: string) => worker.fetch(req(`https://${host}${path}`), stg, createExecutionContext());
+  // Built per request, not when the describe runs: PUB is only set in beforeAll.
+  const stg = () => testEnv({ CONTENT_DOMAIN: '-stg.content.test' });
+  const at = (host: string, path: string) => worker.fetch(req(`https://${host}${path}`), stg(), createExecutionContext());
   it('serves <label>-stg hosts and refuses the plain ones', async () => {
     await seed(ITEM, 9, { 'notes.md': MD }, 'notes.md');
     const t = await token(ITEM, 9);
