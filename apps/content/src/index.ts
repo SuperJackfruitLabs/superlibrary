@@ -198,7 +198,9 @@ async function raw(request: Request, env: Env, itemId: string, url: URL): Promis
 async function serve(request: Request, env: Env): Promise<Response> {
   if (request.method !== 'GET' && request.method !== 'HEAD') return refuse(env, 405, 'method_not_allowed');
   const url = new URL(request.url);
-  const suffix = `.${env.CONTENT_DOMAIN}`;
+  // `superlibrarycontent.dev`: hosts `<label>.superlibrarycontent.dev`. A domain that starts with `-`
+  // (staging's `-stg.superlibrarycontent.dev`) is appended to the label itself, keeping one label.
+  const suffix = env.CONTENT_DOMAIN.startsWith('-') ? env.CONTENT_DOMAIN : `.${env.CONTENT_DOMAIN}`;
   if (!url.hostname.endsWith(suffix)) return refuse(env, 404, 'not_found');
   const itemId = itemIdFromLabel(url.hostname.slice(0, -suffix.length));
   if (!itemId) return refuse(env, 404, 'not_found');

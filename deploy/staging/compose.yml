@@ -1,0 +1,82 @@
+# SuperLibrary on the staging plane (workbench), checked out at /opt/suite-staging/superlibrary.
+# The API Worker runs under workerd through `wrangler dev --env staging` (apps/api/wrangler.jsonc),
+# serving the SPA (apps/web/build) as its assets, with D1 and Queues in the `state` volume. Workers
+# AI, Vectorize and R2 are remote; R2 is superlibrary-blobs-staging, which the staging content
+# Worker reads. That Worker is not here: it runs on Cloudflare (superlibrary-content-staging, route
+# *-stg.superlibrarycontent.dev/*), deployed by deploy.sh, because item hosts need a real zone.
+# They sign in against staging-accounts and reach only other staging copies; no production secret
+# is reused. The shared edge (cloudflared on the external `suite-staging` network) routes
+# staging-app.superlibrary.dev to `superlibrary:8787`. deploy.sh installs and builds before `up`.
+name: staging-superlibrary
+
+x-node: &node
+  image: node:22.20.0-bookworm
+  environment:
+    CI: "true"
+    WRANGLER_SEND_METRICS: "false"
+  env_file:
+    # CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID: the remote AI, Vectorize and R2 bindings, and the
+    # `content` tool's deploy of the staging content Worker.
+    - ../../../env/cloudflare.env
+  volumes:
+    - ../..:/app
+    - state:/state
+    - ../../../env/superlibrary:/run/secrets:ro
+
+services:
+  superlibrary:
+    <<: *node
+    working_dir: /app/apps/api
+    restart: unless-stopped
+    # --test-scheduled exposes /__scheduled; workerd never fires crons on its own, so `cron` calls it.
+    command:
+      - sh
+      - -c
+      - exec node_modules/.bin/wrangler dev --env staging --ip 0.0.0.0 --port 8787 --persist-to /state
+        --env-file /run/secrets/api.env --test-scheduled --show-interactive-dev-session=false
+    ports:
+      - "127.0.0.1:8797:8787"
+    networks: [default, suite-staging]
+
+  # Applies D1 migrations to the persisted state. Run by deploy.sh before `up` (profile: tools).
+  migrate:
+    <<: *node
+    working_dir: /app/apps/api
+    profiles: [tools]
+    command: ["node_modules/.bin/wrangler", "d1", "migrations", "apply", "DB", "--local", "--env", "staging", "--persist-to", "/state"]
+
+  # Deploys the staging content Worker on Cloudflare and sets its one secret (profile: tools).
+  content:
+    <<: *node
+    working_dir: /app/apps/content
+    profiles: [tools]
+    command:
+      - sh
+      - -c
+      - node_modules/.bin/wrangler deploy --env staging && node_modules/.bin/wrangler secret bulk /run/secrets/content.env --env staging
+
+  # The three triggers in wrangler.jsonc (0 * * * *, 0 3 * * *, 30 3 * * *), fired the only way
+  # workerd can be: by asking for them, once in the minute each is due (UTC).
+  cron:
+    image: curlimages/curl:8.16.0
+    restart: unless-stopped
+    entrypoint:
+      - sh
+      - -c
+      - |
+        fire() { curl -fsS -o /dev/null "http://superlibrary:8787/__scheduled?cron=$$1" && echo "$$(date -u +%FT%TZ) scheduled $$1"; }
+        last=
+        while sleep 20; do
+          now=$$(date -u +%H%M); [ "$$now" = "$$last" ] && continue; last=$$now
+          case $$now in ??00) fire '0+*+*+*+*' ;; esac
+          [ "$$now" = 0300 ] && fire '0+3+*+*+*'
+          [ "$$now" = 0330 ] && fire '30+3+*+*+*'
+        done
+    depends_on: [superlibrary]
+
+networks:
+  suite-staging:
+    external: true
+
+volumes:
+  state:
