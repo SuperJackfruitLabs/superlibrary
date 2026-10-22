@@ -20,6 +20,6 @@ docker run --rm -v "$PWD:/app" -w /app -e CI=true node:22.20.0-bookworm sh -c "c
 $compose stop superlibrary superlibrary-content cron >/dev/null 2>&1 || true
 $compose run --rm migrate
 $compose up -d --force-recreate superlibrary superlibrary-content cron
-for _ in $(seq 1 90); do curl -sf http://127.0.0.1:8790/api/health >/dev/null && break; sleep 2; done
-sh deploy/staging/smoke.sh http://127.0.0.1:8790
+for _ in $(seq 1 90); do curl -sf http://127.0.0.1:8797/api/health >/dev/null && break; sleep 2; done
+sh deploy/staging/smoke.sh http://127.0.0.1:8797
 git log -1 --format='staged %h %s'
