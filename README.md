@@ -33,6 +33,12 @@ An existing different program named `suli` or `superlibrary` is refused, never o
 
 (Releases are built by `.github/workflows/release.yml` when a `v*` tag is pushed.)
 
+## Deploying
+
+- Every push to `main` deploys staging, at [staging-app.superlibrary.dev](https://staging-app.superlibrary.dev) (`deploy-staging` in `ci.yml`). Main never deploys production.
+- A `v*` tag deploys production, at [app.superlibrary.dev](https://app.superlibrary.dev) (`release.yml`), alongside the suli release. The tag must be on `main`, and `ci.yml`'s push run on `main` for that exact commit must have passed `test` and `e2e`; otherwise nothing deploys. It then applies the remote D1 migrations and deploys the API Worker, the content Worker, then web, and smokes production.
+- `superlibrary.dev` and `docs.superlibrary.dev` deploy from the operator's machine (`scripts/deploy-sites.sh`, below).
+
 ## Run it locally
 
 ```bash

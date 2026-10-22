@@ -1,7 +1,11 @@
 name: Release suli
 
-# A tag publishes the suli CLI binaries, SHA256SUMS and the installer. The app (API, content
-# Worker, web) deploys continuously from main (see ci.yml); nothing in production waits on a tag.
+# A v* tag does two independent things:
+#   - `release` publishes the suli CLI binaries, SHA256SUMS and the installer (GitHub release).
+#   - `production-gate` -> deploy-api + deploy-content -> deploy-web -> smoke-production ships the app
+#     (API Worker with remote D1 migrations, content Worker, web) to app.superlibrary.dev.
+# Main deploys staging only (ci.yml deploy-staging). Neither chain needs the other, so a failed CLI
+# build never blocks production and vice versa.
 on:
   push:
     tags:
@@ -85,3 +89,151 @@ jobs:
             gh release create "$TAG" --title "$TAG" --generate-notes
           fi
           gh release upload "$TAG" dist/suli-* dist/SHA256SUMS scripts/install.sh --clobber
+
+  # Production only ships a commit that went through main and passed main's own CI. The tag does not
+  # re-run test and e2e (the gate the old continuous deploy-api/content/web jobs had via `needs`); it
+  # requires ci.yml's push run on main for this exact commit to have passed both.
+  # ci.yml uploads no build artifact, so the deploy jobs below build from the tagged commit, but only
+  # after this gate has passed.
+  production-gate:
+    name: Gate production on main's CI
+    if: github.server_url == 'https://github.com'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      sha: ${{ steps.commit.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+          fetch-depth: 0
+      - name: Refuse a tag that is not on main
+        id: commit
+        run: |
+          set -euo pipefail
+          git fetch -q origin main
+          sha="$(git rev-parse HEAD)"
+          if ! git merge-base --is-ancestor "$sha" origin/main; then
+            echo "::error::$sha is not on main; not deploying production"
+            exit 1
+          fi
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+      - name: Require main's CI to have passed test and e2e
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ steps.commit.outputs.sha }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          for run in $(gh api "repos/$REPO/actions/workflows/ci.yml/runs?event=push&branch=main&head_sha=$SHA&per_page=20" \
+              --jq '.workflow_runs[] | select(.head_sha == env.SHA) | .id'); do
+            ok="$(gh api "repos/$REPO/actions/runs/$run/jobs?filter=latest&per_page=100" \
+              --jq '[.jobs[] | select((.name == "test" or .name == "e2e") and .conclusion == "success") | .name] | unique | length')"
+            if [ "$ok" = 2 ]; then
+              echo "CI run $run passed test and e2e for $SHA"
+              exit 0
+            fi
+          done
+          echo "::error::main's CI for $SHA has not passed test and e2e (no push run of ci.yml on main for this commit has both green); not deploying production"
+          exit 1
+
+  # CLOUDFLARE_API_TOKEN is a repository-level secret: the three environments below (production,
+  # content, web) have different names and must not hold it. Each job checks out the gated commit.
+  deploy-api:
+    needs: [production-gate]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions: { contents: read }
+    concurrency: { group: deploy-api, cancel-in-progress: false }
+    environment: { name: production, url: https://app.superlibrary.dev/api/health }
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: 88acd85618f099112eadc9374996b9f7
+      WRANGLER_SEND_METRICS: 'false'
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: '${{ needs.production-gate.outputs.sha }}' }
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      # Remote D1 migrations first, then the Worker that expects them.
+      - run: pnpm --filter @superlibrary/api db:migrate
+      - run: pnpm --filter @superlibrary/api run deploy
+
+  deploy-content:
+    needs: [production-gate]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions: { contents: read }
+    concurrency: { group: deploy-content, cancel-in-progress: false }
+    environment: { name: content }
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: 88acd85618f099112eadc9374996b9f7
+      WRANGLER_SEND_METRICS: 'false'
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: '${{ needs.production-gate.outputs.sha }}' }
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @superlibrary/content run deploy
+
+  # The SPA to Pages project superlibrary-web, after the API it talks to. wrangler runs from a neutral
+  # directory with an absolute path (project detection rewrites a checkout), and is the lockfile's
+  # (installed under apps/api), not an unpinned download.
+  deploy-web:
+    needs: [production-gate, deploy-api]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions: { contents: read }
+    concurrency: { group: deploy-web, cancel-in-progress: false }
+    environment: { name: web, url: https://app.superlibrary.dev }
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: '${{ needs.production-gate.outputs.sha }}' }
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @superlibrary/web build
+      - name: Deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: 88acd85618f099112eadc9374996b9f7
+          WRANGLER_SEND_METRICS: 'false'
+        run: |
+          mkdir -p "$RUNNER_TEMP/wrangler-cwd"
+          cd "$RUNNER_TEMP/wrangler-cwd"
+          "$GITHUB_WORKSPACE/apps/api/node_modules/.bin/wrangler" pages deploy "$GITHUB_WORKSPACE/apps/web/build" --project-name=superlibrary-web --branch=main
+
+  smoke-production:
+    needs: [deploy-api, deploy-content, deploy-web]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Smoke app.superlibrary.dev
+        run: |
+          set -u
+          base=https://app.superlibrary.dev
+          accounts=https://accounts.superjackfruit.com
+          smoke() {
+            curl -fsS "$base/api/health" | grep -q '"ok":true' || { echo "/api/health is not ok"; return 1; }
+            code=$(curl -s -o /dev/null -w '%{http_code}' "$base/api/v1/me")
+            [ "$code" = 401 ] || { echo "/api/v1/me unauthenticated answered $code, not 401"; return 1; }
+            curl -fsS "$base/" | grep -qi '<html' || { echo "/ serves no web app"; return 1; }
+            meta=$(curl -fsS "$base/.well-known/oauth-protected-resource") || { echo "no discovery document"; return 1; }
+            echo "$meta" | grep -q "\"$accounts\"" || { echo "discovery names no $accounts: $meta"; return 1; }
+          }
+          for _ in 1 2 3 4 5 6; do
+            smoke && { echo "smoke: ok ($base)"; exit 0; }
+            sleep 10
+          done
+          echo "::error::production smoke failed"
+          exit 1
