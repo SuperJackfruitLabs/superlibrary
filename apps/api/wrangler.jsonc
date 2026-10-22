@@ -75,5 +75,64 @@
     { "pattern": "app.superlibrary.dev/.well-known/oauth-protected-resource", "zone_name": "superlibrary.dev" },
     { "pattern": "app.superlibrary.dev/mcp", "zone_name": "superlibrary.dev" },
     { "pattern": "app.superlibrary.dev/.well-known/oauth-protected-resource/mcp", "zone_name": "superlibrary.dev" }
-  ]
+  ],
+  // The staging plane (workbench; deploy/staging/): `wrangler dev --env staging`, never deployed.
+  // Every binding is local (D1, R2, Queues persisted in the box's `state` volume) except the two
+  // with no local simulation: Workers AI and Vectorize, which reach Cloudflare ("remote": true),
+  // Vectorize on its own staging indexes. Production's top-level config above is unchanged.
+  "env": {
+    "staging": {
+      "routes": [],
+      "observability": { "enabled": false },
+      // One host serves the SPA (apps/web/build) and, first, the Worker's own paths: production's
+      // routes, plus /__scheduled for `--test-scheduled` (the edge refuses that path from outside).
+      "assets": {
+        "directory": "../web/build",
+        "not_found_handling": "single-page-application",
+        "run_worker_first": ["/api/*", "/mcp", "/.well-known/oauth-protected-resource", "/.well-known/oauth-protected-resource/*", "/__scheduled"]
+      },
+      "vars": {
+        "ORG_PLANE_ISSUER": "https://staging-accounts.superjackfruit.com",
+        "ORG_PLANE_JWKS_URL": "https://staging-accounts.superjackfruit.com/api/auth/jwks",
+        "ORG_PLANE_AUDIENCE": "https://staging-app.superlibrary.dev",
+        "APP_URL": "https://staging-app.superlibrary.dev",
+        // Item hosts need a wildcard certificate staging does not have; the content Worker runs on
+        // the box with this domain, but item origins are not reachable from outside.
+        "CONTENT_ORIGIN_TEMPLATE": "https://{label}.staging-content.superlibrary.dev",
+        "EMBED_HOSTS": "https://staging-app.superpipeline.dev https://staging-console.agentpod.dev",
+        "CONSOLE_ORIGINS": "https://staging-console.agentpod.dev",
+        "RETENTION_MODE": "report",
+        "ORG_PLANE_URL": "https://staging-accounts.superjackfruit.com",
+        "HUB_URL": "https://staging-hub.agentpod.dev",
+        "HUB_AUDIENCE": "https://staging-hub.agentpod.dev",
+        "SUPERPIPELINE_URL": "https://staging-app.superpipeline.dev",
+        "SUPERPIPELINE_AUDIENCE": "https://staging-app.superpipeline.dev",
+        "ROSTER_TTL_SECONDS": "300"
+      },
+      "d1_databases": [
+        { "binding": "DB", "database_name": "superlibrary-catalog-staging", "database_id": "00000000-0000-0000-0000-000000000000", "migrations_dir": "migrations" }
+      ],
+      // Local. The name matches the content Worker's, which reads the same persisted bucket.
+      "r2_buckets": [{ "binding": "BLOBS", "bucket_name": "superlibrary-blobs" }],
+      "ai": { "binding": "AI", "remote": true },
+      "vectorize": [
+        { "binding": "VEC_A", "index_name": "superlibrary-chunks-a-staging", "remote": true },
+        { "binding": "VEC_B", "index_name": "superlibrary-chunks-b-staging", "remote": true }
+      ],
+      "queues": {
+        "producers": [
+          { "binding": "RETENTION", "queue": "superlibrary-retention" },
+          { "binding": "INGEST", "queue": "superlibrary-ingest" },
+          { "binding": "INDEX", "queue": "superlibrary-index" }
+        ],
+        "consumers": [
+          { "queue": "superlibrary-retention", "max_batch_size": 1, "max_retries": 5 },
+          { "queue": "superlibrary-index", "max_batch_size": 2, "max_batch_timeout": 5, "max_retries": 8, "max_concurrency": 2 },
+          { "queue": "superlibrary-ingest", "max_batch_size": 10, "max_batch_timeout": 5, "max_retries": 8, "max_concurrency": 1 }
+        ]
+      },
+      // Fired by the `cron` sidecar in deploy/staging/compose.yml; workerd fires none on its own.
+      "triggers": { "crons": ["0 3 * * *", "30 3 * * *", "0 * * * *"] }
+    }
+  }
 }
