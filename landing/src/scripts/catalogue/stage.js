@@ -5,13 +5,14 @@
 // Loaded lazily by band.js, together with three and the scenes.
 import { Color, PCFShadowMap, Vector2, WebGLRenderer } from 'three';
 import { createCabinet } from './cabinet.js';
+import { createConsult } from './consult.js';
 import { accentRGB } from './common.js';
 import { createGate } from './gate.js';
 import { createIntake } from './intake.js';
 import { createSearch } from './search.js';
 
 /** Scene name (a stage's data-scene) to its factory: ({ phase, accent, still }) => view. */
-export const SCENES = { cabinet: createCabinet, intake: createIntake, gate: createGate, search: createSearch };
+export const SCENES = { cabinet: createCabinet, intake: createIntake, gate: createGate, search: createSearch, consult: createConsult };
 
 function makeRenderer() {
   const renderer = new WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'low-power' });

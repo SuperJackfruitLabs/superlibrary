@@ -22,6 +22,7 @@ if (all.length) {
   const stillMode = new URLSearchParams(location.search).has('catalogue-still');
   const band = document.getElementById('catalogue');
   const how = document.querySelector('.how');
+  const use = document.querySelector('.use');
   const steps = how ? [...how.querySelectorAll('ol.steps > li')] : [];
   const panel = how ? [...how.querySelectorAll('.panel-stage')] : [];
   const entries = new Map(), near = new Set();
@@ -70,6 +71,9 @@ if (all.length) {
     ticking = false;
     const e = stage && band && entries.get(band.querySelector('[data-scene="cabinet"]'));
     if (e && e.view.setProgress(bandProgress(band))) stage.request(e);
+    // "What it's like to use" scrubs through its own section, done by the time it is past mid-screen.
+    const c = stage && use && entries.get(use.querySelector('[data-scene="consult"]'));
+    if (c && c.view.setProgress(clamp((bandProgress(use) - 0.12) / 0.5))) stage.request(c);
     if (!steps.length) return;
     if (!desk.matches) {
       steps.forEach((li, i) => { const s = stage && entries.get(stepStage(i)); if (s && s.view.setProgress(phoneProgress(li))) stage.request(s); });

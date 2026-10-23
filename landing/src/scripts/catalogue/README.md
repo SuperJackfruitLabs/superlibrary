@@ -10,7 +10,7 @@ Small low-poly three.js scenes beside the landing's copy: the cabinet in the ban
 | `band.js` | with the page | The loader: picks each stage's still, decides when to start, wires scroll progress and hover. About 5 KB gzipped. |
 | `stage.js` | lazily, with three | The shared stage: one renderer and one canvas for every scene, plus the still renderer for tooling. |
 | `room.js` | lazily | What every scene shares: materials, outcome colours, the plinth, the camera's view, the sun-phase light, a scroll-scrubbed timeline. |
-| `cabinet.js`, `intake.js`, `gate.js`, `search.js` | lazily | One scene each. |
+| `cabinet.js`, `intake.js`, `gate.js`, `search.js`, `consult.js` | lazily | One scene each. `consult.js` is "What it's like to use": an agent pod reads from the cabinet (read-only tools, so it files nothing) and scrubs through its own section. |
 
 The page marks each stage `<figure data-scene="<name>" aria-hidden="true">` and gives it an `<img data-still>` (plus a `<noscript>` noon still). `stage.js` maps names to scene factories in `SCENES`. Only stages the current layout shows take part: a stage under `display: none` is skipped, and crossing the breakpoint restarts the stage with the new set.
 
@@ -70,8 +70,8 @@ Use `room.js` for the plinth, `roomCamera()` and `light()`, so every scene share
   - DPR capped at 1.5.
 - **Fallbacks are stills.** Each scene has one WebP per sun phase in `public/catalogue/<scene>-<phase>.webp`, showing its end state. They are shown under `prefers-reduced-motion`, vibekit `data-motion="reduce"`, no WebGL, or a lost context. `scripts/render-stills.mjs` renders them from the live scenes through `?catalogue-still`.
 - **Budget.** Under 250 KB gzipped of JS for all scenes together, and under 400 KB of assets. SuperLibrary measures:
-  - JS: 4.9 KB loader + 0.9 KB preload helper + 135 KB lazy stage chunk with three, about 141 KB in all.
-  - Assets: 24 stills in 276 KB, of which a visit fetches about 4.
+  - JS: 4.9 KB loader + 0.9 KB preload helper + 137 KB lazy stage chunk with three, about 143 KB in all.
+  - Assets: 30 stills in 340 KB, of which a visit fetches about 5.
 - **Standalone.** No suite dependency at runtime beyond the vibekit package the landing already ships.
 - **Flat, procedural, low-poly.** Boxes and low-segment cylinders in flat colours, built in code. No downloaded or generated models.
 
