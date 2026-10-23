@@ -8,9 +8,10 @@ import { createCabinet } from './cabinet.js';
 import { accentRGB } from './common.js';
 import { createGate } from './gate.js';
 import { createIntake } from './intake.js';
+import { createSearch } from './search.js';
 
 /** Scene name (a stage's data-scene) to its factory: ({ phase, accent, still }) => view. */
-export const SCENES = { cabinet: createCabinet, intake: createIntake, gate: createGate };
+export const SCENES = { cabinet: createCabinet, intake: createIntake, gate: createGate, search: createSearch };
 
 function makeRenderer() {
   const renderer = new WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'low-power' });
