@@ -6,9 +6,10 @@
 import { Color, PCFShadowMap, Vector2, WebGLRenderer } from 'three';
 import { createCabinet } from './cabinet.js';
 import { accentRGB } from './common.js';
+import { createIntake } from './intake.js';
 
 /** Scene name (a stage's data-scene) to its factory: ({ phase, accent, still }) => view. */
-export const SCENES = { cabinet: createCabinet };
+export const SCENES = { cabinet: createCabinet, intake: createIntake };
 
 function makeRenderer() {
   const renderer = new WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'low-power' });
