@@ -408,14 +408,12 @@ const JSON_LD = {
           <div class="prose">
           <h2 id="use">What it's like to use</h2>
           <p>
-            Say an agent is about to write a pricing page. Before it starts, it calls <code>library_search</code>
-            through SuperLibrary's MCP server and finds the approved final copy. <code>library_related</code> shows
+            Say an agent is about to write a pricing page. Before it starts, it calls <code>library_search</code> through SuperLibrary's MCP server and finds the approved final copy. <code>library_related</code> shows
             the draft that was rejected and the card that completed the work, so it starts from what was accepted
             and knows what was turned down.
           </p>
           <p class="muted">
-            The MCP server has three read-only tools: <code>library_search</code>, <code>library_get</code> and
-            <code>library_related</code>. An agent needs a session token from your organization's sign-in and has
+            The MCP server has three read-only tools: <code>library_search</code>, <code>library_get</code> and <code>library_related</code>. An agent needs a session token from your organization's sign-in and has
             to be given the server. Agents can still add files, through <code>suli upload</code>, under the same
             secret scan as anyone else.
           </p>
@@ -441,8 +439,7 @@ const JSON_LD = {
           </p>
           <pre><code>curl -fsSL https://github.com/SuperJackfruitLabs/superlibrary/releases/latest/download/install.sh | bash</code></pre>
           <p>
-            <code>suli login</code> signs in through the same account service, and <code>suli skill install</code>
-            gives an agent a skill that matches its commands.
+            <code>suli login</code> signs in through the same account service, and <code>suli skill install</code> gives an agent a skill that matches its commands.
           </p>
           <a class="more" href={`${DOCS}/install/`}>Install guide →</a>
         </div>
