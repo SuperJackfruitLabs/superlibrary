@@ -15,7 +15,10 @@
  * the suite links and the version, so this page does not repeat them.
  *
  * The hero is an invented example ItemSummary (packages/contract/src/model.ts); its labels
- * are real field names and values. The MCP tool names are the three apps/api registers.
+ * are real field names and values. The catalogue band under it files the same item: its index
+ * card is HTML, and the cabinet beside it is a small three.js scene loaded only near the viewport
+ * (src/scripts/catalogue), with a still per sun phase in public/catalogue for reduced motion and
+ * no WebGL. The MCP tool names are the three apps/api registers.
  */
 import SuiteHead from '@superjackfruit/frontdoor/components/SuiteHead.astro';
 import Frame from '@superjackfruit/frontdoor/components/Frame.astro';
@@ -163,6 +166,30 @@ const JSON_LD = {
       .item.playing .related li { animation: sl-slide .35s ease-out backwards; animation-delay: calc(2.5s + var(--i, 0) * 140ms); }
       .item.playing .related li + li { --i: 1; }
 
+      /* ── the catalogue band: a lazy three.js cabinet (src/scripts/catalogue) beside a real index card ── */
+      .catalogue .split { grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); }
+      .index-card { position: relative; margin: 30px 0 0; max-width: 380px; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 14px 18px 10px; font-size: 14px; box-shadow: 0 18px 36px -24px rgba(0,0,0,.5); }
+      [data-theme="light"] .index-card { box-shadow: 0 18px 36px -26px rgba(29,23,20,.25); }
+      .index-card::before { content: ''; position: absolute; top: -1px; left: 22px; width: 54px; height: 3px; border-radius: 0 0 3px 3px; background: var(--coral); }
+      .index-card .ttl { font-family: var(--display); font-weight: 600; font-size: 19px; line-height: 1.25; letter-spacing: -0.01em; }
+      .index-card .id { font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+      .index-card dl { margin: 8px 0 0; display: grid; grid-template-columns: auto 1fr; column-gap: 14px; }
+      /* ruled like a catalogue card: one line under each field */
+      .index-card dt, .index-card dd { line-height: 32px; border-bottom: 1px solid var(--line); }
+      .index-card dt:nth-last-child(2), .index-card dd:last-child { border-bottom: 0; }
+      .index-card dt { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+      .index-card dd { margin: 0; font-family: var(--mono); font-size: 12.5px; }
+      .index-card dd.coral { color: var(--coral-text); }
+      /* While the scene runs, the card rises with the drawer (--open, set from native scroll). */
+      .catalogue.scrolling .index-card { transform: translateY(calc((1 - var(--open, 1)) * 18px)); opacity: calc(.4 + .6 * var(--open, 1)); }
+      /* The canvas is made by script, so it carries no scoped-style attribute: hence :global. */
+      .stage { position: relative; margin: 0; width: 100%; aspect-ratio: 26 / 21; }
+      .stage img, .stage :global(canvas) { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+      .stage :global(canvas) { opacity: 0; transition: opacity .5s ease; touch-action: pan-y; }
+      .stage img { transition: opacity .5s ease; }
+      .stage.live :global(canvas) { opacity: 1; }
+      .stage.live img { opacity: 0; }
+
       /* ── bands ── */
       section.band { border-top: 1px solid var(--line); }
       section.band .wrap { padding-top: 88px; padding-bottom: 88px; }
@@ -193,6 +220,8 @@ const JSON_LD = {
         .hero .wrap { grid-template-columns: 1fr; gap: 44px; min-height: auto; padding-top: 40px; padding-bottom: 56px; }
         .card-wrap { width: 100%; }
         .split { grid-template-columns: 1fr; gap: 32px; }
+        .catalogue .split { grid-template-columns: 1fr; }
+        .catalogue .stage { order: -1; }
         .grid, ol.steps { grid-template-columns: 1fr; }
         section.band .wrap { padding-top: 64px; padding-bottom: 64px; }
       }
@@ -269,6 +298,36 @@ const JSON_LD = {
             </script>
           </figure>
         </div>
+      </section>
+
+      <section class="band catalogue" id="catalogue" aria-labelledby="filed">
+        <div class="wrap split">
+          <div>
+            <h2 id="filed">Where finished work goes</h2>
+            <p class="sub">
+              Every item is filed with its outcome. Search pulls approved and completed work first, and the
+              rejected draft is still there when you want to see what was turned down.
+            </p>
+            <article class="index-card" aria-label="The example item's index card">
+              <div class="ttl">Pricing page copy, final</div>
+              <span class="id">itm_4f0c2a9e81b7d3c5</span>
+              <dl>
+                <dt>kind</dt><dd>artifact</dd>
+                <dt>outcome</dt><dd class="coral">approved</dd>
+                <dt>scope</dt><dd>board:brd_9a41…</dd>
+                <dt>version</dt><dd>3</dd>
+                <dt>source</dt><dd>superpipeline</dd>
+              </dl>
+            </article>
+          </div>
+          <figure class="stage" aria-hidden="true">
+            <img data-still alt="" width="780" height="630" loading="lazy" decoding="async" />
+            <noscript><img src="/catalogue/noon.webp" alt="" width="780" height="630" loading="lazy" decoding="async" /></noscript>
+          </figure>
+        </div>
+        <script>
+          import '../scripts/catalogue/band.js';
+        </script>
       </section>
 
       <section class="band" aria-labelledby="how">
