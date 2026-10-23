@@ -1,9 +1,9 @@
 // "Search ranks by outcome": a row of five catalogue drawers on the room's plinth, each labelled
-// with an outcome colour, behind a typed query slip (text only: no picture). When the step comes
-// into view the row reorders: approved swaps to the front of the row, and approved and completed
+// with an outcome colour, behind a typed query slip (text only: no picture). Scrolling through the
+// step reorders the row: approved swaps to the front of the row, and approved and completed
 // rise on their pedestals; rejected and failed stay low but in the row, still visible.
-import { Group, Scene, Vector3 } from 'three';
-import { FLOOR, M, OUTCOME, box, ease, light, plinth, roomCamera, seg, timeline } from './room.js';
+import { Group, Scene } from 'three';
+import { FLOOR, M, OUTCOME, box, ease, scrub, seg, stepRoom, stepView } from './room.js';
 
 const START = ['rejected', 'completed', 'superseded', 'approved', 'failed'];
 const RANKED = ['approved', 'completed', 'superseded', 'rejected', 'failed'];
@@ -23,9 +23,7 @@ function drawer(parent, outcome) {
 
 export function createSearch({ phase, accent }) {
   const scene = new Scene();
-  const root = new Group();
-  scene.add(root);
-  plinth(root, 2.45, 1.4, 0.1);
+  const { root, view } = stepRoom(scene, phase, accent);
   // One pedestal per place in the row; the first two grow as the ranking settles.
   const pedestals = START.map((_, i) => box(0.38, 1, 0.4, M.wood, slotX(i), 0, 0, root));
   const drawers = Object.fromEntries(START.map((o) => [o, drawer(root, o)]));
@@ -34,11 +32,9 @@ export function createSearch({ phase, accent }) {
   for (const [w, x] of [[0.12, -0.2], [0.18, -0.03], [0.08, 0.12]]) box(w, 0.006, 0.026, M.ink, x, 0.011, 0, slip);
   box(0.008, 0.006, 0.05, M.brass, 0.19, 0.011, 0, slip); // the caret after the last word
 
-  light(scene, phase, accent, { reach: 1.6, aim: new Vector3(0, 0.5, 0), power: 7 });
-  const view = roomCamera(new Vector3(0, 0.5, 0.1), 4.0, 1.6);
   const pedestal = (i, h) => { pedestals[i].scale.y = h; pedestals[i].position.y = FLOOR + h / 2; };
 
-  const tl = timeline(2.2, (t) => {
+  const tl = scrub(2.2, (t) => {
     // The swap: approved comes forward and slides left along the front lane, rejected steps back
     // and slides right along the back lane, so they never pass through each other.
     for (const o of START) {
@@ -58,8 +54,5 @@ export function createSearch({ phase, accent }) {
       if (RISE[o]) g.position.z += 0.1 * r;
     });
   });
-  return {
-    scene, camera: view.camera, resize: view.resize, play: tl.play, finish: tl.finish,
-    frame(dt) { const m = tl.frame(dt); view.place(); return m; },
-  };
+  return stepView(scene, view, tl);
 }

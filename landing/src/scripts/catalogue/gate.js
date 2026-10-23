@@ -1,8 +1,9 @@
-// "Uploads are checked": a small, open checking gate over a track on the room's plinth. Cards slide
-// through it; the last one carries a key-shaped mark, stops at the gate, and gets a flagged slip.
+// "Uploads are checked": a small, open checking gate over a track on the room's plinth. Scrolling
+// through the step slides cards through it; the last one carries a key-shaped mark, stops at the
+// gate, and gets a flagged slip.
 // It is a reader on a frame, not a door or a vault: the copy says pattern matching, not a guarantee.
-import { CylinderGeometry, Group, Mesh, Scene, Vector3 } from 'three';
-import { FLOOR, M, box, ease, light, mat, plinth, roomCamera, seg, timeline } from './room.js';
+import { CylinderGeometry, Group, Mesh, Scene } from 'three';
+import { FLOOR, M, box, ease, mat, scrub, seg, stepRoom, stepView } from './room.js';
 
 const CW = 0.34, CH = 0.24; // a card, standing on the track and travelling along x
 const START = -0.88, STOP = -0.3; // the key card halts short of the gate at x = 0
@@ -30,9 +31,7 @@ function card(parent, y, z, key) {
 
 export function createGate({ phase, accent }) {
   const scene = new Scene();
-  const root = new Group();
-  scene.add(root);
-  plinth(root, 2.45, 1.15);
+  const { root, view } = stepRoom(scene, phase, accent);
   box(2.05, 0.02, 0.4, M.woodDark, 0, FLOOR + 0.01, 0, root); // the track
   // The gate: a low, deep reader frame the cards pass under (no door, nothing that locks), with
   // a reader strip along its inside and a small indicator on top that turns amber on a hold.
@@ -53,9 +52,7 @@ export function createGate({ phase, accent }) {
   box(0.1, 0.2, 0.006, mat('#f4d9a8'), 0, 0, 0, slip);
   box(0.05, 0.035, 0.007, mat('#d0574f'), 0.04, 0.085, 0.002, slip);
 
-  light(scene, phase, accent, { reach: 1.6, aim: new Vector3(0, 0.5, 0), power: 7 });
-  const view = roomCamera(new Vector3(0, 0.5, 0), 4.0, 1.6);
-  const tl = timeline(2.9, (t) => {
+  const tl = scrub(2.9, (t) => {
     passing.forEach((c, i) => { const p = seg(t, PASS[i].at, 1.3); c.position.x = START + ease(p) * (PASS[i].to - START); });
     const k = seg(t, 0.95, 0.9);
     key.position.x = START + ease(k) * (STOP - START);
@@ -64,8 +61,5 @@ export function createGate({ phase, accent }) {
     slip.visible = s > 0;
     indicator.material = s > 0 ? lampHold : lampOk;
   });
-  return {
-    scene, camera: view.camera, resize: view.resize, play: tl.play, finish: tl.finish,
-    frame(dt) { const m = tl.frame(dt); view.place(); return m; },
-  };
+  return stepView(scene, view, tl);
 }

@@ -192,19 +192,20 @@ const JSON_LD = {
       .stage { width: 100%; aspect-ratio: 26 / 21; }
       .step-stage { width: 100%; aspect-ratio: 16 / 10; margin: 14px 0 4px; }
       /* How it works as a scroll sequence. Desktop: the steps stack on the left, each tall enough to be
-         the only one in focus, and one pinned panel on the right shows the step crossing the
-         viewport's centre (band.js sets .active and .on; .seq once it runs). Phone: each step keeps
-         its own stage above its text. Native scroll only. */
+         the only one in focus, and one pinned panel on the right shows the step at the viewport's
+         centre. band.js drives the hand-off from native scroll: each panel stage's opacity and each
+         step's --focus (its text dims to half out of focus); .seq once it runs. Phone: each step
+         keeps its own stage above its text. */
       .how-panel { display: none; }
       @media (min-width: 900px) {
         .how-seq { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 56px; }
         .how ol.steps { grid-template-columns: 1fr; gap: 0; margin-top: 0; }
-        .how ol.steps li { min-height: 64vh; display: flex; flex-direction: column; justify-content: center; transition: opacity .3s ease; }
-        .how.seq ol.steps li:not(.active) { opacity: .5; }
+        .how ol.steps li { min-height: 64vh; display: flex; flex-direction: column; justify-content: center; }
+        .how.seq ol.steps li { opacity: calc(.5 + .5 * var(--focus, 1)); }
         .how .step-stage { display: none; }
         .how-panel { display: block; position: sticky; top: calc(50vh - 160px); align-self: start; margin-top: calc(32vh - 160px); aspect-ratio: 16 / 10; }
-        .how-panel .panel-stage { position: absolute; inset: 0; opacity: 0; transition: opacity .4s ease; }
-        .how-panel .panel-stage.on, .how:not(.seq) .panel-stage:first-child { opacity: 1; }
+        .how-panel .panel-stage { position: absolute; inset: 0; opacity: 0; }
+        .how:not(.seq) .panel-stage:first-child { opacity: 1; }
       }
 
       /* ── bands ── */

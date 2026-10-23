@@ -82,7 +82,7 @@ export function createCabinet({ phase, accent, still }) {
   parts.bulb.material.emissiveIntensity = P.lamp * 1.4;
 
   const view = roomCamera(new Vector3(0, 1.0, 0.2), 5.9, 1.24);
-  let progress = still ? 0.6 : 0, yaw = 0;
+  let progress = still ? 0.6 : 0, yaw = 0, snapping = false;
   const ray = new Raycaster();
   const fronts = parts.drawers.map((d) => d.front);
 
@@ -109,7 +109,7 @@ export function createCabinet({ phase, accent, still }) {
       const open = drawerOpen(progress);
       parts.drawers.forEach((d, i) => { d.target = i === MAIN ? open * OUT : d.peek ? PEEK : 0; });
       let moving = false;
-      const k = still ? 1 : 1 - Math.exp(-dt * 9);
+      const k = still || snapping ? 1 : 1 - Math.exp(-dt * 9);
       for (const d of parts.drawers) {
         const diff = d.target - d.out;
         if (Math.abs(diff) > 1e-4) { d.out += diff * k; moving = true; } else d.out = d.target;
@@ -117,11 +117,15 @@ export function createCabinet({ phase, accent, still }) {
         d.body.visible = d.out > 0.002;
       }
       parts.lift.position.y = parts.lift.userData.y0 + ease(clamp((parts.drawers[MAIN].out / OUT - 0.55) / 0.45)) * 0.11;
-      const yawTo = ((progress - 0.5) * 3 * Math.PI) / 180; // ±1.5°: 3° across the band
+      // ±1.5°: 3° in all, over the same stretch of scroll that opens the drawer, so the cabinet is
+      // still once the band is past mid-screen and the steps below take over.
+      const yawTo = ((clamp(progress / 0.6) - 0.5) * 3 * Math.PI) / 180;
       if (Math.abs(yawTo - yaw) > 1e-5) { yaw += (yawTo - yaw) * k; moving = true; } else yaw = yawTo;
       view.place(yaw);
       return moving;
     },
     finish() { this.frame(1); this.frame(1); },
+    /** Lands every drawer and the camera on its target now (another scene wants the canvas). */
+    snap() { snapping = true; this.frame(0); snapping = false; },
   };
 }

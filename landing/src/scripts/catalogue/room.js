@@ -3,7 +3,7 @@
 // (cabinet, intake, gate, search) builds its object on this, so the band and the steps read as one
 // room under one sun.
 import {
-  BoxGeometry, Color, DirectionalLight, HemisphereLight, Mesh, MeshLambertMaterial, PerspectiveCamera, SpotLight, Vector3,
+  BoxGeometry, Color, DirectionalLight, Group, HemisphereLight, Mesh, MeshLambertMaterial, PerspectiveCamera, SpotLight, Vector3,
 } from 'three';
 
 // Sun direction (degrees: elevation, azimuth from the front, + to the right), colour and sky per
@@ -94,6 +94,41 @@ export function light(scene, phase, accent, { reach = 2.4, aim = new Vector3(0, 
   return P;
 }
 
+/**
+ * The step scenes' shared room: the same plinth, camera and light for every step, so the hand-off
+ * between them in the pinned panel reads as one room changing, with nothing in the frame jumping.
+ * Returns the group to build on and the camera view.
+ */
+export function stepRoom(scene, phase, accent) {
+  const root = new Group();
+  scene.add(root);
+  plinth(root, 2.45, 1.4, 0.1);
+  light(scene, phase, accent, { reach: 1.6, aim: new Vector3(0, 0.5, 0), power: 7 });
+  return { root, view: roomCamera(new Vector3(0, 0.52, 0.1), 4.0, 1.6) };
+}
+
+/**
+ * A step scene's view: the scrub timeline plus a small camera offset (yaw, radians) that the
+ * panel's scroll-driven hand-off sets on the incoming scene. Both follow with the same short
+ * damped ease, and frame() reports movement until both have landed.
+ */
+export function stepView(scene, view, tl) {
+  let off = 0, cur = 0;
+  return {
+    scene, camera: view.camera, resize: view.resize, setProgress: tl.setProgress,
+    setOffset(o) { const changed = Math.abs(o - off) > 1e-5; off = o; return changed; },
+    finish() { tl.finish(); off = cur = 0; },
+    snap() { tl.snap(); cur = off; },
+    frame(dt) {
+      let moving = tl.frame(dt);
+      const d = off - cur;
+      if (Math.abs(d) > 1e-5) { cur += d * (1 - Math.exp(-dt * 14)); moving = true; } else cur = off;
+      view.place(cur);
+      return moving;
+    },
+  };
+}
+
 export const ease = (t) => t * t * (3 - 2 * t);
 export const easeOut = (t) => 1 - (1 - t) ** 3;
 export const clamp = (v) => Math.min(1, Math.max(0, v));
@@ -101,22 +136,26 @@ export const clamp = (v) => Math.min(1, Math.max(0, v));
 export const seg = (t, a, len) => clamp((t - a) / len);
 
 /**
- * A one-shot timeline for a scene that plays once: `start` state until play(), then `dur` seconds,
- * then rest. `apply(t)` poses the scene at time t. finish() jumps to the end (the stills use it).
+ * A scroll-scrubbed timeline: setProgress(p) (0..1, from native scroll) sets where the scene should
+ * be, and frame(dt) follows it with a short critically damped ease, so a trackpad's small steps do
+ * not jitter but the scene stays tied to scroll, backwards too. `apply(t)` poses the scene at time
+ * t of `dur` (the segments are authored in seconds, but nothing runs on a clock). finish() jumps to
+ * the end: the stills use it.
  */
-export function timeline(dur, apply) {
-  let t = 0, playing = false;
+export function scrub(dur, apply) {
+  let t = 0, to = 0;
   apply(0);
   return {
-    get done() { return t >= dur; },
-    play() { if (t < dur) playing = true; },
-    finish() { t = dur; playing = false; apply(dur); },
+    setProgress(p) { const n = clamp(p) * dur; const changed = Math.abs(n - to) > 1e-4; to = n; return changed; },
+    finish() { t = to = dur; apply(dur); },
+    /** Lands on the target now: the stage calls it when another scene is waiting for the canvas. */
+    snap() { if (t !== to) { t = to; apply(t); } },
     frame(dt) {
-      if (!playing) return false;
-      t = Math.min(dur, t + dt);
+      const d = to - t;
+      if (Math.abs(d) < dur * 1e-3) { if (d) { t = to; apply(t); } return false; }
+      t += d * (1 - Math.exp(-dt * 14));
       apply(t);
-      if (t >= dur) playing = false;
-      return playing;
+      return true;
     },
   };
 }

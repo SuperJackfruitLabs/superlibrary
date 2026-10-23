@@ -76,7 +76,12 @@ export function createStage({ phase, onLost }) {
       e.el.appendChild(canvas);
       e.el.classList.add('live');
     }
-    const moving = e.view.frame(dt);
+    // Scroll keeps every scene's target current. A scene nobody can see (e.hidden: faded out in the
+    // panel) lands on its target at once when another is waiting, so the visible one never waits;
+    // a visible scene always eases, so it never snaps.
+    const yield_ = queue.length && e.hidden;
+    if (yield_) e.view.snap?.();
+    const moving = e.view.frame(dt) && !yield_;
     renderer.render(e.view.scene, e.view.camera);
     e.onFrame?.(e.view);
     if (moving || e.dirty) { e.dirty = false; raf = requestAnimationFrame(frame); return; }
