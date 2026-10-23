@@ -1,19 +1,25 @@
-// The catalogue band's loader. It picks the still for the visitor's sun phase at once, and fetches
-// three and the scene only when the band nears the viewport, so the hero's first paint is untouched.
-// Reduced motion (the system setting or vibekit's data-motion="reduce") and a missing WebGL keep
-// the still. The index card is HTML in the page either way; scroll only moves it with the drawer.
-import { bandPhase, bandProgress, drawerOpen } from './common.js';
+// The catalogue scenes' loader, for every stage on the page (an element with data-scene). It picks
+// each stage's still for the visitor's sun phase at once, and fetches three, the shared stage and
+// the scenes only after the page has loaded and a stage nears the viewport, so the hero's first
+// paint is untouched. Reduced motion (the system setting or vibekit's data-motion="reduce") and a
+// missing WebGL keep the stills. All copy and labels are HTML in the page either way.
+//
+// Two kinds of scene: the cabinet follows scroll through its band; the steps' scenes play once,
+// when their stage is mostly in view. The shared stage runs one at a time, in the order asked.
+import { bandPhase, bandProgress } from './common.js';
 
-const band = document.getElementById('catalogue');
-const stage = band?.querySelector('.stage');
-if (band && stage) {
+const stages = [...document.querySelectorAll('[data-scene]')];
+if (stages.length) {
   const html = document.documentElement;
   const phase = bandPhase();
-  const still = stage.querySelector('img[data-still]');
-  if (still) still.src = `/catalogue/${phase}.webp`;
+  for (const el of stages) { const img = el.querySelector('img[data-still]'); if (img) img.src = `/catalogue/${el.dataset.scene}-${phase}.webp`; }
   const rm = matchMedia('(prefers-reduced-motion: reduce)');
   const reduced = () => rm.matches || html.dataset.motion === 'reduce';
-  let scene = null, loading = false, near = false, ticking = false;
+  const stillMode = new URLSearchParams(location.search).has('catalogue-still');
+  const band = document.getElementById('catalogue');
+  const entries = new Map(), seen = new Set();
+  const near = new Set();
+  let stage = null, mod = null, loading = false, ticking = false;
 
   function webgl() {
     try {
@@ -23,51 +29,80 @@ if (band && stage) {
       return !!gl;
     } catch { return false; }
   }
-  function update() {
+  // The HTML index card follows the drawer the scene actually drew, not the scroll position, so it
+  // never moves while the cabinet waits its turn.
+  const cardFollows = (view) => band?.style.setProperty('--open', view.open.toFixed(3));
+  function scrolled() {
     ticking = false;
-    if (!scene) return;
-    const p = bandProgress(band);
-    scene.setProgress(p);
-    band.style.setProperty('--open', drawerOpen(p).toFixed(3));
+    const e = band && entries.get(band.querySelector('[data-scene="cabinet"]'));
+    if (e && e.view.setProgress(bandProgress(band))) stage.request(e);
   }
-  function onScroll() { if (near && scene && !ticking) { ticking = true; requestAnimationFrame(update); } }
+  function onScroll() { if (stage && near.size && !ticking) { ticking = true; requestAnimationFrame(scrolled); } }
+  function play(el) {
+    const e = entries.get(el);
+    if (!e || e.played) return;
+    e.played = true;
+    e.view.play();
+    stage.request(e);
+  }
+
   function stop() {
-    scene?.dispose();
-    scene = null;
-    stage.classList.remove('live');
-    band.classList.remove('scrolling');
-    band.style.removeProperty('--open');
+    stage?.dispose();
+    stage = null;
+    entries.clear();
+    band?.classList.remove('scrolling');
+    band?.style.removeProperty('--open');
   }
   async function start() {
-    if (scene || loading || reduced() || !webgl()) return;
+    if (stage || loading || stillMode || reduced() || !webgl()) return;
     loading = true;
     try {
-      const { mountCatalogue } = await import('./scene.js');
+      mod ??= await import('./stage.js');
       if (reduced()) return;
-      scene = mountCatalogue(stage, { phase, onFrame: () => stage.classList.add('live'), onLost: stop });
-      if (scene) { band.classList.add('scrolling'); update(); }
+      stage = mod.createStage({ phase, onLost: stop });
+      if (!stage) return;
+      for (const el of stages) {
+        const name = el.dataset.scene;
+        const e = stage.add(el, name, name === 'cabinet' ? cardFollows : undefined);
+        entries.set(el, e);
+        if (name === 'cabinet') wireCabinet(el, e);
+      }
+      band?.classList.add('scrolling');
+      // Draw every stage once in its opening state (the steps: before they play), in page order,
+      // then play the steps already in view.
+      scrolled();
+      for (const e of entries.values()) stage.request(e);
+      for (const el of seen) play(el);
     } catch { stop(); } finally { loading = false; }
+  }
+  // Hover (mouse) or tap (touch) opens another cabinet drawer a little.
+  function wireCabinet(el, e) {
+    el.addEventListener('pointermove', (ev) => { if (stage && ev.pointerType === 'mouse' && e.view.peekAt(mod.ndc(el, ev))) stage.request(e); });
+    el.addEventListener('pointerleave', () => { if (stage && e.view.unpeek()) stage.request(e); });
+    el.addEventListener('pointerdown', (ev) => { if (stage && ev.pointerType !== 'mouse' && e.view.peekAt(mod.ndc(el, ev), true)) stage.request(e); });
   }
 
   // Not before the page's own load is done, so three never competes with the hero for bandwidth.
   const loaded = document.readyState === 'complete' ? Promise.resolve() : new Promise((r) => addEventListener('load', r, { once: true }));
-  new IntersectionObserver((es) => { near = es[0].isIntersecting; if (near) loaded.then(start); }, { rootMargin: '300px 0px' }).observe(band);
+  const nearIO = new IntersectionObserver((es) => {
+    for (const en of es) en.isIntersecting ? near.add(en.target) : near.delete(en.target);
+    if (near.size) loaded.then(start);
+  }, { rootMargin: '300px 0px' });
+  const inView = new IntersectionObserver((es) => {
+    for (const en of es) if (en.isIntersecting) { seen.add(en.target); if (stage) play(en.target); }
+  }, { threshold: 0.6 });
+  for (const el of stages) { nearIO.observe(el); if (el.dataset.scene !== 'cabinet') inView.observe(el); }
   addEventListener('scroll', onScroll, { passive: true });
-  const recheck = () => { if (reduced()) stop(); else if (near) loaded.then(start); };
+  const recheck = () => { if (reduced()) stop(); else if (near.size) loaded.then(start); };
   rm.addEventListener('change', recheck);
   new MutationObserver(recheck).observe(html, { attributes: true, attributeFilter: ['data-motion'] });
 
-  // Renders the stills in public/catalogue (scripts/render-stills.mjs): ?catalogue-still exposes a
-  // hook that draws the settled scene, drawer open, for one phase and returns it as a WebP.
-  if (new URLSearchParams(location.search).has('catalogue-still')) {
-    window.__catalogueStill = async (p) => {
-      stop();
-      const { mountCatalogue } = await import('./scene.js');
-      const s = mountCatalogue(stage, { phase: p, still: true });
-      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-      const url = s.canvas.toDataURL('image/webp', 0.86);
-      s.dispose();
-      return url;
+  // Renders the stills in public/catalogue (scripts/render-stills.mjs): ?catalogue-still skips the
+  // live stage and exposes a hook that draws one scene's settled end state as a WebP.
+  if (stillMode) {
+    window.__catalogueStill = async (name, p) => {
+      mod ??= await import('./stage.js');
+      return mod.renderStill(document.querySelector(`[data-scene="${name}"]`), name, p);
     };
   }
 }

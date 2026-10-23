@@ -16,9 +16,10 @@
  *
  * The hero is an invented example ItemSummary (packages/contract/src/model.ts); its labels
  * are real field names and values. The catalogue band under it files the same item: its index
- * card is HTML, and the cabinet beside it is a small three.js scene loaded only near the viewport
- * (src/scripts/catalogue), with a still per sun phase in public/catalogue for reduced motion and
- * no WebGL. The MCP tool names are the three apps/api registers.
+ * card is HTML, and the cabinet beside it is a small three.js scene loaded only near the viewport.
+ * Each "How it works" step has a scene of its own in the same room. All four share one canvas
+ * (src/scripts/catalogue, see its README), with a still per sun phase in public/catalogue for
+ * reduced motion and no WebGL. The MCP tool names are the three apps/api registers.
  */
 import SuiteHead from '@superjackfruit/frontdoor/components/SuiteHead.astro';
 import Frame from '@superjackfruit/frontdoor/components/Frame.astro';
@@ -183,12 +184,13 @@ const JSON_LD = {
       /* While the scene runs, the card rises with the drawer (--open, set from native scroll). */
       .catalogue.scrolling .index-card { transform: translateY(calc((1 - var(--open, 1)) * 18px)); opacity: calc(.4 + .6 * var(--open, 1)); }
       /* The canvas is made by script, so it carries no scoped-style attribute: hence :global. */
-      .stage { position: relative; margin: 0; width: 100%; aspect-ratio: 26 / 21; }
-      .stage img, .stage :global(canvas) { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-      .stage :global(canvas) { opacity: 0; transition: opacity .5s ease; touch-action: pan-y; }
-      .stage img { transition: opacity .5s ease; }
-      .stage.live :global(canvas) { opacity: 1; }
-      .stage.live img { opacity: 0; }
+      /* Every scene stage (data-scene): its still, then the 2D snapshot its scene left, then the one
+         shared WebGL canvas while that scene owns it (src/scripts/catalogue/stage.js). */
+      [data-scene] { position: relative; margin: 0; touch-action: pan-y; }
+      [data-scene] img, [data-scene] :global(canvas) { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+      [data-scene].rested img, [data-scene].live img, [data-scene].live :global(.catalogue-rest) { visibility: hidden; }
+      .stage { width: 100%; aspect-ratio: 26 / 21; }
+      .step-stage { width: 100%; aspect-ratio: 16 / 10; margin: 14px 0 4px; }
 
       /* ── bands ── */
       section.band { border-top: 1px solid var(--line); }
@@ -320,9 +322,9 @@ const JSON_LD = {
               </dl>
             </article>
           </div>
-          <figure class="stage" aria-hidden="true">
+          <figure class="stage" data-scene="cabinet" aria-hidden="true">
             <img data-still alt="" width="780" height="630" loading="lazy" decoding="async" />
-            <noscript><img src="/catalogue/noon.webp" alt="" width="780" height="630" loading="lazy" decoding="async" /></noscript>
+            <noscript><img src="/catalogue/cabinet-noon.webp" alt="" width="780" height="630" loading="lazy" decoding="async" /></noscript>
           </figure>
         </div>
         <script>
