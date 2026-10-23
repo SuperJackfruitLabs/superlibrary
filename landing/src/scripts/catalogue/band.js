@@ -4,22 +4,27 @@
 // paint is untouched. Reduced motion (the system setting or vibekit's data-motion="reduce") and a
 // missing WebGL keep the stills. All copy and labels are HTML in the page either way.
 //
-// Two kinds of scene: the cabinet follows scroll through its band; the steps' scenes play once,
-// when their stage is mostly in view. The shared stage runs one at a time, in the order asked.
+// Two kinds of scene: the cabinet follows scroll through its band; the "How it works" scenes play
+// once, each when its step crosses the viewport's centre. On desktop they share one pinned panel
+// (one stage per scene, stacked, only the active one shown); on a phone each step has its own.
+// The shared stage draws one scene at a time, in the order asked.
 import { bandPhase, bandProgress } from './common.js';
 
-const stages = [...document.querySelectorAll('[data-scene]')];
-if (stages.length) {
+const all = [...document.querySelectorAll('[data-scene]')];
+if (all.length) {
   const html = document.documentElement;
   const phase = bandPhase();
-  for (const el of stages) { const img = el.querySelector('img[data-still]'); if (img) img.src = `/catalogue/${el.dataset.scene}-${phase}.webp`; }
+  for (const el of all) { const img = el.querySelector('img[data-still]'); if (img) img.src = `/catalogue/${el.dataset.scene}-${phase}.webp`; }
   const rm = matchMedia('(prefers-reduced-motion: reduce)');
+  const desk = matchMedia('(min-width: 900px)');
   const reduced = () => rm.matches || html.dataset.motion === 'reduce';
   const stillMode = new URLSearchParams(location.search).has('catalogue-still');
   const band = document.getElementById('catalogue');
-  const entries = new Map(), seen = new Set();
-  const near = new Set();
-  let stage = null, mod = null, loading = false, ticking = false;
+  const how = document.querySelector('.how');
+  const steps = how ? [...how.querySelectorAll('ol.steps > li')] : [];
+  const panel = how ? [...how.querySelectorAll('.panel-stage')] : [];
+  const entries = new Map(), near = new Set();
+  let stage = null, mod = null, loading = false, ticking = false, active = -1, centred = false;
 
   function webgl() {
     try {
@@ -29,6 +34,8 @@ if (stages.length) {
       return !!gl;
     } catch { return false; }
   }
+  // Only the stages this layout shows take part (the phone's per-step stages are hidden on desktop).
+  const shown = () => all.filter((el) => el.getClientRects().length);
   // The HTML index card follows the drawer the scene actually drew, not the scroll position, so it
   // never moves while the cabinet waits its turn.
   const cardFollows = (view) => band?.style.setProperty('--open', view.open.toFixed(3));
@@ -38,12 +45,27 @@ if (stages.length) {
     if (e && e.view.setProgress(bandProgress(band))) stage.request(e);
   }
   function onScroll() { if (stage && near.size && !ticking) { ticking = true; requestAnimationFrame(scrolled); } }
+
+  // The step scene for step i in this layout: the panel's on desktop, the step's own on a phone.
+  const stepStage = (i) => (desk.matches ? panel[i] : steps[i]?.querySelector('[data-scene]'));
   function play(el) {
-    const e = entries.get(el);
+    const e = el && entries.get(el);
     if (!e || e.played) return;
     e.played = true;
     e.view.play();
     stage.request(e);
+  }
+  // A scene leaving the panel mid-play jumps to its end, so the one coming in never waits for it.
+  function settle(el) {
+    const e = el && entries.get(el);
+    if (e?.played) { e.view.finish(); stage.request(e); }
+  }
+  function activate(i) {
+    const prev = active;
+    active = i;
+    steps.forEach((li, j) => li.classList.toggle('active', j === i));
+    panel.forEach((el, j) => el.classList.toggle('on', j === i));
+    if (stage && prev !== i && prev >= 0 && desk.matches) settle(panel[prev]);
   }
 
   function stop() {
@@ -61,7 +83,7 @@ if (stages.length) {
       if (reduced()) return;
       stage = mod.createStage({ phase, onLost: stop });
       if (!stage) return;
-      for (const el of stages) {
+      for (const el of shown()) {
         const name = el.dataset.scene;
         const e = stage.add(el, name, name === 'cabinet' ? cardFollows : undefined);
         entries.set(el, e);
@@ -69,10 +91,10 @@ if (stages.length) {
       }
       band?.classList.add('scrolling');
       // Draw every stage once in its opening state (the steps: before they play), in page order,
-      // then play the steps already in view.
+      // then play the step already at the centre, if one is.
       scrolled();
       for (const e of entries.values()) stage.request(e);
-      for (const el of seen) play(el);
+      if (centred && active >= 0) play(stepStage(active));
     } catch { stop(); } finally { loading = false; }
   }
   // Hover (mouse) or tap (touch) opens another cabinet drawer a little.
@@ -88,21 +110,31 @@ if (stages.length) {
     for (const en of es) en.isIntersecting ? near.add(en.target) : near.delete(en.target);
     if (near.size) loaded.then(start);
   }, { rootMargin: '300px 0px' });
-  const inView = new IntersectionObserver((es) => {
-    for (const en of es) if (en.isIntersecting) { seen.add(en.target); if (stage) play(en.target); }
-  }, { threshold: 0.6 });
-  for (const el of stages) { nearIO.observe(el); if (el.dataset.scene !== 'cabinet') inView.observe(el); }
+  for (const el of all) nearIO.observe(el);
+  // A step is active while it crosses a line at the viewport's centre.
+  if (steps.length) {
+    how.classList.add('seq');
+    activate(0);
+    const centre = new IntersectionObserver((es) => {
+      for (const en of es) if (en.isIntersecting) { centred = true; activate(steps.indexOf(en.target)); if (stage) play(stepStage(active)); }
+    }, { rootMargin: '-50% 0px -50% 0px' });
+    for (const li of steps) centre.observe(li);
+  }
   addEventListener('scroll', onScroll, { passive: true });
   const recheck = () => { if (reduced()) stop(); else if (near.size) loaded.then(start); };
   rm.addEventListener('change', recheck);
   new MutationObserver(recheck).observe(html, { attributes: true, attributeFilter: ['data-motion'] });
+  // Crossing the breakpoint swaps which stages are shown: start again with the new set.
+  desk.addEventListener('change', () => { if (stage) { stop(); recheck(); } });
 
   // Renders the stills in public/catalogue (scripts/render-stills.mjs): ?catalogue-still skips the
-  // live stage and exposes a hook that draws one scene's settled end state as a WebP.
+  // live stage and exposes a hook that draws one scene's settled end state as a WebP, at the
+  // largest stage that shows it.
   if (stillMode) {
     window.__catalogueStill = async (name, p) => {
       mod ??= await import('./stage.js');
-      return mod.renderStill(document.querySelector(`[data-scene="${name}"]`), name, p);
+      const el = [...document.querySelectorAll(`[data-scene="${name}"]`)].sort((a, b) => b.clientWidth - a.clientWidth)[0];
+      return mod.renderStill(el, name, p);
     };
   }
 }

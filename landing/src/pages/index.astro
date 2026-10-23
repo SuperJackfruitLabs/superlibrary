@@ -191,6 +191,21 @@ const JSON_LD = {
       [data-scene].rested img, [data-scene].live img, [data-scene].live :global(.catalogue-rest) { visibility: hidden; }
       .stage { width: 100%; aspect-ratio: 26 / 21; }
       .step-stage { width: 100%; aspect-ratio: 16 / 10; margin: 14px 0 4px; }
+      /* How it works as a scroll sequence. Desktop: the steps stack on the left, each tall enough to be
+         the only one in focus, and one pinned panel on the right shows the step crossing the
+         viewport's centre (band.js sets .active and .on; .seq once it runs). Phone: each step keeps
+         its own stage above its text. Native scroll only. */
+      .how-panel { display: none; }
+      @media (min-width: 900px) {
+        .how-seq { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 56px; }
+        .how ol.steps { grid-template-columns: 1fr; gap: 0; margin-top: 0; }
+        .how ol.steps li { min-height: 64vh; display: flex; flex-direction: column; justify-content: center; transition: opacity .3s ease; }
+        .how.seq ol.steps li:not(.active) { opacity: .5; }
+        .how .step-stage { display: none; }
+        .how-panel { display: block; position: sticky; top: calc(50vh - 160px); align-self: start; margin-top: calc(32vh - 160px); aspect-ratio: 16 / 10; }
+        .how-panel .panel-stage { position: absolute; inset: 0; opacity: 0; transition: opacity .4s ease; }
+        .how-panel .panel-stage.on, .how:not(.seq) .panel-stage:first-child { opacity: 1; }
+      }
 
       /* ── bands ── */
       section.band { border-top: 1px solid var(--line); }
@@ -332,9 +347,10 @@ const JSON_LD = {
         </script>
       </section>
 
-      <section class="band" aria-labelledby="how">
+      <section class="band how" aria-labelledby="how">
         <div class="wrap">
           <h2 id="how">How it works</h2>
+          <div class="how-seq">
           <ol class="steps">
             <li>
               <figure class="step-stage" data-scene="intake" aria-hidden="true">
@@ -373,6 +389,13 @@ const JSON_LD = {
               </p>
             </li>
           </ol>
+          <!-- Desktop: one pinned panel shows the step crossing the viewport's centre. -->
+          <div class="how-panel" aria-hidden="true">
+            <figure class="panel-stage" data-scene="intake"><img data-still alt="" width="512" height="320" loading="lazy" decoding="async" /><noscript><img src="/catalogue/intake-noon.webp" alt="" width="512" height="320" loading="lazy" decoding="async" /></noscript></figure>
+            <figure class="panel-stage" data-scene="gate"><img data-still alt="" width="512" height="320" loading="lazy" decoding="async" /><noscript><img src="/catalogue/gate-noon.webp" alt="" width="512" height="320" loading="lazy" decoding="async" /></noscript></figure>
+            <figure class="panel-stage" data-scene="search"><img data-still alt="" width="512" height="320" loading="lazy" decoding="async" /><noscript><img src="/catalogue/search-noon.webp" alt="" width="512" height="320" loading="lazy" decoding="async" /></noscript></figure>
+          </div>
+          </div>
         </div>
       </section>
 

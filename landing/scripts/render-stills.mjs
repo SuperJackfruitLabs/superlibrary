@@ -16,7 +16,7 @@ const b = await chromium.launch({ channel: 'chrome', args: ['--ignore-gpu-blockl
 const p = await b.newPage({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1.5 });
 await p.goto(new URL('?catalogue-still', base).href, { waitUntil: 'load' });
 await p.waitForFunction(() => window.__catalogueStill);
-const scenes = await p.evaluate(() => [...document.querySelectorAll('[data-scene]')].map((el) => el.dataset.scene));
+const scenes = await p.evaluate(() => [...new Set([...document.querySelectorAll('[data-scene]')].map((el) => el.dataset.scene))]);
 for (const scene of scenes) for (const phase of ['dawn', 'morning', 'noon', 'golden', 'dusk', 'night']) {
   const url = await p.evaluate(([s, ph]) => window.__catalogueStill(s, ph), [scene, phase]);
   const buf = Buffer.from(url.split(',')[1], 'base64');
