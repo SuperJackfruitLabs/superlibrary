@@ -15,7 +15,11 @@
  * the suite links and the version, so this page does not repeat them.
  *
  * The hero is an invented example ItemSummary (packages/contract/src/model.ts); its labels
- * are real field names and values. The MCP tool names are the three apps/api registers.
+ * are real field names and values. The catalogue band under it files the same item: its index
+ * card is HTML, and the cabinet beside it is a small three.js scene loaded only near the viewport.
+ * Each "How it works" step has a scene of its own in the same room. All four share one canvas
+ * (src/scripts/catalogue, see its README), with a still per sun phase in public/catalogue for
+ * reduced motion and no WebGL. The MCP tool names are the three apps/api registers.
  */
 import SuiteHead from '@superjackfruit/frontdoor/components/SuiteHead.astro';
 import Frame from '@superjackfruit/frontdoor/components/Frame.astro';
@@ -163,6 +167,49 @@ const JSON_LD = {
       .item.playing .related li { animation: sl-slide .35s ease-out backwards; animation-delay: calc(2.5s + var(--i, 0) * 140ms); }
       .item.playing .related li + li { --i: 1; }
 
+      /* ── the catalogue band: a lazy three.js cabinet (src/scripts/catalogue) beside a real index card ── */
+      .catalogue .split { grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); }
+      .index-card { position: relative; margin: 30px 0 0; max-width: 380px; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 14px 18px 10px; font-size: 14px; box-shadow: 0 18px 36px -24px rgba(0,0,0,.5); }
+      [data-theme="light"] .index-card { box-shadow: 0 18px 36px -26px rgba(29,23,20,.25); }
+      .index-card::before { content: ''; position: absolute; top: -1px; left: 22px; width: 54px; height: 3px; border-radius: 0 0 3px 3px; background: var(--coral); }
+      .index-card .ttl { font-family: var(--display); font-weight: 600; font-size: 19px; line-height: 1.25; letter-spacing: -0.01em; }
+      .index-card .id { font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+      .index-card dl { margin: 8px 0 0; display: grid; grid-template-columns: auto 1fr; column-gap: 14px; }
+      /* ruled like a catalogue card: one line under each field */
+      .index-card dt, .index-card dd { line-height: 32px; border-bottom: 1px solid var(--line); }
+      .index-card dt:nth-last-child(2), .index-card dd:last-child { border-bottom: 0; }
+      .index-card dt { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+      .index-card dd { margin: 0; font-family: var(--mono); font-size: 12.5px; }
+      .index-card dd.coral { color: var(--coral-text); }
+      /* While the scene runs, the card rises with the drawer (--open, set from native scroll). */
+      .catalogue.scrolling .index-card { transform: translateY(calc((1 - var(--open, 1)) * 18px)); opacity: calc(.4 + .6 * var(--open, 1)); }
+      /* The canvas is made by script, so it carries no scoped-style attribute: hence :global. */
+      /* Every scene stage (data-scene): its still, then the 2D snapshot its scene left, then the one
+         shared WebGL canvas while that scene owns it (src/scripts/catalogue/stage.js). */
+      [data-scene] { position: relative; margin: 0; touch-action: pan-y; }
+      [data-scene] img, [data-scene] :global(canvas) { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+      [data-scene].rested img, [data-scene].live img, [data-scene].live :global(.catalogue-rest) { visibility: hidden; }
+      .stage { width: 100%; aspect-ratio: 26 / 21; }
+      .step-stage { width: 100%; aspect-ratio: 16 / 10; margin: 14px 0 4px; }
+      /* What it's like to use: the copy beside the agent at the cabinet; on a phone the stage first. */
+      .use-stage { width: 100%; aspect-ratio: 16 / 10; }
+      /* How it works as a scroll sequence. Desktop: the steps stack on the left, each tall enough to be
+         the only one in focus, and one pinned panel on the right shows the step at the viewport's
+         centre. band.js drives the hand-off from native scroll: each panel stage's opacity and each
+         step's --focus (its text dims to half out of focus); .seq once it runs. Phone: each step
+         keeps its own stage above its text. */
+      .how-panel { display: none; }
+      @media (min-width: 900px) {
+        .how-seq { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 56px; }
+        .how ol.steps { grid-template-columns: 1fr; gap: 0; margin-top: 0; }
+        .how ol.steps li { min-height: 64vh; display: flex; flex-direction: column; justify-content: center; }
+        .how.seq ol.steps li { opacity: calc(.5 + .5 * var(--focus, 1)); }
+        .how .step-stage { display: none; }
+        .how-panel { display: block; position: sticky; top: calc(50vh - 160px); align-self: start; margin-top: calc(32vh - 160px); aspect-ratio: 16 / 10; }
+        .how-panel .panel-stage { position: absolute; inset: 0; opacity: 0; }
+        .how:not(.seq) .panel-stage:first-child { opacity: 1; }
+      }
+
       /* ── bands ── */
       section.band { border-top: 1px solid var(--line); }
       section.band .wrap { padding-top: 88px; padding-bottom: 88px; }
@@ -193,6 +240,9 @@ const JSON_LD = {
         .hero .wrap { grid-template-columns: 1fr; gap: 44px; min-height: auto; padding-top: 40px; padding-bottom: 56px; }
         .card-wrap { width: 100%; }
         .split { grid-template-columns: 1fr; gap: 32px; }
+        .catalogue .split { grid-template-columns: 1fr; }
+        .catalogue .stage { order: -1; }
+        .use .use-stage { order: -1; }
         .grid, ol.steps { grid-template-columns: 1fr; }
         section.band .wrap { padding-top: 64px; padding-bottom: 64px; }
       }
@@ -271,11 +321,46 @@ const JSON_LD = {
         </div>
       </section>
 
-      <section class="band" aria-labelledby="how">
+      <section class="band catalogue" id="catalogue" aria-labelledby="filed">
+        <div class="wrap split">
+          <div>
+            <h2 id="filed">Where finished work goes</h2>
+            <p class="sub">
+              Every item is filed with its outcome. Search pulls approved and completed work first, and the
+              rejected draft is still there when you want to see what was turned down.
+            </p>
+            <article class="index-card" aria-label="The example item's index card">
+              <div class="ttl">Pricing page copy, final</div>
+              <span class="id">itm_4f0c2a9e81b7d3c5</span>
+              <dl>
+                <dt>kind</dt><dd>artifact</dd>
+                <dt>outcome</dt><dd class="coral">approved</dd>
+                <dt>scope</dt><dd>board:brd_9a41…</dd>
+                <dt>version</dt><dd>3</dd>
+                <dt>source</dt><dd>superpipeline</dd>
+              </dl>
+            </article>
+          </div>
+          <figure class="stage" data-scene="cabinet" aria-hidden="true">
+            <img data-still alt="" width="780" height="630" loading="lazy" decoding="async" />
+            <noscript><img src="/catalogue/cabinet-noon.webp" alt="" width="780" height="630" loading="lazy" decoding="async" /></noscript>
+          </figure>
+        </div>
+        <script>
+          import '../scripts/catalogue/band.js';
+        </script>
+      </section>
+
+      <section class="band how" aria-labelledby="how">
         <div class="wrap">
           <h2 id="how">How it works</h2>
+          <div class="how-seq">
           <ol class="steps">
             <li>
+              <figure class="step-stage" data-scene="intake" aria-hidden="true">
+                <img data-still alt="" width="480" height="300" loading="lazy" decoding="async" />
+                <noscript><img src="/catalogue/intake-noon.webp" alt="" width="480" height="300" loading="lazy" decoding="async" /></noscript>
+              </figure>
               <h3>Work comes in, labelled</h3>
               <p>
                 Files are uploaded as artifacts, versioned. Each item carries one of seven outcomes: approved,
@@ -284,6 +369,10 @@ const JSON_LD = {
               </p>
             </li>
             <li>
+              <figure class="step-stage" data-scene="gate" aria-hidden="true">
+                <img data-still alt="" width="480" height="300" loading="lazy" decoding="async" />
+                <noscript><img src="/catalogue/gate-noon.webp" alt="" width="480" height="300" loading="lazy" decoding="async" /></noscript>
+              </figure>
               <h3>Uploads are checked</h3>
               <p>
                 Every upload is scanned for common key formats and size limits before it is kept; a refusal names
@@ -292,6 +381,10 @@ const JSON_LD = {
               </p>
             </li>
             <li>
+              <figure class="step-stage" data-scene="search" aria-hidden="true">
+                <img data-still alt="" width="480" height="300" loading="lazy" decoding="async" />
+                <noscript><img src="/catalogue/search-noon.webp" alt="" width="480" height="300" loading="lazy" decoding="async" /></noscript>
+              </figure>
               <h3>Search ranks by outcome</h3>
               <p>
                 Full-text and vector search run together. Approved and completed work ranks first; rejected and
@@ -300,24 +393,35 @@ const JSON_LD = {
               </p>
             </li>
           </ol>
+          <!-- Desktop: one pinned panel shows the step crossing the viewport's centre. -->
+          <div class="how-panel" aria-hidden="true">
+            <figure class="panel-stage" data-scene="intake"><img data-still alt="" width="512" height="320" loading="lazy" decoding="async" /><noscript><img src="/catalogue/intake-noon.webp" alt="" width="512" height="320" loading="lazy" decoding="async" /></noscript></figure>
+            <figure class="panel-stage" data-scene="gate"><img data-still alt="" width="512" height="320" loading="lazy" decoding="async" /><noscript><img src="/catalogue/gate-noon.webp" alt="" width="512" height="320" loading="lazy" decoding="async" /></noscript></figure>
+            <figure class="panel-stage" data-scene="search"><img data-still alt="" width="512" height="320" loading="lazy" decoding="async" /><noscript><img src="/catalogue/search-noon.webp" alt="" width="512" height="320" loading="lazy" decoding="async" /></noscript></figure>
+          </div>
+          </div>
         </div>
       </section>
 
-      <section class="band" aria-labelledby="use">
-        <div class="wrap prose">
+      <section class="band use" aria-labelledby="use">
+        <div class="wrap split">
+          <div class="prose">
           <h2 id="use">What it's like to use</h2>
           <p>
-            Say an agent is about to write a pricing page. Before it starts, it calls <code>library_search</code>
-            through SuperLibrary's MCP server and finds the approved final copy. <code>library_related</code> shows
+            Say an agent is about to write a pricing page. Before it starts, it calls <code>library_search</code> through SuperLibrary's MCP server and finds the approved final copy. <code>library_related</code> shows
             the draft that was rejected and the card that completed the work, so it starts from what was accepted
             and knows what was turned down.
           </p>
           <p class="muted">
-            The MCP server has three read-only tools: <code>library_search</code>, <code>library_get</code> and
-            <code>library_related</code>. An agent needs a session token from your organization's sign-in and has
+            The MCP server has three read-only tools: <code>library_search</code>, <code>library_get</code> and <code>library_related</code>. An agent needs a session token from your organization's sign-in and has
             to be given the server. Agents can still add files, through <code>suli upload</code>, under the same
             secret scan as anyone else.
           </p>
+          </div>
+          <figure class="use-stage" data-scene="consult" aria-hidden="true">
+            <img data-still alt="" width="512" height="320" loading="lazy" decoding="async" />
+            <noscript><img src="/catalogue/consult-noon.webp" alt="" width="512" height="320" loading="lazy" decoding="async" /></noscript>
+          </figure>
         </div>
       </section>
 
@@ -335,8 +439,7 @@ const JSON_LD = {
           </p>
           <pre><code>curl -fsSL https://github.com/SuperJackfruitLabs/superlibrary/releases/latest/download/install.sh | bash</code></pre>
           <p>
-            <code>suli login</code> signs in through the same account service, and <code>suli skill install</code>
-            gives an agent a skill that matches its commands.
+            <code>suli login</code> signs in through the same account service, and <code>suli skill install</code> gives an agent a skill that matches its commands.
           </p>
           <a class="more" href={`${DOCS}/install/`}>Install guide →</a>
         </div>

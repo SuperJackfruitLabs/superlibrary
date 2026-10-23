@@ -27,12 +27,29 @@ test('the job names production gates on still exist in ci.yml', () => {
   assert.ok(ci.test && ci.e2e);
 });
 
+test('the app jobs skip only on a landing- or docs-only change, as ci.yml plans it', () => {
+  const plan = ci.changes;
+  assert.ok(plan, 'the changes job is gone');
+  assert.match(plan, /dorny\/paths-filter@[0-9a-f]{40}/);
+  assert.match(plan, /predicate-quantifier: every/);
+  assert.match(plan, /- '\*\*'\n\s+- '!landing\/\*\*'\n\s+- '!docs-site\/\*\*'/);
+  // the workflows themselves, and every trigger other than push and pull_request, run it all
+  assert.match(plan, /- '\.github\/\*\*'/);
+  assert.match(plan, /case "\$EVENT" in push\|pull_request\) ;; \*\) app=true ;; esac/);
+  for (const n of ['test', 'e2e']) assert.match(ci[n], /needs: \[changes\]\n\s+if: needs\.changes\.outputs\.app == 'true'/, n);
+  assert.match(ci.landing, /if: needs\.changes\.outputs\.landing == 'true'/);
+  assert.match(ci.docs, /if: needs\.changes\.outputs\.docs == 'true'/);
+});
+
 test('a v* tag deploys production behind the main-CI gate', () => {
   assert.match(rel, /tags:\s*\n\s*- 'v\*'/);
   const gate = release['production-gate'];
   assert.match(gate, /merge-base --is-ancestor "\$sha" origin\/main/);
   assert.match(gate, /workflows\/ci\.yml\/runs\?event=push&branch=main&head_sha=\$SHA/);
   assert.match(gate, /\.name == "test" or \.name == "e2e"/);
+  // a skipped test/e2e counts only when ci.yml's changes job passed and planned the skip
+  assert.match(gate, /\.name == "changes" and \.conclusion == "success"\)\) as \$planned/);
+  assert.match(gate, /\.conclusion == "success" or \(\$planned and \.conclusion == "skipped"\)/);
   assert.match(gate, /"\$ok" = 2/);
   assert.match(gate, /actions: read/);
 });

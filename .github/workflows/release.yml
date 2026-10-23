@@ -121,6 +121,8 @@ jobs:
             exit 1
           fi
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
+      # Passed means success, or skipped by ci.yml's `changes` job (which itself passed) because the
+      # commit touched only landing/ or docs-site/: the app then is the code its parent tested.
       - name: Require main's CI to have passed test and e2e
         env:
           GH_TOKEN: ${{ github.token }}
@@ -128,10 +130,11 @@ jobs:
           REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
+          # shellcheck disable=SC2016  # $planned is jq's variable, not the shell's
           for run in $(gh api "repos/$REPO/actions/workflows/ci.yml/runs?event=push&branch=main&head_sha=$SHA&per_page=20" \
               --jq '.workflow_runs[] | select(.head_sha == env.SHA) | .id'); do
             ok="$(gh api "repos/$REPO/actions/runs/$run/jobs?filter=latest&per_page=100" \
-              --jq '[.jobs[] | select((.name == "test" or .name == "e2e") and .conclusion == "success") | .name] | unique | length')"
+              --jq '(any(.jobs[]; .name == "changes" and .conclusion == "success")) as $planned | [.jobs[] | select((.name == "test" or .name == "e2e") and (.conclusion == "success" or ($planned and .conclusion == "skipped"))) | .name] | unique | length')"
             if [ "$ok" = 2 ]; then
               echo "CI run $run passed test and e2e for $SHA"
               exit 0
