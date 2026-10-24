@@ -36,7 +36,7 @@ describe('installable', () => {
     expect(html).toContain('<link rel="manifest" href="/manifest.webmanifest" />');
     expect(html).toContain('<link rel="apple-touch-icon" href="/apple-touch-icon.png" />');
     expect(html).toContain('<meta name="apple-mobile-web-app-capable" content="yes" />');
-    expect(html).toContain('<meta name="apple-mobile-web-app-title" content="Superlibrary" />');
+    expect(html).toContain('<meta name="apple-mobile-web-app-title" content="SuperLibrary" />');
     expect(html).toMatch(/<meta name="theme-color" content="#[0-9a-f]{6}" media="\(prefers-color-scheme: dark\)" \/>/);
     expect(html).toMatch(/<meta name="theme-color" content="#[0-9a-f]{6}" media="\(prefers-color-scheme: light\)" \/>/);
   });
@@ -48,7 +48,7 @@ describe('installable', () => {
 
   it('the manifest parses and names what an install needs', () => {
     const m = manifest();
-    expect(m).toMatchObject({ name: 'Superlibrary', start_url: '/', scope: '/', display: 'standalone' });
+    expect(m).toMatchObject({ name: 'SuperLibrary', start_url: '/', scope: '/', display: 'standalone' });
     expect(m.short_name).toBeTruthy();
     expect(m.background_color).toMatch(/^#[0-9a-f]{6}$/);
     expect(m.theme_color).toMatch(/^#[0-9a-f]{6}$/);
