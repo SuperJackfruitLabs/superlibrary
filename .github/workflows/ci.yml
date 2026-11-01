@@ -138,8 +138,8 @@ jobs:
           printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
           ssh root@"$HOST" superlibrary "$GITHUB_SHA"
 
-  # superlibrary.dev and docs.superlibrary.dev: build only. They deploy from the operator's
-  # machine (scripts/deploy-sites.sh), so CI holds no Cloudflare token for them. npm, scoped
+  # superlibrary.dev and docs.superlibrary.dev: build only here. sites.yml deploys them on
+  # merge to main (scripts/deploy-sites.sh with the org's Cloudflare token). npm, scoped
   # to each directory, because both sit outside the pnpm workspace with their own lockfiles.
   landing:
     needs: [changes]
