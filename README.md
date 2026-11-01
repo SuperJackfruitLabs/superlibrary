@@ -37,7 +37,7 @@ An existing different program named `suli` or `superlibrary` is refused, never o
 
 - Every push to `main` deploys staging, at [staging-app.superlibrary.dev](https://staging-app.superlibrary.dev) (`deploy-staging` in `ci.yml`). Main never deploys production.
 - A `v*` tag deploys production, at [app.superlibrary.dev](https://app.superlibrary.dev) (`release.yml`), alongside the suli release. The tag must be on `main`, and `ci.yml`'s push run on `main` for that exact commit must have passed `test` and `e2e`; otherwise nothing deploys. It then applies the remote D1 migrations and deploys the API Worker, the content Worker, then web, and smokes production.
-- `superlibrary.dev` and `docs.superlibrary.dev` deploy from the operator's machine (`scripts/deploy-sites.sh`, below).
+- `superlibrary.dev` and `docs.superlibrary.dev` deploy automatically on merge to main (`.github/workflows/sites.yml` runs `scripts/deploy-sites.sh`, below).
 
 ## Run it locally
 
@@ -130,7 +130,7 @@ Notes:
 
 - `landing/` is [superlibrary.dev](https://superlibrary.dev); `docs-site/` is [docs.superlibrary.dev](https://docs.superlibrary.dev) (Starlight, with `/llms.txt`).
 - Both are plain Astro with their own npm lockfiles, outside the pnpm workspace. `npm ci && npm run dev` in either.
-- `scripts/deploy-sites.sh [landing|docs|all]` builds and deploys them as Cloudflare Workers with static assets, from the operator's machine with an existing `wrangler login`. Each `wrangler.jsonc` declares its custom domain.
+- `scripts/deploy-sites.sh [landing|docs|all]` builds and deploys them as Cloudflare Workers with static assets, CI runs it on merge to main with the organisation's `CLOUDFLARE_API_TOKEN`; it also runs by hand with a `wrangler login`. Each `wrangler.jsonc` declares its custom domain.
 - `node scripts/check-docs-claims.mjs` fails when a page names an `/api/v1` route or MCP tool that `apps/api` does not define, or a docs page lacks its title or description. CI runs it with the docs build.
 - Public claims follow the SuperLibrary section of sjl-marketing's claims ledger (`foundation/products.md`, SL-01 onward).
 
