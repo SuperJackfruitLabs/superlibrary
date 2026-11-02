@@ -26,7 +26,7 @@ async function signIn(tokens = { access_token: "at1", expires_in: 300, refresh_t
   resetPageLoadState(); // the plane sends the browser back: /auth/callback is a new page load
   await completeSignIn(new URLSearchParams({ code: "c", state }), PLANE, {
     origin: ORIGIN, now: () => 0,
-    fetchFn: (async () => json(200, tokens)) as never,
+    fetchFn: (async () => json(200, tokens)),
   });
 }
 
@@ -110,7 +110,7 @@ describe("authorization code + PKCE", () => {
     const state = new URL(went).searchParams.get("state")!;
     await completeSignIn(new URLSearchParams({ code: "c", state }), PLANE, {
       origin: ORIGIN, now: () => 0,
-      fetchFn: (async () => json(200, { access_token: "at1", expires_in: 300, refresh_token: "rt1" })) as never,
+      fetchFn: (async () => json(200, { access_token: "at1", expires_in: 300, refresh_token: "rt1" })),
     });
     const refresh = vi.fn(async (_u: string, init?: RequestInit) => {
       const body = new URLSearchParams(String(init!.body));
@@ -132,7 +132,7 @@ describe("authorization code + PKCE", () => {
     const state = new URL(went).searchParams.get("state")!;
     await completeSignIn(new URLSearchParams({ code: "c", state }), PLANE, {
       origin: ORIGIN, now: () => 0,
-      fetchFn: (async () => json(200, { access_token: "at1", expires_in: 300, refresh_token: "rt1" })) as never,
+      fetchFn: (async () => json(200, { access_token: "at1", expires_in: 300, refresh_token: "rt1" })),
     });
     const refresh = vi.fn(async () => json(200, { access_token: "at2", expires_in: 300, refresh_token: "rt2" }));
     const opts = { now: () => 290_000, fetchFn: refresh as never };
@@ -147,9 +147,9 @@ describe("authorization code + PKCE", () => {
     const state = new URL(went).searchParams.get("state")!;
     await completeSignIn(new URLSearchParams({ code: "c", state }), PLANE, {
       origin: ORIGIN, now: () => 0,
-      fetchFn: (async () => json(200, { access_token: "at1", expires_in: 300, refresh_token: "rt1" })) as never,
+      fetchFn: (async () => json(200, { access_token: "at1", expires_in: 300, refresh_token: "rt1" })),
     });
-    expect(await planeAccessToken(PLANE, { now: () => 290_000, fetchFn: (async () => json(400, { error: "invalid_grant" })) as never })).toBeNull();
+    expect(await planeAccessToken(PLANE, { now: () => 290_000, fetchFn: (async () => json(400, { error: "invalid_grant" })) })).toBeNull();
     expect(await planeAccessToken(PLANE, { now: () => 0 })).toBeNull();
   });
 
@@ -173,7 +173,7 @@ describe("only one sign-in redirect per page", () => {
       beginSignIn(PLANE, { returnTo: "/settings", origin: ORIGIN, navigate }),
     ]);
     expect(went).toHaveLength(1);
-    const state = new URL(went[0]!).searchParams.get("state");
+    const state = new URL(went[0]).searchParams.get("state");
     expect(JSON.parse(sessionStorage.getItem("superlibrary.pkce")!).state).toBe(state);
   });
 
@@ -185,9 +185,9 @@ describe("only one sign-in redirect per page", () => {
     await vi.waitFor(() => expect(went.length).toBeGreaterThan(0));
     await new Promise((r) => setTimeout(r, 20));
     expect(went).toHaveLength(1);
-    const state = new URL(went[0]!).searchParams.get("state")!;
+    const state = new URL(went[0]).searchParams.get("state")!;
     const fetchFn = vi.fn(async () => json(200, { access_token: "at1", expires_in: 300, refresh_token: "rt1" }));
-    const out = await completeSignIn(new URLSearchParams({ code: "c", state }), PLANE, { origin: ORIGIN, fetchFn: fetchFn as never, now: () => 0 });
+    const out = await completeSignIn(new URLSearchParams({ code: "c", state }), PLANE, { origin: ORIGIN, fetchFn: fetchFn, now: () => 0 });
     expect(out).toEqual({ returnTo: "/settings" });
   });
 });
@@ -203,7 +203,7 @@ describe("a 401 during sign-in does not abandon it", () => {
     signOutLocal(); // a pane's 401 while the redirect is under way
     const state = new URL(went).searchParams.get("state")!;
     const fetchFn = vi.fn(async () => json(200, { access_token: "at1", expires_in: 300, refresh_token: "rt1" }));
-    const out = await completeSignIn(new URLSearchParams({ code: "c", state }), PLANE, { origin: ORIGIN, fetchFn: fetchFn as never, now: () => 0 });
+    const out = await completeSignIn(new URLSearchParams({ code: "c", state }), PLANE, { origin: ORIGIN, fetchFn: fetchFn, now: () => 0 });
     expect(out).toEqual({ returnTo: "/" });
   });
 
@@ -239,7 +239,7 @@ describe("autoSignIn (the layout's guard, for a visitor with no token)", () => {
 
   test("after an explicit sign-out in this browser it does not: /login is shown", async () => {
     await signIn();
-    await signOut(PLANE, { fetchFn: (async () => json(404, {})) as never });
+    await signOut(PLANE, { fetchFn: (async () => json(404, {})) });
     expect(localStorage.getItem("superlibrary.planeSignedOut")).toBe("1");
     resetPageLoadState(); // a later page load, or another tab
     const navigate = vi.fn();
@@ -356,24 +356,24 @@ describe("refresh survives a bad network; only a refusal ends the session", () =
     expect(fetchFn).toHaveBeenCalledTimes(1);
     await vi.advanceTimersByTimeAsync(1_000);
     expect(fetchFn).toHaveBeenCalledTimes(2);
-    const body = new URLSearchParams(String(fetchFn.mock.calls[1]![1].body));
+    const body = new URLSearchParams(String(fetchFn.mock.calls[1][1].body));
     expect(body.get("refresh_token")).toBe("rt1");
     expect(await planeAccessToken(PLANE, { now })).toBe("at2");
   });
 
   test("a 5xx is transient too", async () => {
     await signIn();
-    expect(await planeAccessToken(PLANE, { now: () => 290_000, fetchFn: (async () => json(503, {})) as never })).toBe("at1");
+    expect(await planeAccessToken(PLANE, { now: () => 290_000, fetchFn: (async () => json(503, {})) })).toBe("at1");
     expect(hasTokens()).toBe(true);
   });
 
   test("an expired token with the network down answers null but keeps the refresh token for later", async () => {
     await signIn();
-    expect(await planeAccessToken(PLANE, { now: () => 400_000, fetchFn: (async () => { throw new TypeError("offline"); }) as never })).toBeNull();
+    expect(await planeAccessToken(PLANE, { now: () => 400_000, fetchFn: (async () => { throw new TypeError("offline"); }) })).toBeNull();
     expect(hasTokens()).toBe(true);
     // An expired token is refreshed at once, backoff or not: the caller has nothing else to send.
     const ok = vi.fn(async () => json(200, { access_token: "at2", expires_in: 300, refresh_token: "rt2" }));
-    expect(await planeAccessToken(PLANE, { now: () => 400_500, fetchFn: ok as never })).toBe("at2"); // inside the 1 s backoff
+    expect(await planeAccessToken(PLANE, { now: () => 400_500, fetchFn: ok })).toBe("at2"); // inside the 1 s backoff
   });
 
   for (const [status, error] of [[400, "invalid_grant"], [401, "invalid_client"]] as const) {
@@ -381,7 +381,7 @@ describe("refresh survives a bad network; only a refusal ends the session", () =
       vi.useFakeTimers();
       await signIn();
       const fetchFn = vi.fn(async () => json(status, { error }));
-      expect(await planeAccessToken(PLANE, { now: () => 290_000, fetchFn: fetchFn as never })).toBeNull();
+      expect(await planeAccessToken(PLANE, { now: () => 290_000, fetchFn: fetchFn })).toBeNull();
       expect(hasTokens()).toBe(false);
       await vi.advanceTimersByTimeAsync(120_000);
       expect(fetchFn).toHaveBeenCalledTimes(1);
@@ -394,9 +394,9 @@ describe("refresh survives a bad network; only a refusal ends the session", () =
       vi.useFakeTimers();
       await signIn();
       const now = () => 290_000;
-      expect(await planeAccessToken(PLANE, { now, fetchFn: (async () => { throw new TypeError("offline"); }) as never })).toBe("at1");
+      expect(await planeAccessToken(PLANE, { now, fetchFn: (async () => { throw new TypeError("offline"); }) })).toBe("at1");
       const fetchFn = vi.fn(async () => json(200, { access_token: "at2", expires_in: 300, refresh_token: "rt2" }));
-      const stop = watchSession(() => PLANE, { target: window, now, fetchFn: fetchFn as never });
+      const stop = watchSession(() => PLANE, { target: window, now, fetchFn: fetchFn });
       try {
         (event === "online" ? window : document).dispatchEvent(new Event(event));
         await vi.advanceTimersByTimeAsync(0); // well inside the 1 s backoff
@@ -467,7 +467,7 @@ describe("signOut", () => {
     const state = new URL(went).searchParams.get("state")!;
     await completeSignIn(new URLSearchParams({ code: "c", state }), PLANE, {
       origin: ORIGIN, now: () => 0,
-      fetchFn: (async () => json(200, { access_token: "at1", expires_in: 300, refresh_token: "rt1" })) as never,
+      fetchFn: (async () => json(200, { access_token: "at1", expires_in: 300, refresh_token: "rt1" })),
     });
   }
 
@@ -486,7 +486,7 @@ describe("signOut", () => {
       "https://accounts.test/.well-known/oauth-authorization-server",
       "https://accounts.test/api/auth/oauth2/revoke",
     ]);
-    const body = new URLSearchParams(calls[1]!.body!);
+    const body = new URLSearchParams(calls[1].body!);
     expect(Object.fromEntries(body)).toEqual({ token: "rt1", token_type_hint: "refresh_token", client_id: "superlibrary-web" });
     expect(await planeAccessToken(PLANE, { now: () => 0 })).toBeNull();
     expect(userSignedOut()).toBe(true); // the person chose it: no silent sign-in straight back
@@ -494,7 +494,7 @@ describe("signOut", () => {
 
   test("memory is cleared even when the plane is unreachable", async () => {
     await signedIn();
-    await signOut(PLANE, { fetchFn: (async () => { throw new TypeError("offline"); }) as never });
+    await signOut(PLANE, { fetchFn: (async () => { throw new TypeError("offline"); }) });
     expect(await planeAccessToken(PLANE, { now: () => 0 })).toBeNull();
   });
 
@@ -513,8 +513,8 @@ describe("signOut", () => {
     await signedIn();
     let finish!: (r: Response) => void;
     const slow = vi.fn(() => new Promise<Response>((r) => (finish = r)));
-    const pending = planeAccessToken(PLANE, { now: () => 290_000, fetchFn: slow as never });
-    await signOut(PLANE, { fetchFn: (async () => json(404, {})) as never });
+    const pending = planeAccessToken(PLANE, { now: () => 290_000, fetchFn: slow });
+    await signOut(PLANE, { fetchFn: (async () => json(404, {})) });
     finish(json(200, { access_token: "at2", expires_in: 300, refresh_token: "rt2" }));
     await pending;
     expect(await planeAccessToken(PLANE, { now: () => 0 })).toBeNull();

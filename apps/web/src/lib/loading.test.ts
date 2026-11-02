@@ -37,7 +37,7 @@ describe('boot words', () => {
 describe('withReadTimeout', () => {
   it('gives a read a 20 s deadline and leaves writes alone', async () => {
     const seen: (AbortSignal | null | undefined)[] = [];
-    const f = withReadTimeout((async (_u: unknown, init?: RequestInit) => { seen.push(init?.signal); return new Response('{}'); }) as typeof fetch);
+    const f = withReadTimeout((async (_u: unknown, init?: RequestInit) => { seen.push(init?.signal); return new Response('{}'); }));
     await f('/api/v1/me');
     await f('/api/v1/items', { method: 'POST', body: '{}' });
     expect(seen[0]).toBeInstanceOf(AbortSignal);
@@ -45,13 +45,13 @@ describe('withReadTimeout', () => {
     expect(REQUEST_TIMEOUT_MS).toBe(20_000);
   });
   it('a read that never answers is aborted', async () => {
-    const never = withReadTimeout(((_u: unknown, init?: RequestInit) => new Promise<Response>((_, reject) => init?.signal?.addEventListener('abort', () => reject(init.signal!.reason)))) as typeof fetch, 30);
+    const never = withReadTimeout(((_u: unknown, init?: RequestInit) => new Promise<Response>((_, reject) => init?.signal?.addEventListener('abort', () => reject(init.signal!.reason)))), 30);
     await expect(never('/api/v1/me')).rejects.toThrow();
   });
   it('keeps a signal the caller gave', async () => {
     const own = new AbortController().signal;
     let got: AbortSignal | null | undefined;
-    await withReadTimeout((async (_u: unknown, init?: RequestInit) => { got = init?.signal; return new Response(''); }) as typeof fetch)('/x', { signal: own });
+    await withReadTimeout((async (_u: unknown, init?: RequestInit) => { got = init?.signal; return new Response(''); }))('/x', { signal: own });
     expect(got).toBe(own);
   });
 });

@@ -118,7 +118,7 @@ describe('the item page model', () => {
     const b = document.createElement('div');
     m.viewer(b);
     await settle();
-    expect(mounts[0]!.destroyed).toBe(true);
+    expect(mounts[0].destroyed).toBe(true);
     expect(mounts.map((x) => x.el)).toEqual([a, b]);
   });
 
@@ -160,7 +160,7 @@ describe('the viewer is mounted once at a time', () => {
     await settle();
     await m.pick(1, new MouseEvent('click', { cancelable: true }));
     expect(mounts).toHaveLength(1);
-    expect(mounts[0]!.version).toEqual([1]);
+    expect(mounts[0].version).toEqual([1]);
     expect(m.shown).toBe(1);
   });
 
@@ -176,7 +176,7 @@ describe('the viewer is mounted once at a time', () => {
     await settle();
     expect(mounts).toHaveLength(3);
     expect(live()).toHaveLength(1);
-    expect(mounts[2]!.destroyed).toBe(false);
+    expect(mounts[2].destroyed).toBe(false);
   });
 
   it('a layout that attaches a new element before the old one detaches still leaves one embed', async () => {
@@ -206,7 +206,7 @@ describe('the viewer is mounted once at a time', () => {
     stop = null;
     release();
     await settle();
-    expect(mounts[0]!.destroyed).toBe(true);
+    expect(mounts[0].destroyed).toBe(true);
   });
 
   it('a mount pending when the element is replaced is destroyed, and only the new one lives', async () => {
@@ -224,7 +224,7 @@ describe('the viewer is mounted once at a time', () => {
     release();
     await settle();
     expect(mounts.map((x) => x.destroyed)).toEqual([true, false]);
-    expect(mounts[1]!.el).toBe(b);
+    expect(mounts[1].el).toBe(b);
   });
 });
 

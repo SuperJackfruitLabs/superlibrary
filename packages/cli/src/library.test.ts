@@ -71,7 +71,7 @@ describe('terminal safety (P4-C22)', () => {
     const lines = resultLines([r]);
     expect(lines).toHaveLength(2);
     lines.forEach(clean);
-    const col = { ...COLS.collections[0]!, name: EVIL, description: EVIL };
+    const col = { ...COLS.collections[0], name: EVIL, description: EVIL };
     clean(collectionLines([col])); clean(createdLine(col));
     const d = detailLines({ ...col, entries: [{ item: { id: 'i', outcome: 'approved', title: EVIL }, addedBy: 'p', addedAt: 't', note: null }] } as never);
     expect(d.split('\n')).toHaveLength(3);

@@ -540,20 +540,20 @@ describe('(7) Files', () => {
     toggle.click();
     expect(files().map((b) => b.querySelector('.sl-file-path')!.textContent)).toEqual(['index.html', 'a/notes.md', 'a/pic.png', 'data.csv']);
     expect(files().map((b) => b.querySelector('.sl-file-size')!.textContent)).toEqual(['900 B', '2.0 KB', '48.8 KB', '10 B']);
-    expect(files()[0]!.getAttribute('aria-current')).toBe('true');
+    expect(files()[0].getAttribute('aria-current')).toBe('true');
   });
 
   it('selecting a file opens it in the frame through /_view?path=, and the entry again without it', async () => {
     const m = await folder();
     q<HTMLButtonElement>('button.sl-files-toggle')!.click();
-    files()[1]!.click();
+    files()[1].click();
     await flush();
     expect(m.iframe.getAttribute('src')).toBe(`${ORIGIN}/_view?sig=T&path=a%2Fnotes.md`);
-    expect(files()[1]!.getAttribute('aria-current')).toBe('true');
-    expect(files()[0]!.hasAttribute('aria-current')).toBe(false);
+    expect(files()[1].getAttribute('aria-current')).toBe('true');
+    expect(files()[0].hasAttribute('aria-current')).toBe(false);
     expect(q('.sl-files-panel')!.hidden).toBe(true);
     q<HTMLButtonElement>('button.sl-files-toggle')!.click();
-    files()[0]!.click();
+    files()[0].click();
     await flush();
     expect(m.iframe.getAttribute('src')).toBe(`${ORIGIN}/_view?sig=T`);
   });
@@ -562,7 +562,7 @@ describe('(7) Files', () => {
     const m = await folder();
     post({ type: 'superlibrary:resize', height: 3000 }, m.iframe.contentWindow);
     q<HTMLButtonElement>('button.sl-files-toggle')!.click();
-    files()[1]!.click();
+    files()[1].click();
     await flush();
     expect(m.iframe.style.height).toBe('480px');
   });
@@ -572,7 +572,7 @@ describe('(7) Files', () => {
     const m = await folder({ getEmbedUrl });
     vi.setSystemTime(new Date('2026-10-09T00:06:00.000Z'));
     q<HTMLButtonElement>('button.sl-files-toggle')!.click();
-    files()[3]!.click();
+    files()[3].click();
     await flush();
     expect(getEmbedUrl).toHaveBeenLastCalledWith({ itemId: ITEM, version: 3 });
     expect(m.iframe.getAttribute('src')).toBe(`${ORIGIN}/_view?sig=F&path=data.csv`);
@@ -582,7 +582,7 @@ describe('(7) Files', () => {
     localStorage.setItem('superlibrary:theme', 'dark');
     const m = await folder();
     q<HTMLButtonElement>('button.sl-files-toggle')!.click();
-    files()[3]!.click();
+    files()[3].click();
     await flush();
     expect(src(m).searchParams.get('path')).toBe('data.csv');
     expect(src(m).searchParams.get('theme')).toBe('dark');
@@ -615,11 +615,11 @@ describe('(8) View source', () => {
   it('follows the file chosen in Files, and shows the chosen file\'s source', async () => {
     const m = await mount({ getEmbedUrl: async () => FOLDER });
     q<HTMLButtonElement>('button.sl-files-toggle')!.click();
-    el.querySelectorAll<HTMLButtonElement>('button.sl-file')[2]!.click();
+    el.querySelectorAll<HTMLButtonElement>('button.sl-file')[2].click();
     await flush();
     expect(source()).toBeNull();
     q<HTMLButtonElement>('button.sl-files-toggle')!.click();
-    el.querySelectorAll<HTMLButtonElement>('button.sl-file')[3]!.click();
+    el.querySelectorAll<HTMLButtonElement>('button.sl-file')[3].click();
     await flush();
     source()!.click();
     await flush();
@@ -712,7 +712,7 @@ describe('PR 3 review: an expired URL is minted again', () => {
     const getEmbedUrl = vi.fn(async ({ version }: { version?: number }) => (version === undefined ? FOLDER : later));
     const m = await mount({ getEmbedUrl });
     q<HTMLButtonElement>('button.sl-files-toggle')!.click();
-    el.querySelectorAll<HTMLButtonElement>('button.sl-file')[3]!.click();
+    el.querySelectorAll<HTMLButtonElement>('button.sl-file')[3].click();
     await flush();
     q<HTMLButtonElement>('button.sl-source')!.click();
     await flush();
@@ -844,7 +844,7 @@ describe('PR 3 review: the last version chosen wins', () => {
     const m = await mount({ getEmbedUrl, getVersions: async () => [3, 2] });
     vi.setSystemTime(new Date('2026-10-09T00:04:55.000Z'));
     q<HTMLButtonElement>('button.sl-files-toggle')!.click();
-    el.querySelectorAll<HTMLButtonElement>('button.sl-file')[1]!.click();
+    el.querySelectorAll<HTMLButtonElement>('button.sl-file')[1].click();
     await m.setVersion(2);
     slow.resolve({ ...FOLDER, url: `${ORIGIN}/_view?sig=OLD` });
     await flush();
@@ -901,7 +901,7 @@ describe('the toolbar on phones (operator review of phase 1): every control keep
     expect(panel().hidden).toBe(true);
     more().click();
     expect(more().getAttribute('aria-expanded')).toBe('true');
-    const words = [...panel().querySelectorAll<HTMLElement>('button, a, label')].map((c) => c.textContent!.trim());
+    const words = [...panel().querySelectorAll<HTMLElement>('button, a, label')].map((c) => c.textContent.trim());
     expect(words).toEqual(['Files (4)', 'View source', expect.stringContaining('Theme'), 'Open in new window']);
     for (const s of ['.sl-files-toggle', '.sl-source', '.sl-theme-menu', '.sl-open']) expect(q(s)!.classList.contains('sl-secondary'), s).toBe(true);
     for (const s of ['.sl-version-menu', '.sl-fullscreen', '.sl-share-toggle']) expect(q(s)!.classList.contains('sl-secondary'), s).toBe(false);
@@ -927,7 +927,7 @@ describe('the toolbar on phones (operator review of phase 1): every control keep
   });
   it('labels are never hidden at narrow widths, and the host may set the colours and face', async () => {
     await mount();
-    const css = document.getElementById('sl-embed-style')!.textContent!;
+    const css = document.getElementById('sl-embed-style')!.textContent;
     expect(css).not.toMatch(/\.sl-toolbar \.sl-label\{position:absolute/);
     expect(css).toMatch(/@container \(max-width:640px\)\{[^}]*\.sl-toolbar \.sl-secondary\{display:none\}/);
     for (const n of ['bg', 'fg', 'muted', 'line', 'hover', 'accent', 'accent-content', 'danger']) {
@@ -938,7 +938,7 @@ describe('the toolbar on phones (operator review of phase 1): every control keep
   });
   it('More items are at least 16px (no iOS zoom), show focus, and focus returns to More after an item runs', async () => {
     const m = await mount();
-    const css = document.getElementById('sl-embed-style')!.textContent!;
+    const css = document.getElementById('sl-embed-style')!.textContent;
     expect(css).toMatch(/\.sl-more-field select\{[^}]*font-size:max\(16px,1em\)/);
     expect(css).toContain('.sl-more-item:focus-visible');
     expect(css).toContain('.sl-more-field select:focus-visible');
@@ -986,7 +986,7 @@ describe('the toolbar on phones (operator review of phase 1): every control keep
   });
   it('the More panel is shown only inside the narrow container, and native selects are 16px', async () => {
     await mount();
-    const css = document.getElementById('sl-embed-style')!.textContent!;
+    const css = document.getElementById('sl-embed-style')!.textContent;
     expect(css).toMatch(/\.sl-more-panel\{display:none!important\}/);
     expect(css).toMatch(/@container \(max-width:640px\)\{[^]*\.sl-more-panel:not\(\[hidden\]\)\{display:flex!important\}/);
     expect(css).toMatch(/\.sl-select select\{[^}]*font-size:max\(16px,1em\)/);

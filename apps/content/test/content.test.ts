@@ -12,7 +12,7 @@ beforeAll(async () => {
   pair = (await crypto.subtle.generateKey({ name: 'Ed25519' }, true, ['sign', 'verify'])) as CryptoKeyPair;
   PUB = JSON.stringify(await crypto.subtle.exportKey('jwk', pair.publicKey));
 });
-const testEnv = (o: Partial<Env> = {}) => ({ ...env, URL_SIGNING_PUBLIC_KEY: PUB, ...o }) as unknown as Env;
+const testEnv = (o: Partial<Env> = {}) => ({ ...env, URL_SIGNING_PUBLIC_KEY: PUB, ...o });
 
 async function token(itemId: string, version: number, o: { exp?: number; host?: string; key?: CryptoKey } = {}) {
   const exp = o.exp ?? Math.floor(Date.now() / 1000) + 300;
@@ -38,7 +38,7 @@ async function seed(itemId: string, version: number, files: Record<string, Seed>
 const req = (url: string, init?: RequestInit) => new Request(url, init) as Parameters<typeof worker.fetch>[0];
 const get = (itemId: string, pathAndQuery: string, init?: RequestInit, e: Env = testEnv()) =>
   worker.fetch(req(`https://${contentLabel(itemId)}.content.test${pathAndQuery}`, init), e, createExecutionContext());
-const dataOf = (html: string) => JSON.parse(/<script id="sl-data" type="application\/json">(.*?)<\/script>/s.exec(html)![1]!);
+const dataOf = (html: string) => JSON.parse(/<script id="sl-data" type="application\/json">(.*?)<\/script>/s.exec(html)![1]);
 
 const MD = { body: '# Hi\n', mediaType: 'text/markdown; charset=utf-8', view: 'markdown' as const };
 const HTML = { body: '<!doctype html><link rel="stylesheet" href="style.css"><p>app</p>', mediaType: 'text/html; charset=utf-8', view: 'html' as const };
@@ -207,7 +207,7 @@ describe('signed URLs', () => {
       expect(res.headers.get('cross-origin-resource-policy'), name).toBe('same-site');
       expect(res.headers.get('x-content-type-options'), name).toBe('nosniff');
       const html = await res.text();
-      expect(JSON.parse(/<script id="sl-expired" type="application\/json">(.*?)<\/script>/s.exec(html)![1]!), name).toEqual({ host: APP, path });
+      expect(JSON.parse(/<script id="sl-expired" type="application\/json">(.*?)<\/script>/s.exec(html)![1]), name).toEqual({ host: APP, path });
       expect(html, name).toContain('<script type="module" src="/_viewer/expired.js"></script>');
       expect(html, name).not.toMatch(/<script>/);
     }

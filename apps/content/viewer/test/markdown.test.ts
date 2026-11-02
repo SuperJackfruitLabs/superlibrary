@@ -41,7 +41,7 @@ describe('markdown details', () => {
 
   it('leaves absolute and above-the-root images as written, and escapes a block in an unknown language', async () => {
     const el = document.createElement('main');
-    await renderMarkdown(el, { ...base, text: '![a](https://cdn.jsdelivr.net/x.png) ![b](../../up.png)\n\n```nolang\n<b>x</b>\n```\n' } as ViewerData);
+    await renderMarkdown(el, { ...base, text: '![a](https://cdn.jsdelivr.net/x.png) ![b](../../up.png)\n\n```nolang\n<b>x</b>\n```\n' });
     const srcs = [...el.querySelectorAll('img')].map((i) => i.getAttribute('src'));
     expect(srcs).toEqual(['https://cdn.jsdelivr.net/x.png', '../../up.png']);
     expect(el.querySelector('pre code b')).toBeNull();
@@ -50,7 +50,7 @@ describe('markdown details', () => {
 
   it('a Mermaid block that cannot be drawn stays as source with the reason; the rest of the document shows', async () => {
     const el = document.createElement('main');
-    await renderMarkdown(el, { ...base, text: '# Doc\n\n```mermaid\nnot a diagram at all\n```\n\nafter\n' } as ViewerData);
+    await renderMarkdown(el, { ...base, text: '# Doc\n\n```mermaid\nnot a diagram at all\n```\n\nafter\n' });
     expect(el.querySelector('h1')!.textContent).toBe('Doc');
     expect(el.querySelector('.note')!.textContent).toMatch(/^This diagram could not be drawn: /);
     expect(el.querySelector('pre code.language-mermaid')!.textContent).toBe('not a diagram at all\n');

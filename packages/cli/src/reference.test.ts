@@ -22,11 +22,11 @@ function arms(): Array<{ verbs: string[]; subs: Set<string>; flags: Set<string> 
   const body = source.slice(start, end);
   const runs = [...body.matchAll(/((?:^ {4}case [^\n]+:[^\n]*\n)+)/gm)];
   return runs.map((m, i) => {
-    const text = body.slice(m.index! + m[0].length, i + 1 < runs.length ? runs[i + 1]!.index : body.length);
+    const text = body.slice(m.index + m[0].length, i + 1 < runs.length ? runs[i + 1].index : body.length);
     return {
-      verbs: [...m[1]!.matchAll(/case "([^"]+)":/g)].map((x) => x[1]!),
-      subs: new Set([...text.matchAll(/\bsub [!=]== "([a-z-]+)"/g)].map((x) => x[1]!)),
-      flags: new Set([...text.matchAll(/(?:\bflags?\(rest, |rest\.includes\()"(--[a-z-]+)"/g)].map((x) => x[1]!)),
+      verbs: [...m[1].matchAll(/case "([^"]+)":/g)].map((x) => x[1]),
+      subs: new Set([...text.matchAll(/\bsub [!=]== "([a-z-]+)"/g)].map((x) => x[1])),
+      flags: new Set([...text.matchAll(/(?:\bflags?\(rest, |rest\.includes\()"(--[a-z-]+)"/g)].map((x) => x[1])),
     };
   });
 }
@@ -74,8 +74,8 @@ describe('the command table matches the switch', () => {
     const names = new Set<string>();
     for (const f of readdirSync(SRC).filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'))) {
       const text = readFileSync(join(SRC, f), 'utf8');
-      for (const m of text.matchAll(/export const ENV_[A-Z_]+ = "([A-Z_]+)"/g)) names.add(m[1]!);
-      for (const m of text.matchAll(/process\.env\.([A-Z_]+)/g)) names.add(m[1]!);
+      for (const m of text.matchAll(/export const ENV_[A-Z_]+ = "([A-Z_]+)"/g)) names.add(m[1]);
+      for (const m of text.matchAll(/process\.env\.([A-Z_]+)/g)) names.add(m[1]);
     }
     expect(ENV_VARS.map((e) => e.name).sort()).toEqual([...names].sort());
   });

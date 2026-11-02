@@ -65,7 +65,7 @@ describe('rows', () => {
     expect(rowOfItem(i, boards)).toMatchObject({ line: 'Work record · Marketing & Community', snippet: null });
   });
   it('an empty station name falls back to the station id, and an empty one to nothing', () => {
-    const p = (stationName: string, station?: string) => rowOfResult({ ...r, provenance: { ...r.provenance, stationName, station } } as SearchResult, boards).station;
+    const p = (stationName: string, station?: string) => rowOfResult({ ...r, provenance: { ...r.provenance, stationName, station } }, boards).station;
     expect(p('', 'stn_1')).toBe('stn_1');
     expect(p('', undefined)).toBeNull();
   });

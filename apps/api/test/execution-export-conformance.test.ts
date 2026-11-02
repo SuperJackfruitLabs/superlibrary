@@ -22,8 +22,8 @@ function canonical(value: unknown): string {
 async function bundle(raw = canonical({ kind: 'workspace.patch', result: 'produced', patch: 'hello → नमस्ते\n' })) {
   const sha256 = await sha256Hex(raw);
   const evidence = structuredClone(evidenceFixture);
-  evidence.artifacts[0]!.digest = sha256;
-  evidence.artifacts[0]!.bytes = bytes(raw);
+  evidence.artifacts[0].digest = sha256;
+  evidence.artifacts[0].bytes = bytes(raw);
   const artifact = { artifact_id: ARTIFACT_ID, session_id: evidence.task.session_id, path: ARTIFACT_PATH, sha256, bytes: bytes(raw), disposition: 'produced' };
   return [
     { path: ENTRY, body: canonical({ schema_version: 'agentpod-execution-manifest/v1', evidence, artifact_files: [artifact] }) },
@@ -81,7 +81,7 @@ describe('M23 AgentPod immutable execution bundle: real Library upload and signe
     const changed = await upload(await bundle(canonical({ result: 'new version' })), { item: saved.body.itemId, entry: ENTRY });
     expect(changed.body.version).toBe(2);
     // The old version grant still retrieves its exact original bytes after a new version exists.
-    expect(await (await contentGet(downloadUrl(url, ARTIFACT_PATH))).text()).toBe(files[1]!.body);
+    expect(await (await contentGet(downloadUrl(url, ARTIFACT_PATH))).text()).toBe(files[1].body);
     const wrongItem = new URL(downloadUrl(url, ARTIFACT_PATH));
     wrongItem.hostname = `${contentLabel('itm_00000000000000ff')}.content.test`;
     expect((await contentGet(wrongItem.href)).status).toBe(403);
@@ -114,7 +114,7 @@ describe('M23 AgentPod immutable execution bundle: real Library upload and signe
     try {
       expect((await commit(pending.uploadId)).status).toBe(500);
       expect(put).toHaveBeenCalledTimes(1);
-      expect(put.mock.calls[0]![0]).toMatch(/^manifests\/itm_[0-9a-f]{16}\/1\.json$/);
+      expect(put.mock.calls[0][0]).toMatch(/^manifests\/itm_[0-9a-f]{16}\/1\.json$/);
     } finally {
       put.mockRestore();
     }
@@ -138,7 +138,7 @@ describe('M23 AgentPod immutable execution bundle: real Library upload and signe
       const pending = await upload(files, { headers: owner, scope: 'board:brd_00000000000000b1', entry: ENTRY, commit: false });
       expect(pending.status).toBe(200);
       for (const headers of [otherPerson, otherTenant]) {
-        expect((await SELF.fetch(`${API}/api/v1/uploads/${pending.uploadId}/files?path=${encodeURIComponent(ARTIFACT_PATH)}`, { method: 'PUT', headers, body: files[1]!.body })).status).toBe(404);
+        expect((await SELF.fetch(`${API}/api/v1/uploads/${pending.uploadId}/files?path=${encodeURIComponent(ARTIFACT_PATH)}`, { method: 'PUT', headers, body: files[1].body })).status).toBe(404);
         expect((await commit(pending.uploadId, headers)).status).toBe(404);
       }
       const saved = await commit(pending.uploadId, owner);
@@ -163,11 +163,11 @@ describe('M23 AgentPod immutable execution bundle: real Library upload and signe
     const refused = await upload(files, { entry: ENTRY });
     expect(refused.status).toBe(422);
     expect(refused.body).toEqual({ error: 'secret_found', findings: [{ path: ARTIFACT_PATH, line: 1, rule: 'github-token' }] });
-    const hash = await sha256Hex(files[1]!.body);
+    const hash = await sha256Hex(files[1].body);
     expect(await env.BLOBS.head(`blobs/${hash}`)).toBeNull();
     expect(await env.BLOBS.head(`quarantine/${refused.uploadId}/${hash}`)).not.toBeNull();
     expect(await env.DB.prepare('SELECT COUNT(*) AS n FROM version_files WHERE sha256 = ?').bind(hash).first()).toEqual({ n: 0 });
-    expect(files[1]!.body).toContain(synthetic);
-    expect(files[0]!.body).not.toContain(synthetic);
+    expect(files[1].body).toContain(synthetic);
+    expect(files[0].body).not.toContain(synthetic);
   });
 });

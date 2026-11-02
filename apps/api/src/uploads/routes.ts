@@ -43,7 +43,7 @@ function defaultEntry(paths: string[]): string {
   const depth = (p: string) => p.split('/').length;
   const shallowest = (name: string) =>
     sorted.filter((p) => p.split('/').pop()!.toLowerCase() === name).sort((a, b) => depth(a) - depth(b))[0];
-  return shallowest('index.html') ?? shallowest('readme.md') ?? sorted[0]!;
+  return shallowest('index.html') ?? shallowest('readme.md') ?? sorted[0];
 }
 
 const refusePath = (c: { path: string; reason: string; rule?: string }) =>
@@ -149,7 +149,7 @@ async function heldBy(env: Env, p: Uploader, shas: string[]): Promise<Set<string
 export async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
   const out = new Array<R>(items.length);
   let next = 0;
-  const worker = async () => { while (next < items.length) { const i = next++; out[i] = await fn(items[i]!); } };
+  const worker = async () => { while (next < items.length) { const i = next++; out[i] = await fn(items[i]); } };
   await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
   return out;
 }
@@ -343,7 +343,7 @@ async function batch(request: Request, env: Env, p: Uploader, id: string): Promi
   const bodies = await Promise.all((parts as unknown as Blob[]).map(async (b) => new Uint8Array(await b.arrayBuffer())));
   if (bodies.reduce((n, b) => n + b.length, 0) > LIMITS.batchBytes) return tooLarge();
   let k = 0;
-  const arrivals: Arrival[] = manifest.files.map((f) => (f.held ? { path: f.path, held: true as const } : { path: f.path, bytes: bodies[k++]! }));
+  const arrivals: Arrival[] = manifest.files.map((f) => (f.held ? { path: f.path, held: true as const } : { path: f.path, bytes: bodies[k++] }));
   const r = await receive(env, p, s, arrivals);
   return r instanceof Response ? r : json({ files: r });
 }
@@ -523,7 +523,7 @@ async function commit(env: Env, p: Uploader, id: string): Promise<Response> {
   const entry = files.find((f) => f.path === s.entry)!;
   // Spec §3: a file is addressed by its SHA-256; a folder by the SHA-256 of its (path, sha256)
   // list sorted by path (SQLite's BINARY order: UTF-8 bytes, which is code point order).
-  const sha256 = files.length === 1 ? files[0]!.sha256 : await sha256Hex(JSON.stringify(files.map((f) => [f.path, f.sha256])));
+  const sha256 = files.length === 1 ? files[0].sha256 : await sha256Hex(JSON.stringify(files.map((f) => [f.path, f.sha256])));
   const totalBytes = files.reduce((n, f) => n + f.bytes, 0);
   const override = findings.length > 0 ? 1 : 0;
   statements.push(

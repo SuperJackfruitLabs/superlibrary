@@ -56,8 +56,8 @@ export async function withOrgPlane<T>(fn: (calls: string[]) => Promise<T>): Prom
     const url = input instanceof Request ? input.url : String(input);
     calls.push(url);
     if (url === PLANE_JWKS) return new Response(jwksBody, { headers: { 'content-type': 'application/json' } });
-    return realFetch(input as RequestInfo, init);
-  }) as typeof fetch;
+    return realFetch(input, init);
+  });
   try {
     return await fn(calls);
   } finally {

@@ -94,7 +94,7 @@ export async function sendFiles(request: SendRequest, uploadId: string, files: S
     let next = 0;
     const worker = async () => {
       while (!failed && next < units.length) {
-        const u = units[next++]!;
+        const u = units[next++];
         const res = u.kind === 'put'
           ? await attempt(() => request(`/api/v1/uploads/${uploadId}/files?path=${encodeURIComponent(u.file.path)}`, { method: 'PUT', body: u.file.bytes }), retries, sleep)
           : await attempt(() => request(`/api/v1/uploads/${uploadId}/batch`, { method: 'POST', body: batchBody(u.files, u.held) }), retries, sleep);

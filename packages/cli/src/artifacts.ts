@@ -1,7 +1,7 @@
 import { lstatSync, readFileSync, readdirSync, realpathSync, statSync } from 'node:fs';
 import { basename, join, relative, resolve, sep } from 'node:path';
 import { createHash } from 'node:crypto';
-import { ITEM_ID, LIMITS, NOTHING_ADDED, checkPath, sendFiles, isTransient, describeRefusal, pathRefusalSentence, refusalSentence, sizeRefusal, type UploadRefusal, type CommitResult, type EmbedGrant } from '@superlibrary/contract';
+import { ITEM_ID, LIMITS, NOTHING_ADDED, checkPath, sendFiles, isTransient, pathRefusalSentence, refusalSentence, sizeRefusal, type UploadRefusal, type CommitResult, type EmbedGrant } from '@superlibrary/contract';
 import { baseUrl, tokenSource, type TokenSource } from './credential.ts';
 import { oneLine } from './args.ts';
 export interface LocalFile { path: string; bytes: Uint8Array }
@@ -85,7 +85,7 @@ export async function refused(res: Response, what: string, shared = false): Prom
   if (body.error === 'product_not_enabled') throw new Error(`Superlibrary is not enabled for workspace ${body.org}. An owner can enable it in the account settings.`);
   const { error = `http_${res.status}`, findings, ...detail } = body;
   const sentence = shared ? refusalSentence({ ok: false, status: res.status, error, findings, detail }) : null;
-  const why = res.status === 400 ? reasonOf(body as { issues?: unknown; detail?: unknown; message?: unknown }) : '';
+  const why = res.status === 400 ? reasonOf(body) : '';
   throw new Error(sentence ?? `${what} was refused (${res.status} ${body.error ?? ''}${body.path ? `: ${body.path}` : ''}${body.rule ? ` matches ${body.rule}` : ''})${why ? `: ${why}` : ''}.`);
 }
 

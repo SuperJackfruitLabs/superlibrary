@@ -12,16 +12,16 @@ describe('chunkText', () => {
     expect(chunks.length).toBeGreaterThan(3);
     for (const c of chunks) expect(c.length).toBeLessThanOrEqual(CHUNK.chars);
     for (let i = 1; i < chunks.length; i++) {
-      const tail = chunks[i - 1]!.slice(-200);
-      expect(chunks[i]!.includes(tail.slice(tail.indexOf(' ') + 1, tail.indexOf(' ') + 60))).toBe(true);
+      const tail = chunks[i - 1].slice(-200);
+      expect(chunks[i].includes(tail.slice(tail.indexOf(' ') + 1, tail.indexOf(' ') + 60))).toBe(true);
     }
   });
   it('overlaps consecutive chunks by about 480 characters (unique words, so a shared tail is real)', () => {
     const text = Array.from({ length: 1500 }, (_, i) => `w${i}`).join(' ');
     const chunks = chunkText(text);
     for (let i = 1; i < chunks.length; i++) {
-      const prev = chunks[i - 1]!;
-      const head = chunks[i]!.split(' ').slice(0, 5).join(' ');
+      const prev = chunks[i - 1];
+      const head = chunks[i].split(' ').slice(0, 5).join(' ');
       const at = prev.lastIndexOf(head);
       expect(at).toBeGreaterThanOrEqual(0);
       const shared = prev.length - at;

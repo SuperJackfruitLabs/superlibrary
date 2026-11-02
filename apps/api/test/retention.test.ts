@@ -135,7 +135,7 @@ describe('retention sweep (spec §12, plan D14)', () => {
     const send = vi.fn();
     const err = vi.spyOn(console, 'error').mockImplementation(() => {});
     const ctl = createScheduledController({ scheduledTime: Date.UTC(2026, 9, 9, 4), cron: '0 4 * * *' });
-    await worker.scheduled!(ctl, { ...env, RETENTION: { send } as unknown as Queue<RetentionMessage> }, createExecutionContext());
+    await worker.scheduled(ctl, { ...env, RETENTION: { send } as unknown as Queue<RetentionMessage> }, createExecutionContext());
     expect(send).not.toHaveBeenCalled();
     expect(err).toHaveBeenCalledWith('no handler for cron', '0 4 * * *');
     err.mockRestore();
@@ -151,11 +151,11 @@ describe('retention sweep (spec §12, plan D14)', () => {
   it('the cron enqueues one sweep; the consumer runs it and acks', async () => {
     const send = vi.fn();
     const ctl = createScheduledController({ scheduledTime: Date.UTC(2026, 9, 9, 3), cron: '0 3 * * *' });
-    await worker.scheduled!(ctl, { ...env, RETENTION: { send } as unknown as Queue<RetentionMessage> }, createExecutionContext());
+    await worker.scheduled(ctl, { ...env, RETENTION: { send } as unknown as Queue<RetentionMessage> }, createExecutionContext());
     expect(send).toHaveBeenCalledWith({ type: 'sweep', at: '2026-10-09T03:00:00.000Z' });
     const batch = createMessageBatch<RetentionMessage>('superlibrary-retention', [{ id: 'm1', timestamp: new Date(), attempts: 1, body: { type: 'sweep', at: '2026-10-09T03:00:00.000Z' } }]);
     const ctx = createExecutionContext();
-    await worker.queue!(batch, env, ctx);
+    await worker.queue(batch, env, ctx);
     expect((await getQueueResult(batch, ctx)).explicitAcks).toEqual(['m1']);
   });
 });

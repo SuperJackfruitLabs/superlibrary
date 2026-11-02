@@ -9,7 +9,7 @@ vi.mock('$lib/session.svelte', () => ({
   session: { me: { principalId: 'prn_000000000000000000a2', org: 'org_1', workspaceId: 'wks_1', role: 'owner' } },
   api: async (path: string, init?: RequestInit) => {
     if (path.endsWith('/remove')) return new Response('{}');
-    const id = /items\/(itm_[0-9a-f]{16})/.exec(path)![1]!;
+    const id = /items\/(itm_[0-9a-f]{16})/.exec(path)![1];
     return Response.json({ item: item(id), versions: [version] });
   },
 }));
@@ -28,7 +28,7 @@ describe('the item page after a removal', () => {
     const props = $state({ itemId: A });
     c = mount(ItemView, { target: document.body, props });
     await settle();
-    [...document.querySelectorAll('button')].find((b) => b.textContent!.trim() === 'Remove from memory')!.click();
+    [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Remove from memory')!.click();
     flushSync();
     const ta = document.querySelector<HTMLTextAreaElement>('[role=alertdialog] textarea')!;
     ta.value = 'posted twice'; ta.dispatchEvent(new Event('input', { bubbles: true })); flushSync();

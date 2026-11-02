@@ -38,7 +38,7 @@ const ORG = /^org_[0-9a-f]{20}$/;
 
 function bearerOf(request: Request): string | null {
   const m = (request.headers.get('Authorization') ?? '').match(/^Bearer\s+(.+)$/i);
-  return m ? m[1]!.trim() : null;
+  return m ? m[1].trim() : null;
 }
 
 function signInRequired(env: Env): Response {

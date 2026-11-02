@@ -40,7 +40,7 @@ describe('the suite shell (operator direction A)', () => {
     expect(menu.hidden).toBe(false);
     expect(menu.textContent).toContain('An owner of this workspace');
     expect(menu.querySelectorAll('input[type=radio]')).toHaveLength(0);
-    const items = [...menu.querySelectorAll('button')].map((b) => b.textContent!.trim());
+    const items = [...menu.querySelectorAll('button')].map((b) => b.textContent.trim());
     expect(items).toEqual(['Appearance', 'Sign out']);
     menu.querySelector<HTMLButtonElement>('button.suite-shell-appearance')!.click(); flushSync();
     expect(onappearance).toHaveBeenCalledWith(btn);

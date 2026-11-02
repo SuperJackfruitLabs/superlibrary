@@ -19,7 +19,7 @@ const realFetch = globalThis.fetch;
 function roster(boards: string[]) {
   bag.ORG_PLANE_URL = 'https://accounts.test';
   bag.SERVICE_CREDENTIALS = JSON.stringify({ [ORG]: 'svc:x' });
-  globalThis.fetch = (async (i: RequestInfo | URL) => (String(i).endsWith('/api/token/service') ? Response.json({ access_token: 't', expires_in: 300 }) : Response.json({ boards }))) as typeof fetch;
+  globalThis.fetch = (async (i: RequestInfo | URL) => (String(i).endsWith('/api/token/service') ? Response.json({ access_token: 't', expires_in: 300 }) : Response.json({ boards })));
 }
 async function seed(id: string, text: string, o: { board?: string; outcome?: string; title?: string } = {}) {
   await seedRecord({ id, text, ws: WS, ...o });
@@ -113,7 +113,7 @@ describe('supersededBy visibility', () => {
     roster(['brd_00000000000000b1']);
     const r = await search(env, agent, { query: 'handbook draft', limit: 10 });
     expect(r.map((x) => x.itemId)).toEqual(['itm_00000000000000c5']);
-    expect(r[0]!.supersededBy).toBeNull();
+    expect(r[0].supersededBy).toBeNull();
   });
 });
 
@@ -152,13 +152,13 @@ describe('queries people type', () => {
     await env.DB.prepare(`INSERT OR REPLACE INTO source_boards (workspace_id, board_id, name, last_seen_at) VALUES (?, 'brd_00000000000000b1', 'B', 't')`).bind(WS).run();
     await seed('itm_00000000000000f1', 'Réunion au café du matin');
     await seed('itm_00000000000000f2', 'नमस्ते दुनिया योजना');
-    expect((await search(env, person, { query: 'cafe reunion', limit: 5 }))[0]!.itemId).toBe('itm_00000000000000f1');
-    expect((await search(env, person, { query: 'दुनिया', limit: 5 }))[0]!.itemId).toBe('itm_00000000000000f2');
+    expect((await search(env, person, { query: 'cafe reunion', limit: 5 }))[0].itemId).toBe('itm_00000000000000f1');
+    expect((await search(env, person, { query: 'दुनिया', limit: 5 }))[0].itemId).toBe('itm_00000000000000f2');
   });
   it('still answers from full-text search when the vector index is down', async () => {
     await env.DB.prepare(`INSERT OR REPLACE INTO source_boards (workspace_id, board_id, name, last_seen_at) VALUES (?, 'brd_00000000000000b1', 'B', 't')`).bind(WS).run();
     await seed('itm_00000000000000f3', 'incident review for the outage');
-    vec.query = (async () => { throw new Error('vectorize down'); }) as typeof vec.query;
+    vec.query = (async () => { throw new Error('vectorize down'); });
     expect((await search(env, person, { query: 'incident outage', limit: 5 })).map((x) => x.itemId)).toEqual(['itm_00000000000000f3']);
   });
 });
@@ -186,7 +186,7 @@ describe('outcome weights rank lower and never hide (spec §7, ruling S3-R10)', 
     await seed('itm_0000000000009201', 'zyxwv dispatch canary run', { outcome: 'abandoned' });
     for (let i = 0; i < 5; i++) await seed(`itm_00000000000092${hex(i + 2)}`, `quarterly budget memo ${i}`, { outcome: 'approved' });
     const r = await search(env, person, { query: 'zyxwv dispatch canary', limit: 10 });
-    expect(r[0]!.itemId).toBe('itm_0000000000009201');
+    expect(r[0].itemId).toBe('itm_0000000000009201');
   });
   it('ties between outcomes keep the spec order', () => {
     const at = (o: Parameters<typeof fuse>[1]) => fuse({ fts: 3, vector: 3 }, o);

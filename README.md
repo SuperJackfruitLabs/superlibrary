@@ -55,6 +55,8 @@ Open `http://localhost:5173` (dev auth, no sign-in).
 
 ```bash
 pnpm typecheck && pnpm test                # every package; run once more with TZ=UTC
+pnpm lint                                  # type-aware lint, held by a ratchet (docs/code-quality.md)
+node --test scripts/architecture.test.mjs  # imports between projects, cycles, file sizes
 pnpm --filter @superlibrary/web e2e        # the whole e2e suite, Chromium and WebKit
 CI=true pnpm --filter @superlibrary/web e2e --project=chromium   # as CI runs it, fresh servers
 ```

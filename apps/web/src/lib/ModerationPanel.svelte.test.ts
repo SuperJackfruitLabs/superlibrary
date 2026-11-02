@@ -16,7 +16,7 @@ async function removeWith(reason: string) {
   const onremoved = vi.fn();
   c = mount(ModerationPanel, { target: document.body, props: { item, onchanged: vi.fn(), onremoved } });
   flushSync();
-  [...document.querySelectorAll('button')].find((b) => b.textContent!.trim() === 'Remove from memory')!.click();
+  [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Remove from memory')!.click();
   flushSync();
   const ta = document.querySelector<HTMLTextAreaElement>('[role=alertdialog] textarea')!;
   ta.value = reason; ta.dispatchEvent(new Event('input', { bubbles: true })); flushSync();

@@ -84,7 +84,7 @@ describe('repository invariants', () => {
       expect(Object.keys(c.vars as object).sort(), file).toEqual(['CONTENT_DOMAIN', 'FRAME_ANCESTORS']);
       expect(c.assets, file).toEqual({ directory: './viewer-dist', binding: 'VIEWER', run_worker_first: true });
       // Staging (deploy/staging/): the same shape, its own bucket, and only `-stg` item hosts.
-      const stg = (c.env as Record<string, Record<string, unknown>>).staging!;
+      const stg = (c.env as Record<string, Record<string, unknown>>).staging;
       expect(Object.keys(c.env as object), file).toEqual(['staging']);
       expect(Object.keys(stg).filter((k) => !allowed.includes(k)), file).toEqual([]);
       expect(stg.r2_buckets, file).toEqual([{ binding: 'BLOBS', bucket_name: 'superlibrary-blobs-staging' }]);
@@ -92,7 +92,7 @@ describe('repository invariants', () => {
       expect(stg.routes, file).toEqual([{ pattern: '*-stg.superlibrarycontent.dev/*', zone_name: 'superlibrarycontent.dev' }]);
     }
     // The one secret is the verification half of the URL signing key.
-    const env = /export interface Env \{([^}]*)\}/.exec(read('apps/content/src/index.ts'))![1]!;
+    const env = /export interface Env \{([^}]*)\}/.exec(read('apps/content/src/index.ts'))![1];
     const names = [...env.matchAll(/^\s*(\w+):/gm)].map((m) => m[1]).sort();
     expect(names).toEqual(['BLOBS', 'CONTENT_DOMAIN', 'FRAME_ANCESTORS', 'URL_SIGNING_PUBLIC_KEY', 'VIEWER']);
   });

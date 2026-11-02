@@ -13,7 +13,7 @@ beforeEach(() => {
 });
 afterEach(() => { if (c) unmount(c); c = null; document.body.innerHTML = ''; vi.unstubAllGlobals(); });
 const open = (onclose = vi.fn(), opener: HTMLElement | null = null) => { c = mount(AppearanceDialog, { target: document.body, props: { onclose, opener } }); flushSync(); return onclose; };
-const radio = (name: string) => [...document.querySelectorAll<HTMLInputElement>('input[name="vibe"]')].find((r) => r.closest('label')!.textContent!.includes(name))!;
+const radio = (name: string) => [...document.querySelectorAll<HTMLInputElement>('input[name="vibe"]')].find((r) => r.closest('label')!.textContent.includes(name))!;
 const segment = (label: string) => [...document.querySelectorAll<HTMLElement>('[role="radio"]')].find((r) => r.textContent === label)!;
 const locationBox = () => document.querySelector<HTMLInputElement>('input[type="checkbox"]')!;
 const geo = (impl: (ok: PositionCallback, fail: PositionErrorCallback) => void) => vi.stubGlobal('navigator', { ...navigator, geolocation: { getCurrentPosition: impl } });
@@ -32,8 +32,8 @@ describe('the appearance dialog', () => {
     open();
     const cards = [...document.querySelectorAll('.sl-vibe-card')];
     expect(cards.map((l) => l.querySelector('.sl-vibe-name')!.textContent)).toEqual(['Daylight', 'Paper', 'Studio', 'Quiet']);
-    expect(cards[1]!.textContent).toContain('A letter from a colleague');
-    expect(cards[2]!.querySelector('.sl-vibe-sample')!.getAttribute('data-vibe')).toBe('studio');
+    expect(cards[1].textContent).toContain('A letter from a colleague');
+    expect(cards[2].querySelector('.sl-vibe-sample')!.getAttribute('data-vibe')).toBe('studio');
   });
 
   it('a vibe applies at once and is saved', () => {
@@ -92,13 +92,13 @@ describe('the appearance dialog', () => {
       stops.push(document.activeElement!);
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true }));
     }
-    const name = (el: Element) => el instanceof HTMLInputElement ? `${el.type}:${el.value || el.name}` : el.textContent!.trim();
+    const name = (el: Element) => el instanceof HTMLInputElement ? `${el.type}:${el.value || el.name}` : el.textContent.trim();
     expect(stops.map(name)).toEqual(['radio:daylight', 'Follow the sun', 'Strong', 'checkbox:on', 'Done', 'radio:daylight']);
     expect(dialog.contains(document.activeElement)).toBe(true);
     // Shift+Tab from the first stop wraps to Done.
     radio('Daylight').focus();
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true, cancelable: true }));
-    expect(document.activeElement!.textContent!.trim()).toBe('Done');
+    expect(document.activeElement!.textContent.trim()).toBe('Done');
   });
 
   it('use my location: allowed, the place is kept and the box stays checked', async () => {
@@ -142,10 +142,10 @@ describe('the appearance dialog', () => {
     locationBox().click(); await settle(); // off
     locationBox().click(); // C pending
     expect(asks).toHaveLength(2);
-    asks[0]!.fail({ code: 1 } as GeolocationPositionError); await settle(); flushSync();
+    asks[0].fail({ code: 1 } as GeolocationPositionError); await settle(); flushSync();
     expect(locationBox().checked).toBe(true);
     expect(document.querySelector('[role="status"]')!.textContent).not.toContain('Location was not shared');
-    asks[1]!.ok({ coords: { latitude: 1, longitude: 2 } } as GeolocationPosition); await settle(); flushSync();
+    asks[1].ok({ coords: { latitude: 1, longitude: 2 } } as GeolocationPosition); await settle(); flushSync();
     expect(look.appearance.useLocation).toBe(true);
     expect(locationBox().checked).toBe(true);
   });

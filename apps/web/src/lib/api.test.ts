@@ -18,7 +18,7 @@ describe('createApi', () => {
 
   it('a 401 reports the token it sent — not a sign-out (the AgentPod console, SuperJackfruitLabs/agentpod#698)', async () => {
     const onUnauthorized = vi.fn();
-    const api = createApi({ plane: () => PLANE, token: async () => 'sent-token', onUnauthorized, dev: false, fetchFn: (async () => new Response('{}', { status: 401 })) as never });
+    const api = createApi({ plane: () => PLANE, token: async () => 'sent-token', onUnauthorized, dev: false, fetchFn: (async () => new Response('{}', { status: 401 })) });
     expect((await api('/api/v1/me')).status).toBe(401);
     expect(onUnauthorized).toHaveBeenCalledWith('sent-token');
   });
@@ -29,9 +29,9 @@ describe('createApi', () => {
     await createApi({ plane: () => null, token: async () => null, onUnauthorized: () => {}, dev: true, fetchFn })('/x');
     await createApi({ plane: () => PLANE, token: async () => 't', onUnauthorized: () => {}, dev: true, fetchFn })('/x');
     await createApi({ plane: () => null, token: async () => null, onUnauthorized: () => {}, dev: false, fetchFn })('/x');
-    expect([heads[0]!.get('x-dev-principal'), heads[0]!.get('x-dev-org')]).toEqual([DEV_PRINCIPAL, DEV_ORG]);
-    expect(heads[1]!.get('x-dev-principal')).toBeNull();
-    expect(heads[2]!.get('x-dev-principal')).toBeNull();
+    expect([heads[0].get('x-dev-principal'), heads[0].get('x-dev-org')]).toEqual([DEV_PRINCIPAL, DEV_ORG]);
+    expect(heads[1].get('x-dev-principal')).toBeNull();
+    expect(heads[2].get('x-dev-principal')).toBeNull();
   });
 });
 

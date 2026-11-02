@@ -134,7 +134,7 @@ export async function shortControls(page: Page, atLeast: number): Promise<string
       if (r.width === 0 || r.height === 0 || style.visibility === 'hidden') continue;
       if (el.closest('[hidden], .visually-hidden')) continue;
       const p = el.tagName === 'A' ? el.closest('p') : null;
-      if (p && p.textContent!.trim() !== el.textContent!.trim()) continue;
+      if (p && p.textContent.trim() !== el.textContent.trim()) continue;
       checked++;
       if (r.height < 44 - 0.5) short.push(`${el.tagName.toLowerCase()}${el.className ? '.' + String(el.className).split(' ').join('.') : ''} "${(el.textContent || el.getAttribute('aria-label') || el.getAttribute('name') || '').trim().slice(0, 40)}" ${r.height.toFixed(1)}px`);
     }

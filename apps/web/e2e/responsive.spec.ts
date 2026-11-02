@@ -33,7 +33,7 @@ for (const width of WIDTHS) {
     const bar = page.locator('.sl-toolbar');
     await expect(bar).toBeVisible();
     for (const control of await bar.locator('button:visible, a:visible, .sl-select:visible').all()) {
-      const words = await control.evaluate((el) => [...el.querySelectorAll('.sl-label, .sl-version')].some((l) => (l as HTMLElement).offsetWidth > 1 && l.textContent!.trim() !== ''));
+      const words = await control.evaluate((el) => [...el.querySelectorAll('.sl-label, .sl-version')].some((l) => (l as HTMLElement).offsetWidth > 1 && l.textContent.trim() !== ''));
       expect(words, 'no toolbar control is an icon alone').toBe(true);
     }
     if (width === 390) {

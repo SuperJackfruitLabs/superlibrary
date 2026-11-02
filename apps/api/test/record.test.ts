@@ -26,7 +26,7 @@ describe('the work-record view (spec §11 "work-record timelines")', () => {
     expect(v.item).toMatchObject({ id: 'itm_00000000000002a1', kind: 'work-record' });
     expect(v.boardName).toBe('Marketing & Community');
     expect(v.record.handoffs.map((h) => [h.stage, h.attempt, h.status])).toEqual([['draft', 1, 'failed'], ['draft', 2, 'completed']]);
-    expect(v.record.comments[0]!.body).toContain('<img src=x');   // stored as text; the app renders it as text
+    expect(v.record.comments[0].body).toContain('<img src=x');   // stored as text; the app renders it as text
     expect(v.artifacts.map((a) => a.id)).toEqual([mine.body.itemId]);
     const audited = await env.DB.prepare(`SELECT detail FROM audit_events WHERE item_id = ? AND action = 'item.read' ORDER BY rowid DESC LIMIT 1`).bind('itm_00000000000002a1').first<{ detail: string }>();
     expect(JSON.parse(audited!.detail)).toEqual({ via: 'record' });

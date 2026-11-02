@@ -43,7 +43,7 @@ afterEach(() => { vi.restoreAllMocks(); restore(); setIndexingForTests(null); __
 /** The hub's roster answer for any agent; everything else (pipeline, plane token) falls through to the fakes. */
 const roster = (boards: string[]) => {
   const real = globalThis.fetch;
-  globalThis.fetch = (async (i: RequestInfo | URL, init?: RequestInit) => (String(i).includes('/api/bridge/principals/') ? Response.json({ boards }) : real(i, init))) as typeof fetch;
+  globalThis.fetch = (async (i: RequestInfo | URL, init?: RequestInit) => (String(i).includes('/api/bridge/principals/') ? Response.json({ boards }) : real(i, init)));
 };
 
 describe('sources to retrieval, through the item.changed seam', () => {

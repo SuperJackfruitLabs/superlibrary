@@ -90,7 +90,7 @@ describe('sending files in a batch', () => {
       { path: 'readme.md', mediaType: 'text/markdown; charset=utf-8', view: 'markdown', findings: [] },
       { path: 'leak.ts', mediaType: expect.any(String), view: expect.any(String), findings: [{ line: 1, rule: 'github-token' }] },
     ]);
-    const leakSha = await sha256Hex(files[1]!.body);
+    const leakSha = await sha256Hex(files[1].body);
     expect(await env.BLOBS.head(`blobs/${leakSha}`)).toBeNull();
     expect(await env.BLOBS.head(`quarantine/${uploadId}/${leakSha}`)).not.toBeNull();
     const refused = await commit(uploadId);
@@ -127,14 +127,14 @@ describe('sending files in a batch', () => {
     const { uploadId } = await (await create(files)).json<{ uploadId: string }>();
     const soon = new Date(Date.now() + 60_000).toISOString();
     await env.DB.prepare(`UPDATE upload_sessions SET expires_at = ? WHERE id = ?`).bind(soon, uploadId).run();
-    expect((await batch(uploadId, [files[0]!])).status).toBe(200);
+    expect((await batch(uploadId, [files[0]])).status).toBe(200);
     const s = await env.DB.prepare(`SELECT expires_at, created_at FROM upload_sessions WHERE id = ?`).bind(uploadId).first<{ expires_at: string; created_at: string }>();
     expect(Date.parse(s!.expires_at)).toBeGreaterThan(Date.now() + (LIMITS.uploadTtlHours * 3600_000) - 60_000);
 
     // A session already at its lifetime cap is not renewed further.
     const created = Date.now() - LIMITS.uploadMaxHours * 3600_000 + 120_000;
     await env.DB.prepare(`UPDATE upload_sessions SET created_at = ?, expires_at = ? WHERE id = ?`).bind(new Date(created).toISOString().replace('T', ' ').slice(0, 19), soon, uploadId).run();
-    expect((await batch(uploadId, [files[1]!])).status).toBe(200);
+    expect((await batch(uploadId, [files[1]])).status).toBe(200);
     const capped = await env.DB.prepare(`SELECT expires_at FROM upload_sessions WHERE id = ?`).bind(uploadId).first<{ expires_at: string }>();
     expect(Date.parse(capped!.expires_at)).toBeLessThanOrEqual(created + LIMITS.uploadMaxHours * 3600_000 + 1000);
   });
@@ -143,13 +143,13 @@ describe('sending files in a batch', () => {
 describe('resuming: bytes this person already sent are not sent again', () => {
   it('create names the held paths; a held entry is received from storage, re-sniffed and committed', async () => {
     const files = [local('index.html', '<!doctype html><p>held</p>'), local('new.txt', `fresh ${Date.now()}`)];
-    const first = await upload([{ path: 'index.html', body: files[0]!.body }]);
+    const first = await upload([{ path: 'index.html', body: files[0].body }]);
     expect(first.status).toBe(201);
 
     const created = await create(files);
     const { uploadId, held } = await created.json<{ uploadId: string; held: string[] }>();
     expect(held).toEqual(['index.html']);
-    const res = await batch(uploadId, [{ path: 'index.html', held: true }, files[1]!]);
+    const res = await batch(uploadId, [{ path: 'index.html', held: true }, files[1]]);
     expect(res.status).toBe(200);
     const out = await res.json<{ files: Array<{ path: string; mediaType?: string; missing?: boolean }> }>();
     expect(out.files[0]).toMatchObject({ path: 'index.html', mediaType: 'text/html; charset=utf-8' });
@@ -168,7 +168,7 @@ describe('resuming: bytes this person already sent are not sent again', () => {
 
   it('another person cannot claim bytes by their hash alone', async () => {
     const files = [local('mine.txt', `private bytes ${Date.now()}`)];
-    expect((await upload([{ path: 'mine.txt', body: files[0]!.body }])).status).toBe(201);
+    expect((await upload([{ path: 'mine.txt', body: files[0].body }])).status).toBe(201);
     const theirs = await create(files, devHeaders(HUMAN_2));
     const { uploadId, held } = await theirs.json<{ uploadId: string; held: string[] }>();
     expect(held).toEqual([]);
@@ -181,11 +181,11 @@ describe('resuming: bytes this person already sent are not sent again', () => {
 
   it('held bytes are scanned again: an earlier override does not carry over', async () => {
     const files = [local('cfg.ts', SECRET)];
-    expect((await upload([{ path: 'cfg.ts', body: files[0]!.body }], { override: 'fixture' })).status).toBe(201);
+    expect((await upload([{ path: 'cfg.ts', body: files[0].body }], { override: 'fixture' })).status).toBe(201);
     const { uploadId, held } = await (await create(files)).json<{ uploadId: string; held: string[] }>();
     expect(held).toEqual(['cfg.ts']);
     const res = await batch(uploadId, [{ path: 'cfg.ts', held: true }]);
-    expect((await res.json<{ files: Array<{ findings: unknown[] }> }>()).files[0]!.findings).toEqual([{ line: 1, rule: 'github-token' }]);
+    expect((await res.json<{ files: Array<{ findings: unknown[] }> }>()).files[0].findings).toEqual([{ line: 1, rule: 'github-token' }]);
     expect((await commit(uploadId)).status).toBe(422);
   });
 });

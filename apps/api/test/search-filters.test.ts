@@ -46,7 +46,7 @@ describe('search filters (spec §11)', () => {
     };
     // Each path alone, so neither can hide the other's missing filter.
     const query = vec.query;
-    vec.query = (async () => { throw new Error('vectorize down'); }) as typeof vec.query;
+    vec.query = (async () => { throw new Error('vectorize down'); });
     await expectFiltered();   // the words path only
     vec.query = query;
     await env.DB.prepare(`DELETE FROM chunks_fts WHERE item_id IN ('itm_00000000000000f1', 'itm_00000000000000f2')`).run();

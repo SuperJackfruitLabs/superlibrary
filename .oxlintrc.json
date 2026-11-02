@@ -1,0 +1,51 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "unicorn", "oxc", "import", "node", "promise", "vitest"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error"
+  },
+  "rules": {
+    "typescript/no-floating-promises": "error",
+    "typescript/no-misused-promises": "error",
+    "typescript/await-thenable": "error",
+    "typescript/switch-exhaustiveness-check": ["error", { "considerDefaultExhaustiveForUnions": true }],
+    "typescript/consistent-type-imports": "error",
+    "typescript/no-explicit-any": "error",
+    "typescript/no-non-null-assertion": "error",
+    "no-empty": ["error", { "allowEmptyCatch": false }],
+    "no-console": "error",
+    "no-unused-vars": [
+      "error",
+      {
+        "ignoreRestSiblings": true,
+        "argsIgnorePattern": "^_",
+        "varsIgnorePattern": "^_",
+        "caughtErrorsIgnorePattern": "^_"
+      }
+    ]
+  },
+  "ignorePatterns": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/build/**",
+    "**/.svelte-kit/**",
+    "**/.wrangler/**",
+    "**/.wrangler-e2e/**",
+    "**/viewer-dist/**",
+    "**/test-results/**",
+    "apps/web/static/**",
+    "apps/web/vendor/**",
+    "**/vitest.config.ts",
+    "**/vite.config.*",
+    "**/vite.bundle.config.ts",
+    "**/svelte.config.js",
+    "**/playwright.config.ts"
+  ],
+  "overrides": [
+    {
+      "files": ["scripts/**", "**/scripts/**", "**/brand-src/**", "**/e2e/**", "**/test/**", "**/*.test.ts", "packages/cli/src/**"],
+      "rules": { "no-console": "off" }
+    }
+  ]
+}

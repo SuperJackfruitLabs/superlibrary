@@ -96,7 +96,7 @@ describe('re-index (spec §7, §15)', () => {
   it('two identical empty final pages swap exactly once and leave exactly one active slot', async () => {
     const send = vi.spyOn(env.INDEX, 'send').mockResolvedValue(undefined as never);
     await startReindex(env, 'test/next');
-    const after = (send.mock.calls[0]![0] as Extract<IndexMessage, { type: 'reindex' }>).after;
+    const after = (send.mock.calls[0][0] as Extract<IndexMessage, { type: 'reindex' }>).after;
     await Promise.all([reindexPage(env, 'b', after), reindexPage(env, 'b', after)]);
     await reindexPage(env, 'b', after);
     const rows = (await env.DB.prepare(`SELECT slot, state FROM vector_slots ORDER BY slot`).all<{ slot: string; state: string }>()).results;
@@ -107,7 +107,7 @@ describe('re-index (spec §7, §15)', () => {
   it('a page from a cancelled run does nothing in a new run of the same slot', async () => {
     const send = vi.spyOn(env.INDEX, 'send').mockResolvedValue(undefined as never);
     await startReindex(env, 'test/next');
-    const old = (send.mock.calls[0]![0] as Extract<IndexMessage, { type: 'reindex' }>).after;
+    const old = (send.mock.calls[0][0] as Extract<IndexMessage, { type: 'reindex' }>).after;
     await cancelReindex(env);
     await startReindex(env, 'test/next');
     const cursor = (await readSlots(env)).building!.cursor;
@@ -153,7 +153,7 @@ describe('re-index (spec §7, §15)', () => {
   it('a reindex page is consumed from the queue', async () => {
     const send = vi.spyOn(env.INDEX, 'send').mockResolvedValue(undefined as never);
     await startReindex(env, 'test/next');
-    const after = (send.mock.calls[0]![0] as Extract<IndexMessage, { type: 'reindex' }>).after;
+    const after = (send.mock.calls[0][0] as Extract<IndexMessage, { type: 'reindex' }>).after;
     await indexBatch(createMessageBatch<IndexMessage>('superlibrary-index', [{ id: 'p', timestamp: new Date(), attempts: 1, body: { type: 'reindex', slot: 'b', after } }]), env);
     send.mockRestore();
     expect((await readSlots(env)).active.slot).toBe('b');      // no items: one page, then the swap

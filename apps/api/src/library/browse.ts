@@ -15,7 +15,7 @@ export async function browse(env: Env, p: Person, q: BrowseQuery): Promise<Brows
   if (q.cursor) {
     const m = CURSOR.exec(q.cursor);
     if (!m) throw new BadCursor('cursor');
-    after = [m[1]!, m[2]!];
+    after = [m[1], m[2]];
   }
   const scopes = await viewerScopes(env, p);
   // ?1-?3 visibility (spec §4, first), ?4 now, ?5 kinds, ?6 board scope, ?7 collection, ?8 agent/station/activity.

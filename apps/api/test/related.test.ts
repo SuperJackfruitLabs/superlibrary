@@ -21,7 +21,7 @@ beforeEach(async () => {
   await env.DB.prepare(`DELETE FROM roster_cache`).run();
   bag.ORG_PLANE_URL = 'https://accounts.test';
   bag.SERVICE_CREDENTIALS = JSON.stringify({ [ORG]: 'svc:x' });
-  globalThis.fetch = (async (i: RequestInfo | URL) => (String(i).endsWith('/api/token/service') ? Response.json({ access_token: 't', expires_in: 300 }) : Response.json({ boards: ['brd_00000000000000b1'] }))) as typeof fetch;
+  globalThis.fetch = (async (i: RequestInfo | URL) => (String(i).endsWith('/api/token/service') ? Response.json({ access_token: 't', expires_in: 300 }) : Response.json({ boards: ['brd_00000000000000b1'] })));
 });
 afterEach(() => { setIndexingForTests(null); globalThis.fetch = realFetch; bag.ORG_PLANE_URL = ''; bag.SERVICE_CREDENTIALS = ''; });
 

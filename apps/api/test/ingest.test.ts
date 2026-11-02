@@ -138,7 +138,7 @@ describe('ingestBatch', () => {
   });
   it('retries a message when Superpipeline is down, and acks the rest', async () => {
     const real = globalThis.fetch;
-    globalThis.fetch = (async (i: RequestInfo | URL, init?: RequestInit) => (String(i).includes(C2) ? new Response(null, { status: 503 }) : real(i, init))) as typeof fetch;
+    globalThis.fetch = (async (i: RequestInfo | URL, init?: RequestInit) => (String(i).includes(C2) ? new Response(null, { status: 503 }) : real(i, init)));
     const batch = createMessageBatch<IngestMessage>('superlibrary-ingest', [
       { id: 'a', timestamp: new Date(), attempts: 1, body: { type: 'card.sync', workspaceId: ws, boardId: B, cardId: C1, reason: 'card.updated' } },
       { id: 'b', timestamp: new Date(), attempts: 1, body: { type: 'card.sync', workspaceId: ws, boardId: B, cardId: C2, reason: 'card.updated' } },
@@ -170,7 +170,7 @@ describe('deletion is confirmed against the board', () => {
       if (u.origin === 'https://pipeline.test' && u.pathname.includes(C1)) return new Response(null, { status: 404 });
       if (u.origin === 'https://pipeline.test' && u.pathname === `/v1/boards/${B}`) return new Response(null, { status: 403 });
       return real(i, init);
-    }) as typeof fetch;
+    });
     try {
       const batch = createMessageBatch<IngestMessage>('superlibrary-ingest', [sync(C1)]);
       const ctx = createExecutionContext();
@@ -192,7 +192,7 @@ describe('deletion is confirmed against the board', () => {
     globalThis.fetch = (async (i: RequestInfo | URL, init?: RequestInit) => {
       const u = new URL(String(i instanceof Request ? i.url : i));
       return u.origin === 'https://pipeline.test' && u.pathname === `/v1/boards/${B}/cards/${C1}` ? new Response(null, { status: 404 }) : real(i, init);
-    }) as typeof fetch;
+    });
     try { await expect(syncCard(env, { workspaceId: ws, boardId: B, cardId: C1 })).rejects.toThrow(); } finally { globalThis.fetch = real; }
     expect(await recordOf(C1)).not.toBeNull();
   });

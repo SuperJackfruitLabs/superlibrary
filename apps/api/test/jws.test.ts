@@ -22,7 +22,7 @@ async function keyed(kid: string) {
 function scripted(...steps: Array<{ keys: unknown[] } | 'down'>) {
   let n = 0;
   const fetchFn = (async () => {
-    const step = steps[Math.min(n++, steps.length - 1)]!;
+    const step = steps[Math.min(n++, steps.length - 1)];
     if (step === 'down') return new Response('nope', { status: 503 });
     return new Response(JSON.stringify(step), { headers: { 'content-type': 'application/json' } });
   }) as unknown as typeof fetch;

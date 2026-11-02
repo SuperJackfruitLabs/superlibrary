@@ -82,10 +82,10 @@ describe('backfill', () => {
     await syncCard(env, { workspaceId: ws, boardId: B, cardId: 'card_00000000000000e2' });
     const fake = globalThis.fetch;
     globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
-      const u = new URL(new Request(input as RequestInfo, init).url);
+      const u = new URL(new Request(input, init).url);
       if (u.origin === 'https://pipeline.test' && u.pathname === `/v1/boards/${B}`) return new Response('boom', { status: 500 });
-      return fake(input as RequestInfo, init);
-    }) as typeof fetch;
+      return fake(input, init);
+    });
     const { sent, done } = capture();
     try {
       await expect(backfillBoard(env, ws, B)).rejects.toThrow();
@@ -110,7 +110,7 @@ describe('backfill', () => {
       const ok = await SELF.fetch(url, { method: 'POST', headers: devHeaders(HUMAN, ORG) });
       expect(ok.status).toBe(202);
       expect(await ok.json()).toEqual({ boards: 1, registered: 1, failed: 0 });
-      expect(sendBatch.mock.calls[0]![0]).toEqual([{ body: { type: 'board.backfill', workspaceId: expect.any(String), boardId: B } }]);
+      expect(sendBatch.mock.calls[0][0]).toEqual([{ body: { type: 'board.backfill', workspaceId: expect.any(String), boardId: B } }]);
     } finally { sendBatch.mockRestore(); delete bag.PUSH_SIGNING_KEY; }
   });
   it('a Superpipeline outage answers 502, not an unhandled 500', async () => {
@@ -119,10 +119,10 @@ describe('backfill', () => {
     bag.OPERATORS = HUMAN;
     const fake = globalThis.fetch;
     globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
-      const u = new URL(new Request(input as RequestInfo, init).url);
+      const u = new URL(new Request(input, init).url);
       if (u.origin === 'https://pipeline.test' && u.pathname === '/v1/boards') return new Response('boom', { status: 500 });
-      return fake(input as RequestInfo, init);
-    }) as typeof fetch;
+      return fake(input, init);
+    });
     try {
       const r = await SELF.fetch('https://api.test/api/v1/sources/superpipeline/backfill', { method: 'POST', headers: devHeaders(HUMAN, ORG) });
       expect(r.status).toBe(502);

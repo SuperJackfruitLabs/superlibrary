@@ -29,13 +29,13 @@ describe('PDF (plan D5): pdf.js in the frame, on the main thread, no eval', () =
     const el = document.createElement('main');
     await renderPdf(el, data);
     expect((globalThis as { pdfjsWorker?: { WorkerMessageHandler?: string } }).pdfjsWorker?.WorkerMessageHandler).toBe('in-thread');
-    const opts = getDocument.mock.calls[0]![0] as { data: Uint8Array; isEvalSupported: boolean };
+    const opts = getDocument.mock.calls[0][0] as { data: Uint8Array; isEvalSupported: boolean };
     expect(opts.isEvalSupported).toBe(false);
     expect([...opts.data]).toEqual([0x25, 0x50, 0x44]);
     const canvases = [...el.querySelectorAll('canvas')];
     expect(canvases.map((c) => [c.width, c.height, c.getAttribute('aria-label')])).toEqual([[150, 300, 'Page 1 of 3'], [150, 300, 'Page 2 of 3'], [150, 300, 'Page 3 of 3']]);
     expect(rendered).toEqual([1]);
-    observed!([{ target: canvases[2]!, isIntersecting: true }, { target: canvases[1]!, isIntersecting: false }]);
+    observed!([{ target: canvases[2], isIntersecting: true }, { target: canvases[1], isIntersecting: false }]);
     await new Promise((r) => setTimeout(r, 0));
     expect(rendered).toEqual([1, 3]);
   });

@@ -44,7 +44,7 @@ async function inParallel<T>(n: number, jobs: (() => Promise<T>)[]): Promise<T[]
   const out: T[] = new Array(jobs.length);
   let next = 0;
   await Promise.all(Array.from({ length: n }, async () => {
-    while (next < jobs.length) { const i = next++; out[i] = await jobs[i]!(); }
+    while (next < jobs.length) { const i = next++; out[i] = await jobs[i](); }
   }));
   return out;
 }

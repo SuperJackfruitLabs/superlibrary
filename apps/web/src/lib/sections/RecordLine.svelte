@@ -4,7 +4,7 @@
   import Toast from '$kit/Toast.svelte';
   let { view }: { view: WorkRecordView } = $props();
   const r = $derived(view.record);
-  const card = $derived(view.item.source?.sourceUrl && /^https:\/\//.test(view.item.source.sourceUrl) ? view.item.source.sourceUrl : null);
+  const card = $derived(view.item.source?.sourceUrl && view.item.source.sourceUrl.startsWith('https://') ? view.item.source.sourceUrl : null);
 </script>
 
 <p class="result-meta">

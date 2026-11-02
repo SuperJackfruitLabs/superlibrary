@@ -5,7 +5,7 @@ export function parseDelimited(text: string, sep: ',' | '\t'): string[][] {
   let field = '';
   let quoted = false;
   for (let i = 0; i < text.length; i++) {
-    const c = text[i]!;
+    const c = text[i];
     if (quoted) {
       if (c === '"' && text[i + 1] === '"') { field += '"'; i++; }
       else if (c === '"') quoted = false;
