@@ -18,7 +18,7 @@ const SIZE_LIMIT = 1000;
 /** Files over SIZE_LIMIT and the most lines each may have. Lower these; never raise them. */
 const OVERSIZE = {};
 /** Files in the largest runtime import cycle inside a project. Lower it; never raise it. */
-const LARGEST_CYCLE = 2;
+const LARGEST_CYCLE = 0;
 
 /**
  * Every import from one project into another, as 'from>to', with why it may exist. Shipped code
@@ -236,7 +236,7 @@ test('the rules see what they should', () => {
 });
 
 test('the import reader tells run-time imports from type-only ones', () => {
-  const kinds = new Map(found.filter((i) => i.from === 'apps/api/src/indexing/consumer.ts').map((i) => [i.to, i.value]));
+  const kinds = new Map(found.filter((i) => i.from === 'apps/api/src/indexing/index-item.ts').map((i) => [i.to, i.value]));
   assert.equal(kinds.get('apps/api/src/env.ts'), false, "`import type { Env }` loads nothing");
   assert.equal(kinds.get('apps/api/src/indexing/chunk.ts'), true);
   assert.equal(kinds.get('@superlibrary/contract'), true);

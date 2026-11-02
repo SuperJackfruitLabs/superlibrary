@@ -1,7 +1,7 @@
 // apps/api/src/indexing/reindex.ts
 import type { Env } from '../env';
 import { embedderFor } from './embedder';
-import { indexItem } from './consumer';
+import { indexItem } from './index-item';
 import { readSlots } from './vector-index';
 
 /**
