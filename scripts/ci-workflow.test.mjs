@@ -76,6 +76,11 @@ test('the CLI release and the app deploy are independent', () => {
   assert.doesNotMatch(release['production-gate'], /needs:/);
 });
 
+test('the test job runs the lint ratchet and the architecture test', () => {
+  assert.match(ci.test, /- run: pnpm lint\n/);
+  assert.match(ci.test, /- run: node --test scripts\/architecture\.test\.mjs\n/);
+});
+
 test('production smoke covers health, auth, html and discovery', () => {
   const s = release['smoke-production'];
   for (const p of ['/api/health', '/api/v1/me', '= 401', '<html', '/.well-known/oauth-protected-resource', 'https://accounts.superjackfruit.com'])

@@ -73,9 +73,14 @@ jobs:
       - uses: oven-sh/setup-bun@v2
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
+      # Type-aware lint with a ratchet: per-rule counts in scripts/lint-baseline.json may fall,
+      # never rise (docs/code-quality.md).
+      - run: pnpm lint
       - run: pnpm test
       # The workflow shape (what main deploys, what a tag deploys, and the gates between).
       - run: node --test scripts/ci-workflow.test.mjs
+      # Imports between projects, import cycles and file sizes (docs/code-quality.md).
+      - run: node --test scripts/architecture.test.mjs
 
   e2e:
     needs: [changes]
