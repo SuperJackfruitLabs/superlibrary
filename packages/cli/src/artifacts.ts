@@ -1,7 +1,7 @@
 import { lstatSync, readFileSync, readdirSync, realpathSync, statSync } from 'node:fs';
 import { basename, join, relative, resolve, sep } from 'node:path';
 import { createHash } from 'node:crypto';
-import { ITEM_ID, LIMITS, NOTHING_ADDED, checkPath, sendFiles, isTransient, describeRefusal, pathRefusalSentence, refusalSentence, sizeRefusal, type UploadRefusal, type CommitResult, type EmbedGrant } from '@superlibrary/contract';
+import { ITEM_ID, LIMITS, NOTHING_ADDED, checkPath, sendFiles, isTransient, pathRefusalSentence, refusalSentence, sizeRefusal, type UploadRefusal, type CommitResult, type EmbedGrant } from '@superlibrary/contract';
 import { baseUrl, tokenSource, type TokenSource } from './credential.ts';
 import { oneLine } from './args.ts';
 export interface LocalFile { path: string; bytes: Uint8Array }

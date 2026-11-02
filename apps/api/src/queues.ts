@@ -3,7 +3,7 @@ import { indexBatch } from './indexing/consumer';
 import { ingestBatch } from './ingest/consumer';
 import { sweep } from './lifecycle/retention';
 
-// `any`: each queue carries its own message type.
+// oxlint-disable-next-line typescript/no-explicit-any -- each queue carries its own message type
 export type QueueHandler = (batch: MessageBatch<any>, env: Env) => Promise<void>;
 
 async function retentionBatch(batch: MessageBatch<RetentionMessage>, env: Env): Promise<void> {

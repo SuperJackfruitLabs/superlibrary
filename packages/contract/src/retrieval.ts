@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { ITEM_ID } from './ids';
-import { OUTCOMES, type ItemSource, type Outcome } from './model';
+import type { ItemSource, Outcome } from './model';
 import { ITEM_KINDS, LibraryFilters, SINCE_UNTIL, sinceBeforeUntil } from './library';
 import { CARD_ID } from './provenance';
 

@@ -68,7 +68,7 @@ export default {
       return withCost(error(500, 'unexpected'), c.cost, startedAt);
     }
   },
-  async queue(batch: MessageBatch<unknown>, env: Env, _ctx: ExecutionContext) {
+  async queue(batch: MessageBatch, env: Env, _ctx: ExecutionContext) {
     const handle = queueHandlers[batch.queue];
     if (!handle) {
       console.error('no handler for queue', batch.queue);
@@ -85,4 +85,4 @@ export default {
     } else if (c.cron === RETENTION_CRON) await env.RETENTION.send({ type: 'sweep', at: new Date(c.scheduledTime).toISOString() });
     else console.error('no handler for cron', c.cron);
   },
-} satisfies ExportedHandler<Env, unknown>;
+} satisfies ExportedHandler<Env>;
