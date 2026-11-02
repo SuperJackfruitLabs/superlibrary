@@ -52,23 +52,28 @@ const where = (f) => {
   return `${f.filename}${at ? ':' + at.line : ''}`;
 };
 
-// Shipped source: under a src/ folder and not a test file.
+// Shipped source: under a src/ folder, or the content Worker's viewer, and not a test file.
 const isSource = (file) =>
-  /(^|\/)src\//.test(file) && !/(\.test\.|\.spec\.|(^|\/)__tests__\/)/.test(file);
+  (/(^|\/)src\//.test(file) || file.startsWith('apps/content/viewer/')) &&
+  !/(\.test\.|\.spec\.|(^|\/)(__tests__|test)\/)/.test(file);
 // Rules shipped source must stay clean of, whatever the baseline allows elsewhere (tests, scripts).
 const SRC_CLEAN = new Set([
   'eslint(no-empty)',
   'eslint(no-unsafe-optional-chaining)',
+  'eslint(no-unused-vars)',
   'eslint(no-useless-concat)',
   'typescript(await-thenable)',
   'typescript(consistent-type-imports)',
+  'typescript(no-explicit-any)',
   'typescript(no-extraneous-class)',
   'typescript(no-non-null-asserted-optional-chain)',
   'typescript(no-unnecessary-template-expression)',
+  'typescript(no-unnecessary-type-arguments)',
   'typescript(require-array-sort-compare)',
   'typescript(restrict-template-expressions)',
   'unicorn(no-array-reverse)',
   'unicorn(no-useless-spread)',
+  'unicorn(prefer-string-starts-ends-with)',
 ]);
 const unclean = findings.filter((f) => SRC_CLEAN.has(f.code) && isSource(f.filename));
 if (unclean.length) {
