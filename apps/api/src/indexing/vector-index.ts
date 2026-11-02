@@ -47,7 +47,7 @@ export function indexFor(env: Env, s: SlotRow): VectorIndex {
     },
     async query(values, o) {
       if (values.length !== dims) throw new Error(`embedder mismatch for slot ${s.slot}`);
-      const r = await raw.query(values, { topK: o.topK, namespace: o.namespace, returnMetadata: 'indexed', filter: { ...o.filter, embedder: { $eq: embedderId } } as VectorizeVectorMetadataFilter });
+      const r = await raw.query(values, { topK: o.topK, namespace: o.namespace, returnMetadata: 'indexed', filter: { ...o.filter, embedder: { $eq: embedderId } } });
       return r.matches.map((m) => ({ id: m.id, score: m.score, itemId: String((m.metadata as Record<string, unknown> | undefined)?.itemId ?? m.id.split(':')[0]) }));
     },
     async get(ids) {

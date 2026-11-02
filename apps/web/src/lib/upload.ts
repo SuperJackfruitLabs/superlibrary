@@ -117,7 +117,7 @@ function expandZipSelection(zip: Uint8Array): { files: LocalFile[]; leftOut: Lef
   } catch (e) {
     return { refused: `This file could not be read as a zip: ${e instanceof Error ? e.message : String(e)}.` };
   }
-  return { files: Object.keys(inflated).sort().map((path) => ({ path, bytes: inflated[path]! })), leftOut: split.leftOut };
+  return { files: Object.keys(inflated).sort().map((path) => ({ path, bytes: inflated[path] })), leftOut: split.leftOut };
 }
 
 /** A zip's files, junk and denied entries dropped, checked from its central directory before inflating. */
@@ -139,22 +139,22 @@ const ZIP_OVERHEAD = 2 * 1024 * 1024;
  */
 export async function selectFiles(picked: ArrayLike<File>, opts: { expandZips: boolean }): Promise<Selection | Refused> {
   const chosen = Array.from(picked);
-  if (opts.expandZips && chosen.length === 1 && chosen[0]!.name.toLowerCase().endsWith('.zip')) {
-    const z = chosen[0]!;
+  if (opts.expandZips && chosen.length === 1 && chosen[0].name.toLowerCase().endsWith('.zip')) {
+    const z = chosen[0];
     if (z.size > LIMITS.folderBytes + ZIP_OVERHEAD) return { refused: 'The zip is larger than 100 MB, the limit for a folder.' };
     const out = expandZipSelection(new Uint8Array(await z.arrayBuffer()));
     if ('refused' in out) return out;
     return { ...out, name: z.name.replace(/\.zip$/i, '') };
   }
   const paths = pickedPaths(chosen);
-  const split = partition(chosen.map((file, i) => ({ path: paths[i]!, file, size: file.size })));
+  const split = partition(chosen.map((file, i) => ({ path: paths[i], file, size: file.size })));
   if ('refused' in split) return split;
   const cap = overCaps(split.kept);
   if (cap) return { refused: cap };
   const files = await Promise.all(split.kept.map(async (e) => ({ path: e.path, bytes: new Uint8Array(await e.file.arrayBuffer()) })));
   // A folder pick is named after its folder, one file after itself; several loose files get no name.
   const rel = (chosen[0] as (File & { webkitRelativePath?: string }) | undefined)?.webkitRelativePath ?? '';
-  const name = rel.includes('/') ? rel.split('/')[0]! : chosen.length === 1 ? chosen[0]!.name : '';
+  const name = rel.includes('/') ? rel.split('/')[0] : chosen.length === 1 ? chosen[0].name : '';
   return { files, leftOut: split.leftOut, name };
 }
 
@@ -163,7 +163,7 @@ const quoteRule = (l: LeftOut) => `${l.path} (the ${l.rule} rule)`;
 /** "These N files are left out: …", each with its rule; null when nothing was. */
 export function leftOutSentence(leftOut: LeftOut[]): string | null {
   if (leftOut.length === 0) return null;
-  if (leftOut.length === 1) return `This file is left out: ${quoteRule(leftOut[0]!)}.`;
+  if (leftOut.length === 1) return `This file is left out: ${quoteRule(leftOut[0])}.`;
   return `These ${leftOut.length} files are left out: ${listWords(leftOut.map(quoteRule))}.`;
 }
 

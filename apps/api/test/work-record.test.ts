@@ -87,7 +87,7 @@ describe('buildWorkRecord', () => {
   });
   it('a referenced item is linked only for an item link, not for any URL that mentions one', () => {
     const b = bundle({}, { references: [{ cardId: C, url: 'https://evil.example/a/itm_0000000000000001', title: null, provider: 'url', externalId: null }] });
-    expect(buildWorkRecord(b, APP).record.references[0]!.itemId).toBeNull();
+    expect(buildWorkRecord(b, APP).record.references[0].itemId).toBeNull();
   });
   it('stays under the body cap (in bytes) by dropping the oldest comments first, and says so', () => {
     const comments = Array.from({ length: 400 }, (_, i) => cmt(i, 'x'.repeat(4000)));
@@ -95,7 +95,7 @@ describe('buildWorkRecord', () => {
     expect(new TextEncoder().encode(JSON.stringify(record)).length).toBeLessThanOrEqual(BODY_CAP);
     expect(record.truncated).toBe(true);
     expect(record.comments.at(-1)!.id).toBe('cmt_399');
-    expect(record.comments[0]!.id).not.toBe('cmt_0');
+    expect(record.comments[0].id).not.toBe('cmt_0');
   });
   it('measures bytes, not characters', () => {
     // 300 000 three-byte characters are 300 000 UTF-16 units but 900 000 bytes.
@@ -110,11 +110,11 @@ describe('buildWorkRecord', () => {
     const b = bundle({ spec: { s: 'z'.repeat(400_000) } }, { comments: [cmt(1, 'keep?')], attempts: [attempt(1, { b: big }), attempt(2, { b: big }), attempt(3, { b: 'small' })] });
     const { record } = buildWorkRecord(b, APP);
     expect(record.comments).toEqual([]);
-    expect(record.handoffs[0]!.handoff).toMatch(/left out/);
-    expect(record.handoffs[2]!.handoff).toEqual({ b: 'small' });
+    expect(record.handoffs[0].handoff).toMatch(/left out/);
+    expect(record.handoffs[2].handoff).toEqual({ b: 'small' });
     expect(record.truncated).toBe(true);
     const only = buildWorkRecord(bundle({}, { comments: [cmt(1, 'x'.repeat(600_000)), cmt(2, 'x'.repeat(600_000))], attempts: [attempt(1, { b: 'kept' })] }), APP).record;
-    expect(only.handoffs[0]!.handoff).toEqual({ b: 'kept' });
+    expect(only.handoffs[0].handoff).toEqual({ b: 'kept' });
   });
   it('trims the spec last when nothing else is left to drop', () => {
     const { record } = buildWorkRecord(bundle({ spec: { s: 'z'.repeat(950_000) } }), APP);
@@ -144,7 +144,7 @@ describe('review fixes', () => {
     const { record, text } = buildWorkRecord(bundle({}, { references: [{ cardId: C, url, title: null, provider: 'url', externalId: null }] }), APP);
     expect(JSON.stringify(record)).not.toContain(K);
     expect(text).not.toContain(K);
-    expect(record.references[0]!.itemId).toBe('itm_0000000000000001');
+    expect(record.references[0].itemId).toBe('itm_0000000000000001');
   });
   it('redacts a private key body, not only its header', () => {
     const pem = '-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEAxyz\nabcdefg\n-----END RSA PRIVATE KEY-----';
@@ -169,7 +169,7 @@ describe('review fixes', () => {
     const b = bundle({ spec: { s: '\u0001'.repeat(300_000) } }, { attempts: [{ ...attempt(1, null), failureReason: 'f'.repeat(500_000) }] });
     const { record } = buildWorkRecord(b, APP);
     expect(new TextEncoder().encode(JSON.stringify(record)).length).toBeLessThanOrEqual(BODY_CAP);
-    expect(record.handoffs[0]!.failureReason!.length).toBe(500_000);
+    expect(record.handoffs[0].failureReason!.length).toBe(500_000);
   });
   it('clips an oversized title and drops surplus references as a last resort', () => {
     const t = buildWorkRecord(bundle({ title: 'T'.repeat(950_000) }), APP).record;
@@ -181,7 +181,7 @@ describe('review fixes', () => {
   });
   it('no app host means no item links, even for a hostless url', () => {
     const b = bundle({}, { references: [{ cardId: C, url: 'file:///a/itm_0000000000000001', title: null, provider: 'url', externalId: null }] });
-    expect(buildWorkRecord(b, 'not a url').record.references[0]!.itemId).toBeNull();
+    expect(buildWorkRecord(b, 'not a url').record.references[0].itemId).toBeNull();
   });
   it('drops oldest by time even when the bundle is out of order, and skips deleted comments', () => {
     const comments = [cmt(5, 'x'.repeat(500_000)), cmt(1, 'x'.repeat(500_000)), { ...cmt(9, 'gone'), deletedAt: '2026-10-03T00:00:00Z' }];
@@ -190,7 +190,7 @@ describe('review fixes', () => {
   });
   it('a malformed app url yields no item links instead of throwing', () => {
     const b = bundle({}, { references: [{ cardId: C, url: 'https://app.superlibrary.dev/a/itm_0000000000000001', title: null, provider: 'url', externalId: null }] });
-    expect(buildWorkRecord(b, 'not a url').record.references[0]!.itemId).toBeNull();
+    expect(buildWorkRecord(b, 'not a url').record.references[0].itemId).toBeNull();
   });
 });
 

@@ -83,7 +83,7 @@ export const searchRoutes: Handler = async (request, env, _ctx, url) => {
     const ver = url.searchParams.get('version');
     const version = ver === null ? undefined : Number(ver);
     if (version !== undefined && (!Number.isInteger(version) || version < 1)) return error(400, 'invalid');
-    const g = await getForViewer(env, v, lib[1]!, version);
+    const g = await getForViewer(env, v, lib[1], version);
     return g ? json({ item: g.result, text: g.text, wrapped: g.wrapped }) : error(404, 'not_found');
   }
   if (url.pathname === '/api/v1/related') {

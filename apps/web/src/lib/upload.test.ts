@@ -18,7 +18,7 @@ function fakeApi(handlers: Record<string, (init: RequestInit) => Response>) {
   const api = async (path: string, init: RequestInit = {}) => {
     const key = `${init.method ?? 'GET'} ${path.replace(/upl_[0-9a-f]{16}/, ':id').replace(/\?path=.*/, '?path')}`;
     calls.push(key);
-    return handlers[key]!(init);
+    return handlers[key](init);
   };
   return { api, calls };
 }
@@ -80,13 +80,13 @@ describe('selectFiles: what a pick becomes, checked before any file is read', ()
     const arrayBuffer = vi.fn(async () => new ArrayBuffer(0));
     return { f: { name, size, webkitRelativePath: rel, arrayBuffer } as unknown as File, arrayBuffer };
   };
-  const zipFile = (entries: Parameters<typeof zipSync>[0], name = 'site.zip') => new File([zipSync(entries) as Uint8Array<ArrayBuffer>], name);
+  const zipFile = (entries: Parameters<typeof zipSync>[0], name = 'site.zip') => new File([zipSync(entries)], name);
   const ok = async (...args: Parameters<typeof selectFiles>) => { const out = await selectFiles(...args); if ('refused' in out) throw new Error(out.refused); return out; };
 
   it("drops a folder pick's own name from every path, and names the selection after the folder", async () => {
     const out = await ok([file('index.html', 'site/index.html', '<p>'), file('a b.css', 'site/css/a b.css')], { expandZips: true });
     expect(out.files.map((f) => f.path)).toEqual(['index.html', 'css/a b.css']);
-    expect(out.files[0]!.bytes).toEqual(enc('<p>'));
+    expect(out.files[0].bytes).toEqual(enc('<p>'));
     expect(out.name).toBe('site');
   });
 
@@ -192,7 +192,7 @@ describe('uploadFiles', () => {
     const parts: Blob[] = [];
     await uploadFiles(api, [{ path: 'a.md', bytes: enc('abc') }], { title: 'T', item: 'itm_0000000000000003' });
     expect(declared).toEqual({ title: 'T', item: 'itm_0000000000000003', files: [{ path: 'a.md', bytes: 3, sha256: 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad' }] });
-    sent = new Uint8Array(await parts[0]!.arrayBuffer());
+    sent = new Uint8Array(await parts[0].arrayBuffer());
     expect(sent).toEqual(enc('abc'));
   });
 

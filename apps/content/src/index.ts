@@ -89,7 +89,7 @@ async function manifestOf(env: Env, itemId: string, version: number): Promise<Ma
 }
 
 /** A file of this version, or null. Own keys only: `constructor` or `__proto__` is no file (ruling T11). */
-const fileOf = (m: Manifest, path: string): ManifestFile | null => (Object.hasOwn(m.files, path) ? m.files[path]! : null);
+const fileOf = (m: Manifest, path: string): ManifestFile | null => (Object.hasOwn(m.files, path) ? m.files[path] : null);
 
 const nameOf = (path: string) => path.split('/').pop() ?? path;
 
@@ -101,7 +101,7 @@ function decode(bytes: ArrayBuffer): string {
   const b = new Uint8Array(bytes);
   const [enc, bom] =
     b[0] === 0xff && b[1] === 0xfe ? ['utf-16le', 2] : b[0] === 0xfe && b[1] === 0xff ? ['utf-16be', 2] : ['utf-8', b[0] === 0xef && b[1] === 0xbb && b[2] === 0xbf ? 3 : 0];
-  return new TextDecoder(enc as string, { fatal: false, ignoreBOM: true }).decode(b.subarray(bom as number));
+  return new TextDecoder(enc, { fatal: false, ignoreBOM: true }).decode(b.subarray(bom));
 }
 
 function base64(bytes: ArrayBuffer): string {

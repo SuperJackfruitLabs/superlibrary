@@ -64,7 +64,7 @@ export function compareTreePaths(a: string, b: string): number {
   const sa = a.split('/');
   const sb = b.split('/');
   for (let i = 0; i < Math.min(sa.length, sb.length); i++) {
-    if (sa[i] !== sb[i]) return sa[i]! < sb[i]! ? -1 : 1;
+    if (sa[i] !== sb[i]) return sa[i] < sb[i] ? -1 : 1;
   }
   return sa.length - sb.length;
 }

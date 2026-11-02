@@ -5,7 +5,7 @@ import { h } from './dom';
 import { applyTheme, listenForLinks, listenForTheme, reportExpiredMedia, reportHeight, themeFromQuery } from './protocol';
 import { render } from './render';
 
-const data = JSON.parse(document.getElementById('sl-data')!.textContent!) as ViewerData;
+const data = JSON.parse(document.getElementById('sl-data')!.textContent) as ViewerData;
 const app = document.getElementById('app')!;
 // No theme in the URL and no message from the host: the system's (the stylesheet's default).
 const initial = themeFromQuery(location.search);

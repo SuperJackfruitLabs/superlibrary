@@ -57,7 +57,7 @@ describe('owned upload verification through real plane proof and upload handlers
     expect((await verify(saved.uploadId, { Authorization: `Bearer ${await planeToken({ sub: AGENT, principalKind: 'agent' })}` })).status).toBe(403);
     const missing = { ...headers }; delete missing['X-On-Behalf-Token'];
     expect((await verify(saved.uploadId, missing)).status).toBe(403);
-    expect((await verify(saved.uploadId, { Authorization: headers.Authorization! })).status).toBe(403);
+    expect((await verify(saved.uploadId, { Authorization: headers.Authorization })).status).toBe(403);
     expect((await verify(saved.uploadId, { ...headers, 'X-On-Behalf-Kind': 'human' })).status).toBe(403);
     expect((await verify(saved.uploadId, { Authorization: `Bearer ${await planeToken({ sub: HUMAN_2, principalKind: 'human', act: { sub: HUB_SVC } })}` })).status).toBe(403);
     for (const proof of ['malformed', await planeToken({ sub: AGENT, principalKind: 'agent', org: OTHER_ORG, act: { sub: HUB_SVC } }), await planeToken({ sub: AGENT, principalKind: 'agent', act: { sub: HUMAN_2 } }), await planeToken({ sub: HUMAN_2, principalKind: 'agent', act: { sub: HUB_SVC } }), await planeToken({ sub: AGENT, principalKind: 'agent', act: { sub: HUB_SVC } }, { exp: '-1m' })])

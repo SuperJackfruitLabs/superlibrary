@@ -14,7 +14,7 @@ export function handoffText(h: unknown): string | null {
   if (typeof h === 'string') return h.trim() || null;
   if (typeof h === 'object' && !Array.isArray(h)) {
     const o = h as Record<string, unknown>;
-    for (const k of ['summary', 'text', 'message']) if (typeof o[k] === 'string' && (o[k] as string).trim()) return (o[k] as string).trim();
+    for (const k of ['summary', 'text', 'message']) if (typeof o[k] === 'string' && o[k].trim()) return o[k].trim();
   }
   const s = JSON.stringify(h, null, 2);
   return s.length > 2000 ? `${s.slice(0, 2000)}…` : s;

@@ -107,7 +107,7 @@ async function duringFirstBatch<T>(meanwhile: () => Promise<void>, act: () => Pr
       await meanwhile();
     }
     return original(statements);
-  }) as D1Database['batch'];
+  });
   try {
     const out = await act();
     // A race that never happened proves nothing: the hook must have caught the revoke's batch.
@@ -207,8 +207,8 @@ describe('widening scope (spec §4: a person’s act, audited)', () => {
     expect((await again.json<{ item: { scope: string } }>()).item.scope).toBe('workspace');
     const rows = (await auditRows('item.scope_changed', r.body.itemId)).results;
     expect(rows).toHaveLength(1);
-    expect(rows[0]!.actor).toBe(devHeaders()['X-Dev-Principal']);
-    expect(JSON.parse(rows[0]!.detail)).toEqual({ from: BOARD, to: 'workspace' });
+    expect(rows[0].actor).toBe(devHeaders()['X-Dev-Principal']);
+    expect(JSON.parse(rows[0].detail)).toEqual({ from: BOARD, to: 'workspace' });
   });
 
   it('refuses narrowing, a malformed scope, and anyone but the uploader or an owner', async () => {

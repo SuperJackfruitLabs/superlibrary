@@ -38,13 +38,13 @@ describe('the kit', () => {
     put(Toolbar, { label: 'Item', items: [{ label: 'Upload a new version', icon: 'upload', href: '/upload?item=x', primary: true }, { label: 'Copy link', icon: 'link', onclick: copy }] });
     const bar = document.querySelector('[role="toolbar"]')!;
     expect(bar.getAttribute('aria-label')).toBe('Item');
-    expect([...bar.querySelectorAll('.kit-toolbar-item')].map((e) => e.textContent!.trim())).toEqual(['Upload a new version', 'Copy link']);
+    expect([...bar.querySelectorAll('.kit-toolbar-item')].map((e) => e.textContent.trim())).toEqual(['Upload a new version', 'Copy link']);
     const more = bar.querySelector<HTMLButtonElement>('button.kit-more')!;
-    expect(more.textContent!.trim()).toBe('More');
+    expect(more.textContent.trim()).toBe('More');
     more.click(); flushSync();
     const panel = document.getElementById(more.getAttribute('aria-controls')!)!;
     expect(panel.hidden).toBe(false);
-    [...panel.querySelectorAll('button')].find((b) => b.textContent!.trim() === 'Copy link')!.click();
+    [...panel.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Copy link')!.click();
     expect(copy).toHaveBeenCalled();
   });
   it('a Toast speaks, and a danger Toast interrupts', () => {

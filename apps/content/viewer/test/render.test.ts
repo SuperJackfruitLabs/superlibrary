@@ -5,7 +5,7 @@ import { render } from '../render';
 const base = { name: 'f', mediaType: 'text/plain', bytes: 1, sha256: 'a'.repeat(64), rawUrl: 'https://c.test/s/t/f', baseUrl: 'https://c.test/s/t/', host: 'https://app.test' };
 const mount = async (d: Partial<ViewerData>) => {
   const el = document.createElement('main');
-  await render(el, { ...base, path: 'f', view: 'text', ...d } as ViewerData);
+  await render(el, { ...base, path: 'f', view: 'text', ...d });
   return el;
 };
 
@@ -13,11 +13,11 @@ describe('render, part 1', () => {
   it('code is highlighted and paged at 2,000 lines', async () => {
     const el = await mount({ view: 'code', path: 'a.ts', text: Array.from({ length: 2500 }, (_, i) => `const x${i} = ${i};`).join('\n') });
     expect(el.querySelector('code.hljs')).not.toBeNull();
-    expect(el.querySelector('code')!.textContent!.split('\n')).toHaveLength(2000);
+    expect(el.querySelector('code')!.textContent.split('\n')).toHaveLength(2000);
     const more = el.querySelector<HTMLButtonElement>('button.more')!;
     expect(more.hidden).toBe(false);
     more.click();
-    expect(el.querySelector('code')!.textContent!.split('\n')).toHaveLength(2500);
+    expect(el.querySelector('code')!.textContent.split('\n')).toHaveLength(2500);
     expect(more.hidden).toBe(true);
   });
 

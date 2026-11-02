@@ -85,7 +85,7 @@ describe('links in rendered files open through the host (PR 3 review: the sandbo
     const ev = click(document.querySelector('em')!);
     expect(ev.defaultPrevented).toBe(true);
     expect(post).toHaveBeenCalledWith({ type: 'superlibrary:open', url: 'https://example.com/x?y=1' }, HOST);
-    click(document.querySelectorAll('a')[1]!, { button: 1 });
+    click(document.querySelectorAll('a')[1], { button: 1 });
     expect(post).toHaveBeenLastCalledWith({ type: 'superlibrary:open', url: 'http://example.org/' }, HOST);
     stop();
   });
@@ -94,7 +94,7 @@ describe('links in rendered files open through the host (PR 3 review: the sandbo
     const { post, stop } = setup('<figure class="diagram"><svg xmlns="http://www.w3.org/2000/svg"><a href="https://example.com/node"><text>n</text></a><a xlink:href="https://example.com/old" xmlns:xlink="http://www.w3.org/1999/xlink"><text>o</text></a></svg></figure>');
     click(document.querySelector('text')!);
     expect(post).toHaveBeenCalledWith({ type: 'superlibrary:open', url: 'https://example.com/node' }, HOST);
-    click(document.querySelectorAll('text')[1]!);
+    click(document.querySelectorAll('text')[1]);
     expect(post).toHaveBeenLastCalledWith({ type: 'superlibrary:open', url: 'https://example.com/old' }, HOST);
     stop();
   });

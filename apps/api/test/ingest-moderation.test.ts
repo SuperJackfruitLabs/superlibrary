@@ -89,9 +89,9 @@ const duringFetch = (cardId: string, hook: () => Promise<unknown>) => {
   const inner = globalThis.fetch;
   let armed = true;
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
-    if (armed && new URL(new Request(input as RequestInfo).url).pathname.endsWith(`/cards/${cardId}`)) { armed = false; await hook(); }
-    return inner(input as RequestInfo, init);
-  }) as typeof fetch;
+    if (armed && new URL(new Request(input).url).pathname.endsWith(`/cards/${cardId}`)) { armed = false; await hook(); }
+    return inner(input, init);
+  });
 };
 const refsOf = (itemId: string) => env.DB.prepare(`SELECT 1 FROM item_references WHERE item_id = ?`).bind(itemId).first();
 

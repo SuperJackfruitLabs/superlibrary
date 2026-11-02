@@ -141,7 +141,7 @@ describe("a version's file list (the host toolbar's Files)", () => {
     const r = await upload([{ path: 'note.md', body: '# n' }]);
     const g = await (await embed(r.body.itemId)).json<{ entry: string; files: FileEntry[] }>();
     expect(g.entry).toBe('note.md');
-    expect(g.files).toEqual([{ path: 'note.md', mediaType: (await filesOf(r.body.itemId, 1, ['note.md']))[0]!.mediaType, view: 'markdown', bytes: 3 }]);
+    expect(g.files).toEqual([{ path: 'note.md', mediaType: (await filesOf(r.body.itemId, 1, ['note.md']))[0].mediaType, view: 'markdown', bytes: 3 }]);
   });
 
   it("the item detail carries each version's own list, in the same order", async () => {
@@ -149,10 +149,10 @@ describe("a version's file list (the host toolbar's Files)", () => {
     await upload([{ path: 'only/index.html', body: '<!doctype html>' }, { path: 'only/b.js', body: 'let b' }], { item: v1.body.itemId });
     const d = await (await SELF.fetch(`${API}/api/v1/items/${v1.body.itemId}`, { headers: devHeaders() })).json<{ versions: { version: number; files: FileEntry[] }[] }>();
     expect(d.versions.map((v) => v.version)).toEqual([2, 1]);
-    expect(d.versions[0]!.files).toEqual(await filesOf(v1.body.itemId, 2, ['only/index.html', 'only/b.js']));
-    expect(d.versions[1]!.files).toEqual(await filesOf(v1.body.itemId, 1, TREE));
+    expect(d.versions[0].files).toEqual(await filesOf(v1.body.itemId, 2, ['only/index.html', 'only/b.js']));
+    expect(d.versions[1].files).toEqual(await filesOf(v1.body.itemId, 1, TREE));
     const g = await (await embed(v1.body.itemId, { version: 1 })).json<{ files: FileEntry[] }>();
-    expect(g.files).toEqual(d.versions[1]!.files);
+    expect(g.files).toEqual(d.versions[1].files);
   });
 });
 
@@ -183,7 +183,7 @@ describe('timestamps', () => {
     expect(stored!.created_at).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
     const d = await (await SELF.fetch(`${API}/api/v1/items/${r.body.itemId}`, { headers: devHeaders() })).json<{ item: { createdAt: string; expiresAt: string }; versions: { createdAt: string }[] }>();
     expect(d.item.createdAt).toBe(stored!.created_at.replace(' ', 'T') + 'Z');
-    expect(d.versions[0]!.createdAt).toMatch(ISO_Z);
+    expect(d.versions[0].createdAt).toMatch(ISO_Z);
     expect(d.item.expiresAt).toMatch(ISO_Z);
     expect(Date.parse(d.item.expiresAt)).toBe(Date.parse(expiresAt));
     const listed = await (await SELF.fetch(`${API}/api/v1/items?limit=100`, { headers: devHeaders() })).json<{ items: { id: string; createdAt: string }[] }>();

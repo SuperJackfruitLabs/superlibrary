@@ -49,7 +49,7 @@ async function misfits(page: Page): Promise<string[]> {
     for (const tr of document.querySelectorAll('main tr')) {
       const cells = [...tr.children].filter(visible).map((c) => c.getBoundingClientRect());
       for (let i = 1; i < cells.length; i++) {
-        const a = cells[i - 1]!, b = cells[i]!;
+        const a = cells[i - 1], b = cells[i];
         const sameLine = Math.abs(a.top - b.top) < 2;
         if (sameLine && a.right > b.left + 1) { out.push(`cells collide in ${name(tr)}`); break; }
       }
@@ -67,7 +67,7 @@ async function smallTargets(page: Page): Promise<string[]> {
       const r0 = el.getBoundingClientRect();
       if (r0.width === 0 || r0.height === 0 || st.visibility === 'hidden' || el.closest('[hidden], .visually-hidden, .sl-skip, iframe, .sl-embed')) continue;
       const p = el.tagName === 'A' ? el.closest('p, dd, small, li') : null;
-      if (p && p.textContent!.trim() !== el.textContent!.trim()) continue; // a link inside a sentence (WCAG 2.5.8 inline)
+      if (p && p.textContent.trim() !== el.textContent.trim()) continue; // a link inside a sentence (WCAG 2.5.8 inline)
       const box = el instanceof HTMLInputElement && (el.type === 'checkbox' || el.type === 'radio') ? (el.closest('label') ?? el) : el;
       const r = box.getBoundingClientRect();
       if (r.height < 43.5) out.push(`${el.tagName.toLowerCase()}${el instanceof HTMLInputElement ? `[${el.type}]` : ''} "${(el.textContent || el.getAttribute('aria-label') || '').trim().slice(0, 30)}" ${r.height.toFixed(0)}px`);

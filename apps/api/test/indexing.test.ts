@@ -227,7 +227,7 @@ describe('reconcile', () => {
     const send = vi.fn();
     const waits: Promise<unknown>[] = [];
     const ctx = { waitUntil: (p: Promise<unknown>) => { waits.push(p); }, passThroughOnException() {} } as unknown as ExecutionContext;
-    await worker.scheduled!({ cron: '30 3 * * *', scheduledTime: Date.UTC(2026, 9, 9, 3, 30), noRetry() {} } as ScheduledController, { ...env, INDEX: { sendBatch: send } as unknown as Queue<IndexMessage> }, ctx);
+    await worker.scheduled({ cron: '30 3 * * *', scheduledTime: Date.UTC(2026, 9, 9, 3, 30), noRetry() {} }, { ...env, INDEX: { sendBatch: send } as unknown as Queue<IndexMessage> }, ctx);
     await Promise.all(waits);
     expect(waits).toHaveLength(1);
     const sent = send.mock.calls.flatMap((c) => c[0] as Array<{ body: any }>);

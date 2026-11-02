@@ -26,7 +26,7 @@ export function resolveRelative(fromPath: string, href: string): string | null {
 
 /** Spec §9: GFM (tables, task lists), then sanitized; raw HTML in the file survives only as DOMPurify allows. */
 export function markdownHtml(src: string): string {
-  const html = marked.parse(src, { gfm: true, async: false }) as string;
+  const html = marked.parse(src, { gfm: true, async: false });
   return DOMPurify.sanitize(html, { USE_PROFILES: { html: true } });
 }
 

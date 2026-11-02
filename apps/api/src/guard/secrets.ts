@@ -32,7 +32,7 @@ function entropy(s: string): number {
 
 function highEntropyAssignment(line: string): boolean {
   for (const m of line.matchAll(ASSIGNMENT)) {
-    const value = m[1]!;
+    const value = m[1];
     // A word-only value with dashes ("your-api-key-here") is a placeholder, not a secret.
     if (/^[a-z-]+$/i.test(value)) continue;
     if (entropy(value) >= 3.5) return true;

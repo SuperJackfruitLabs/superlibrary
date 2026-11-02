@@ -107,7 +107,7 @@ async function whileFirstBatchWaits(inner: () => Promise<Response>, outer: () =>
       innerRes = { status: res.status, body: await res.json() };
     }
     return original(statements);
-  }) as D1Database['batch'];
+  });
   try {
     const res = await outer();
     return { inner: innerRes!, outer: { status: res.status, body: await res.json() } };
@@ -145,7 +145,7 @@ describe('a refused commit adds nothing to the library (spec §8, ruling T7/T8)'
     expect((await env.BLOBS.list({ prefix: `quarantine/${refused.uploadId}/` })).objects).toHaveLength(0);
     const manifest = await (await env.BLOBS.get(`manifests/${result.itemId}/1.json`))!.json<{ entry: string; files: Record<string, { sha256: string }> }>();
     expect(manifest.entry).toBe('README.md');
-    expect(manifest.files['src/config.ts']!.sha256).toBe(sha);
+    expect(manifest.files['src/config.ts'].sha256).toBe(sha);
   });
 
   it('an override covers only the findings it saw: a new hit after it needs a new override', async () => {
@@ -154,9 +154,9 @@ describe('a refused commit adds nothing to the library (spec §8, ruling T7/T8)'
     const declared = await Promise.all(files.map(async (f) => ({ path: f.path, bytes: enc(f.body).length, sha256: await sha256Hex(enc(f.body)) })));
     const { uploadId } = await (await post('', { title: 't', files: declared })).json<{ uploadId: string }>();
     const send = (f: { path: string; body: string }) => SELF.fetch(`${API}/api/v1/uploads/${uploadId}/files?path=${f.path}`, { method: 'PUT', headers: devHeaders(), body: f.body });
-    await send(files[0]!);
+    await send(files[0]);
     expect((await post(`${uploadId}/override`, { reason: 'the first one is a fixture' })).status).toBe(200);
-    await send(files[1]!);
+    await send(files[1]);
     const res = await post(`${uploadId}/commit`);
     expect(res.status).toBe(422);
     expect((await res.json<{ findings: unknown[] }>()).findings).toHaveLength(2);

@@ -34,7 +34,7 @@ describe('subscriptions (spec §5)', () => {
     await subscribeWorkspace(env, ws, ORG);
     await subscribeWorkspace(env, ws, ORG);
     expect(state.pushConfigs).toHaveLength(2);   // Superpipeline upserts on (agent, url); we may call it again
-    const cfg = state.pushConfigs[0]!;
+    const cfg = state.pushConfigs[0];
     expect(cfg.url).toBe(`https://api.test/api/v1/sources/superpipeline/events?board=brd_00000000000000b1&ws=${ws}`);
     expect(cfg.token).toBe(await pushSecret(env, ws, 'brd_00000000000000b1'));
     expect(cfg.events).toContain('card.completed');
@@ -128,9 +128,9 @@ describe('the receiver guards', () => {
     const send = vi.spyOn(env.INGEST, 'sendBatch').mockResolvedValue({ metadata: {} } as never);
     const body = JSON.stringify({ event: 'card.updated', boardId: 'brd_00000000000000b1', seq: 1, ts: 't', cardIds: ['card_00000000000000c1'] });
     await SELF.fetch(evUrl('brd_00000000000000b1'), { method: 'POST', headers: { 'X-Superpipeline-Signature': await sign('brd_00000000000000b1', body) }, body });
-    const sent = send.mock.calls[0]![0] as Array<{ body: { workspaceId: string } }>;
-    expect(sent[0]!.body.workspaceId).toBe(ws);
-    expect(sent[0]!.body.workspaceId).not.toBe(other);
+    const sent = send.mock.calls[0][0] as Array<{ body: { workspaceId: string } }>;
+    expect(sent[0].body.workspaceId).toBe(ws);
+    expect(sent[0].body.workspaceId).not.toBe(other);
     send.mockRestore();
   });
 });
@@ -165,7 +165,7 @@ describe('subscribeAll and the crons', () => {
   it('the hourly cron runs the subscription, not the retention sweep', async () => {
     const send = vi.fn();
     const ctx = createExecutionContext();
-    await worker.scheduled!(createScheduledController({ scheduledTime: Date.UTC(2026, 9, 10, 5), cron: '0 * * * *' }), { ...env, RETENTION: { send } as never }, ctx);
+    await worker.scheduled(createScheduledController({ scheduledTime: Date.UTC(2026, 9, 10, 5), cron: '0 * * * *' }), { ...env, RETENTION: { send } as never }, ctx);
     await waitOnExecutionContext(ctx);
     expect(send).not.toHaveBeenCalled();
     expect(state.pushConfigs.length).toBeGreaterThan(0);
@@ -214,7 +214,7 @@ describe('fail closed and bounds', () => {
     expect(send).not.toHaveBeenCalled();
     const ok = await SELF.fetch(evUrl(B1, WS), { method: 'POST', headers: { 'X-Superpipeline-Signature': await sign(B1, body, WS) }, body });
     expect(ok.status).toBe(202);
-    expect((send.mock.calls[0]![0] as Array<{ body: { workspaceId: string } }>)[0]!.body.workspaceId).toBe(WS);
+    expect((send.mock.calls[0][0] as Array<{ body: { workspaceId: string } }>)[0].body.workspaceId).toBe(WS);
     expect((await SELF.fetch(`https://api.test/api/v1/sources/superpipeline/events?board=${B1}`, { method: 'POST', body })).status).toBe(404);
     send.mockRestore();
   });
@@ -235,10 +235,10 @@ describe('fail closed and bounds', () => {
     state.boards.set('brd_00000000000000b2', { id: 'brd_00000000000000b2', name: 'Second', cards: new Map() });
     const real = globalThis.fetch;
     globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
-      const req = new Request(input as RequestInfo, init);
+      const req = new Request(input, init);
       if (req.method === 'POST' && req.url.includes('/brd_00000000000000b1/push-configs')) return new Response(null, { status: 500 });
-      return real(input as RequestInfo, init);
-    }) as typeof fetch;
+      return real(input, init);
+    });
     const err = vi.spyOn(console, 'error').mockImplementation(() => {});
     try {
       expect(await subscribeWorkspace(env, WS, ORG)).toEqual({ boards: 2, registered: 1, failed: 1 });

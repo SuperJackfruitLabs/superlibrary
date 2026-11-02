@@ -131,12 +131,12 @@ for (const [phase, time] of [['dusk', '2026-10-11T18:10:00'], ['night', '2026-10
      */
     const onSurface = (text: string, surface: string) => page.evaluate(([t, s]) => {
       const rgb = (c: string) => (c.match(/[\d.]+/g) ?? []).map(Number);
-      const lum = (c: string) => { const [r, g, b] = rgb(c).map((v) => { const x = v / 255; return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4; }); return 0.2126 * r! + 0.7152 * g! + 0.0722 * b!; };
+      const lum = (c: string) => { const [r, g, b] = rgb(c).map((v) => { const x = v / 255; return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4; }); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
       const fg = getComputedStyle(document.querySelector(t)!).color;
       const bg = getComputedStyle(document.querySelector(s)!).backgroundColor;
       const alpha = rgb(bg)[3] ?? 1;
       const [hi, lo] = [lum(fg), lum(bg)].sort((a, b) => b - a);
-      return { opaque: alpha === 1, ratio: (hi! + 0.05) / (lo! + 0.05) };
+      return { opaque: alpha === 1, ratio: (hi + 0.05) / (lo + 0.05) };
     }, [text, surface] as const);
 
     await page.goto('/');

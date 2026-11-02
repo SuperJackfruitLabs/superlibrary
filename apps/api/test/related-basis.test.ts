@@ -55,7 +55,7 @@ describe('related for a card with no record yet (gap S3)', () => {
     await rec('itm_00000000000027d2', 'release checklist for billing', B2);
     bag.ORG_PLANE_URL = 'https://accounts.test';
     bag.SERVICE_CREDENTIALS = JSON.stringify({ [ORG]: 'svc_lib:secret' });
-    globalThis.fetch = (async (i: RequestInfo | URL) => String(i).endsWith('/api/token/service') ? Response.json({ access_token: 't', expires_in: 300 }) : Response.json({ boards: [B1] })) as typeof fetch;
+    globalThis.fetch = (async (i: RequestInfo | URL) => String(i).endsWith('/api/token/service') ? Response.json({ access_token: 't', expires_in: 300 }) : Response.json({ boards: [B1] }));
     const agent: AgentViewer = { kind: 'agent', principalId: 'prn_000000000000000000a2', org: ORG, workspaceId: ws, act: null, via: null };
     const got = await ids({ cardId: NEW_CARD, text: 'release checklist' }, agent);
     expect(got).toContain('itm_00000000000027d1');

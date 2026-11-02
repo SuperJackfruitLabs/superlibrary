@@ -29,9 +29,9 @@ describe('the outcomes page', () => {
     c = mount(Page, { target: document.body });
     await settle();
     const tabs = [...document.querySelectorAll<HTMLAnchorElement>('nav[aria-label="Outcome"] a')];
-    expect(tabs.map((a) => a.textContent!.replace(/\s+/g, ' ').trim())).toEqual(['Everything 28', 'Approved 14', 'Completed 6', 'In progress 3', 'Superseded 2', 'Rejected 2', 'Failed 1', 'Abandoned 0']);
-    expect(tabs[1]!.getAttribute('href')).toBe('/outcomes?outcome=approved');
-    expect(tabs[0]!.getAttribute('href')).toBe('/outcomes');
+    expect(tabs.map((a) => a.textContent.replace(/\s+/g, ' ').trim())).toEqual(['Everything 28', 'Approved 14', 'Completed 6', 'In progress 3', 'Superseded 2', 'Rejected 2', 'Failed 1', 'Abandoned 0']);
+    expect(tabs[1].getAttribute('href')).toBe('/outcomes?outcome=approved');
+    expect(tabs[0].getAttribute('href')).toBe('/outcomes');
     expect(document.querySelector('[aria-current="page"]')!.textContent).toContain('Rejected');
     expect(calls.find((x) => x.path === '/api/v1/browse')!.body.outcomes).toEqual(['rejected']);
   });
@@ -65,7 +65,7 @@ describe('the outcomes page', () => {
     c = mount(Page, { target: document.body });
     await settle();
     expect(document.querySelector('[aria-busy="true"][data-skeleton]')).not.toBeNull();
-    const tabs = [...document.querySelectorAll<HTMLAnchorElement>('nav[aria-label="Outcome"] a')].map((a) => a.textContent!.replace(/\s+/g, ' ').trim());
+    const tabs = [...document.querySelectorAll<HTMLAnchorElement>('nav[aria-label="Outcome"] a')].map((a) => a.textContent.replace(/\s+/g, ' ').trim());
     expect(tabs).toEqual(['Everything –', 'Approved –', 'Completed –', 'In progress –', 'Superseded –', 'Rejected –', 'Failed –', 'Abandoned –']);
     expect(document.body.textContent).not.toMatch(/Nothing|\b0 items?\b/);
     release();

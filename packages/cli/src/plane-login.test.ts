@@ -2,7 +2,7 @@ import { expect, it } from 'vitest';
 import { SULI_CLIENT_ID, deviceLogin, discoverPlane } from './plane-login.ts';
 
 it('discovers the plane from the API and signs in as the suli device client', async () => {
-  const target = await discoverPlane('https://app.test', (async () => Response.json({ resource: 'https://app.test', authorization_servers: ['https://accounts.test'] })) as never);
+  const target = await discoverPlane('https://app.test', (async () => Response.json({ resource: 'https://app.test', authorization_servers: ['https://accounts.test'] })));
   expect(target).toEqual({ plane: 'https://accounts.test', audience: 'https://app.test' });
   const bodies: unknown[] = [];
   const fetchFn = (async (url: string, init: RequestInit) => {
@@ -18,6 +18,6 @@ it('discovers the plane from the API and signs in as the suli device client', as
 });
 
 it('no sign-in service is a 404; any other failure of discovery is an error', async () => {
-  expect(await discoverPlane('https://app.test', (async () => new Response('', { status: 404 })) as never)).toBeNull();
-  await expect(discoverPlane('https://app.test', (async () => new Response('', { status: 503 })) as never)).rejects.toThrow('discovery answered 503');
+  expect(await discoverPlane('https://app.test', (async () => new Response('', { status: 404 })))).toBeNull();
+  await expect(discoverPlane('https://app.test', (async () => new Response('', { status: 503 })))).rejects.toThrow('discovery answered 503');
 });

@@ -24,7 +24,7 @@ function hub(boards: string[] | 'down', seen: string[] = []) {
     if (u.endsWith('/api/token/service')) return Response.json({ access_token: 't', expires_in: 300 });
     if (boards === 'down') return new Response(null, { status: 503 });
     return Response.json({ boards });
-  }) as typeof fetch;
+  });
   return seen;
 }
 const item = (scope: string, created_by = 'prn_000000000000000000a9'): ItemRow => ({ id: 'itm_00000000000000c1', workspace_id: WS, kind: 'artifact', title: 't', scope, outcome: 'completed', created_by, latest_version: 1, expires_at: null, revoked_at: null, created_at: 'x' });

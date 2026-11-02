@@ -112,7 +112,7 @@ describe('review fixes', () => {
         void real(`UPDATE items SET outcome = 'rejected' WHERE id = ?`).bind(a).run();
       }
       return real(q);
-    }) as typeof env.DB.prepare);
+    }));
     const res = await supersede(a, b);
     spy.mockRestore();
     expect(res.status).toBe(200);

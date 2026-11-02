@@ -19,7 +19,7 @@ beforeEach(() => { window.matchMedia = (() => ({ matches: false })) as unknown a
 afterEach(() => { if (c) unmount(c); c = null; document.body.innerHTML = ''; calls.length = 0; });
 const item = (n: number) => ({ id: `itm_00000000000000a${n}`, kind: 'artifact', title: `Item ${n}`, scope: 'workspace', outcome: 'completed', createdBy: 'p', createdAt: '2026-10-01T00:00:00.000Z', latestVersion: 1, expiresAt: null, revokedAt: null });
 const settle = async () => { for (let i = 0; i < 6; i++) { await Promise.resolve(); await new Promise((r) => setTimeout(r, 0)); flushSync(); } };
-const button = (t: string) => [...document.querySelectorAll('button')].find((b) => b.textContent!.trim() === t)!;
+const button = (t: string) => [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === t)!;
 
 describe('the library page', () => {
   it('the Upload action is the kit button', async () => {
@@ -46,7 +46,7 @@ describe('the library page', () => {
     browse = () => Response.json({ items: [{ ...item(1), source: { agent: 'prn_00000000000000a1', board: 'brd_x', path: 'a/b.md' }, supersededBy: 'itm_00000000000000a2', caption: 'A caption' }], next: 'c1', counts: {} });
     c = mount(Page, { target: document.body });
     await settle();
-    const text = document.body.textContent!;
+    const text = document.body.textContent;
     expect(document.querySelector('.sl-day-hero .vk-sky')).not.toBeNull();
     expect(document.querySelector('.sl-day-hero h1')!.textContent).toBe('Library');
     expect(document.querySelector('.sl-day-hero form[role="search"] label[for="q"]')!.textContent).toBe('Search the library');

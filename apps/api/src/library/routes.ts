@@ -32,7 +32,7 @@ export const libraryRoutes: Handler = async (request, env, _ctx, url) => {
   const rec = /^\/api\/v1\/items\/(itm_[0-9a-f]{16})\/record$/.exec(url.pathname);
   if (rec && request.method === 'GET') {
     const p = await resolvePerson(request, env);
-    return p instanceof Response ? p : recordView(env, p, rec[1]!);
+    return p instanceof Response ? p : recordView(env, p, rec[1]);
   }
   const col = /^\/api\/v1\/collections(?:\/(col_[0-9a-f]{16})(\/items(?:\/(itm_[0-9a-f]{16}))?)?)?$/.exec(url.pathname);
   if (col) {
@@ -60,9 +60,9 @@ export const libraryRoutes: Handler = async (request, env, _ctx, url) => {
   if (mod) {
     const p = await resolvePerson(request, env);
     if (p instanceof Response) return p;
-    if (mod[2] === 'supersede' && request.method === 'POST') return supersede(request, env, p, mod[1]!);
-    if (mod[2] === 'caption' && request.method === 'PATCH') return setCaption(request, env, p, mod[1]!);
-    if (mod[2] === 'remove' && request.method === 'POST') return removeFromMemory(request, env, p, mod[1]!);
+    if (mod[2] === 'supersede' && request.method === 'POST') return supersede(request, env, p, mod[1]);
+    if (mod[2] === 'caption' && request.method === 'PATCH') return setCaption(request, env, p, mod[1]);
+    if (mod[2] === 'remove' && request.method === 'POST') return removeFromMemory(request, env, p, mod[1]);
     return null;
   }
   return null;

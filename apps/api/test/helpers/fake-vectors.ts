@@ -3,7 +3,7 @@ import type { Embedder, VectorizeLike } from '../../src/indexing/vector-index';
 type Stored = { id: string; values: number[]; namespace?: string; metadata?: Record<string, unknown> };
 const cos = (a: number[], b: number[]) => {
   let d = 0, na = 0, nb = 0;
-  for (let i = 0; i < a.length; i++) { d += a[i]! * b[i]!; na += a[i]! ** 2; nb += b[i]! ** 2; }
+  for (let i = 0; i < a.length; i++) { d += a[i] * b[i]; na += a[i] ** 2; nb += b[i] ** 2; }
   return na && nb ? d / Math.sqrt(na * nb) : 0;
 };
 function matches(meta: Record<string, unknown> | undefined, filter: Record<string, any> | undefined): boolean {
@@ -48,7 +48,7 @@ export function fakeEmbedder(id = 'workers-ai/bge-m3', dims = 1024): Embedder & 
         for (const w of t.toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').match(/[\p{L}\p{N}]+/gu) ?? []) {
           let h = 0;
           for (const c of w) h = (h * 31 + c.codePointAt(0)!) >>> 0;
-          v[h % dims]! += 1;
+          v[h % dims] += 1;
         }
         return v;
       });

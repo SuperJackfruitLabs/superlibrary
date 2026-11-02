@@ -70,7 +70,7 @@ describe('indexBatch', () => {
     const send = vi.spyOn(env.INDEX, 'send').mockResolvedValue(undefined as never);
     try {
       await reindex.startReindex(env, 'test/next');
-      const first = send.mock.calls[0]![0] as Extract<IndexMessage, { type: 'reindex' }>;
+      const first = send.mock.calls[0][0] as Extract<IndexMessage, { type: 'reindex' }>;
       const page = batch([first]);
       await consumer.indexBatch(page, env);
       expect((await result(page)).explicitAcks).toEqual(['m0']);

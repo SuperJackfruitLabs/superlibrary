@@ -23,11 +23,11 @@ export function fakePipeline(state: FakeState): () => void {
   bag.SERVICE_CREDENTIALS = JSON.stringify({ [ORG]: 'svc_lib:secret' });
   const real = globalThis.fetch;
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
-    const req = new Request(input as RequestInfo, init);
+    const req = new Request(input, init);
     const u = new URL(req.url);
     state.calls.push(`${req.method} ${u.pathname}`);
     if (u.origin === 'https://accounts.test' && u.pathname === '/api/token/service') return Response.json({ access_token: 'svc-token', expires_in: 300 });
-    if (u.origin !== 'https://pipeline.test') return real(input as RequestInfo, init);
+    if (u.origin !== 'https://pipeline.test') return real(input, init);
     if (req.headers.get('Authorization') !== 'Bearer svc-token') return new Response(null, { status: 401 });
     const m = u.pathname.match(/^\/v1\/boards(?:\/([^/]+)(?:\/cards\/([^/]+)(?:\/(\w+))?|\/(push-configs))?)?$/);
     if (!m) return new Response(null, { status: 404 });
@@ -53,6 +53,6 @@ export function fakePipeline(state: FakeState): () => void {
     if (sub === 'links') return Response.json({ links: bundle.links, externalLinks: [] });
     if (sub === 'activities') return Response.json({ activities: [], handoff: null, gates: bundle.gates });
     return new Response(null, { status: 404 });
-  }) as typeof fetch;
+  });
   return () => { globalThis.fetch = real; bag.ORG_PLANE_URL = ''; bag.SERVICE_CREDENTIALS = ''; };
 }

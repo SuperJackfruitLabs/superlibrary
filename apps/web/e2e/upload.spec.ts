@@ -43,7 +43,7 @@ test('denied files in a pick are left out and listed; the rest uploads', async (
   await expect(page.getByText('1 file chosen')).toBeVisible();
   await page.getByRole('button', { name: 'Upload', exact: true }).click();
   await expect(page).toHaveURL(/\/a\/itm_[0-9a-f]{16}$/);
-  const id = page.url().split('/a/')[1]!;
+  const id = page.url().split('/a/')[1];
   const read = await (await request.get(`http://localhost:8787/api/v1/items/${id}`, { headers: DEV })).json();
   expect(read.versions[0].files.map((f: { path: string }) => f.path)).toEqual(['notes.md']);
 });

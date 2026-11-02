@@ -19,7 +19,7 @@ function block(css: string, selector: string): string {
 function hex(body: string, name: string): string {
   const m = new RegExp(`--${name}:\\s*#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})\\b`).exec(body);
   if (!m) throw new Error(`--${name} is not a three- or six-digit hex colour here`);
-  const h = m[1]!.toLowerCase();
+  const h = m[1].toLowerCase();
   return `#${h.length === 3 ? [...h].map((c) => c + c).join('') : h}`;
 }
 const PRODUCT = { light: block(sl, ':root, [data-theme="light"]'), dark: block(sl, '[data-theme="dark"]') } as const;

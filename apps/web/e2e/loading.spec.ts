@@ -121,7 +121,7 @@ test.describe('timing', () => {
 
   test('a read that never answers turns to Failed with Try again at 20 s, and says the server is slow at 8 s', async ({ browser }) => {
     test.setTimeout(90_000);
-    const { ctx, page } = await openAt(browser, 'daylight', SIZES[0], ROUTES[0]!);
+    const { ctx, page } = await openAt(browser, 'daylight', SIZES[0], ROUTES[0]);
     await hold(page, 'never', /\/api\/v1\/browse$/);
     await page.goto('/');
     await expect(page.locator('[data-skeleton]')).toBeVisible();

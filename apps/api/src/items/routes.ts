@@ -65,7 +65,7 @@ export async function extrasFor(env: Env, p: Person, items: ItemRow[], scopes?: 
   for (const i of items) if (i.scope.startsWith('board:')) boards.add(i.scope.slice(6));
   const known = new Set<string>();
   if (boards.size) {
-    const ws = items[0]!.workspace_id;
+    const ws = items[0].workspace_id;
     const rows = await env.DB.prepare(`SELECT board_id FROM source_boards WHERE workspace_id = ?1 AND board_id IN (SELECT value FROM json_each(?2))`).bind(ws, JSON.stringify([...boards])).all<{ board_id: string }>();
     for (const r of rows.results) known.add(r.board_id);
   }
@@ -96,7 +96,7 @@ export async function readable(env: Env, p: Person, id: string): Promise<ItemRow
 /** Each listed version's files, keyed by version, entry first then tree order (`orderFiles`). */
 async function filesByVersion(env: Env, itemId: string, versions: Array<{ version: number; entry: string }>): Promise<Map<number, FileEntry[]>> {
   const rows = versions.length === 1
-    ? await env.DB.prepare(`SELECT version, path, media_type, view, bytes FROM version_files WHERE item_id = ? AND version = ?`).bind(itemId, versions[0]!.version)
+    ? await env.DB.prepare(`SELECT version, path, media_type, view, bytes FROM version_files WHERE item_id = ? AND version = ?`).bind(itemId, versions[0].version)
       .all<{ version: number; path: string; media_type: string; view: View; bytes: number }>()
     : await env.DB.prepare(`SELECT version, path, media_type, view, bytes FROM version_files WHERE item_id = ?`).bind(itemId)
       .all<{ version: number; path: string; media_type: string; view: View; bytes: number }>();

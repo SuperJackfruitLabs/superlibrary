@@ -85,7 +85,7 @@ export async function refused(res: Response, what: string, shared = false): Prom
   if (body.error === 'product_not_enabled') throw new Error(`Superlibrary is not enabled for workspace ${body.org}. An owner can enable it in the account settings.`);
   const { error = `http_${res.status}`, findings, ...detail } = body;
   const sentence = shared ? refusalSentence({ ok: false, status: res.status, error, findings, detail }) : null;
-  const why = res.status === 400 ? reasonOf(body as { issues?: unknown; detail?: unknown; message?: unknown }) : '';
+  const why = res.status === 400 ? reasonOf(body) : '';
   throw new Error(sentence ?? `${what} was refused (${res.status} ${body.error ?? ''}${body.path ? `: ${body.path}` : ''}${body.rule ? ` matches ${body.rule}` : ''})${why ? `: ${why}` : ''}.`);
 }
 

@@ -51,7 +51,7 @@ describe('the app header', () => {
   it('Sign out is inside the account menu, not in the bar, and calls back', () => {
     const onsignout = vi.fn();
     open(onsignout);
-    const signout = [...document.querySelectorAll<HTMLButtonElement>('header button')].find((b) => b.textContent!.trim() === 'Sign out')!;
+    const signout = [...document.querySelectorAll<HTMLButtonElement>('header button')].find((b) => b.textContent.trim() === 'Sign out')!;
     expect(signout.closest('.suite-shell-menu')).not.toBeNull();
     signout.click();
     expect(onsignout).toHaveBeenCalledOnce();

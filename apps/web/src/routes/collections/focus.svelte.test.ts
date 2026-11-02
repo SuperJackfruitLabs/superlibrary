@@ -11,7 +11,7 @@ import Page from './[id]/+page.svelte';
 let c: ReturnType<typeof mount> | null = null;
 afterEach(() => { if (c) unmount(c); c = null; document.body.innerHTML = ''; });
 const settle = async () => { for (let i = 0; i < 6; i++) { await new Promise((r) => setTimeout(r, 0)); flushSync(); } };
-const btn = (t: string) => [...document.querySelectorAll('button')].find((b) => b.textContent!.trim() === t)!;
+const btn = (t: string) => [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === t)!;
 
 describe('collection focus', () => {
   it('saving a rename returns focus to the Rename button', async () => {

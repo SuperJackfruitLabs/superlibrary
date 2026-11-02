@@ -14,7 +14,7 @@ describe('serviceToken', () => {
     globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
       seen.push({ url: String(input), auth: new Headers(init?.headers).get('Authorization'), body: String(init?.body) });
       return Response.json({ access_token: 'tok-1', token_type: 'Bearer', expires_in: 300 });
-    }) as typeof fetch;
+    });
     expect(await serviceToken(env, 'org_00000000000000000a01', 'https://app.superpipeline.dev')).toBe('tok-1');
     expect(await serviceToken(env, 'org_00000000000000000a01', 'https://app.superpipeline.dev')).toBe('tok-1');
     expect(seen).toEqual([{ url: 'https://accounts.test/api/token/service', auth: 'Bearer svc_x:secret', body: JSON.stringify({ audience: 'https://app.superpipeline.dev' }) }]);

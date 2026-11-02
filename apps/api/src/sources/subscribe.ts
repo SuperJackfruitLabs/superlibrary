@@ -23,7 +23,7 @@ export const pushConfigured = (env: Env) => (env.PUSH_SIGNING_KEY ?? '').length 
 /** Bound to the workspace as well as the board, so a signature for one workspace's row cannot enqueue for another's. */
 export async function pushSecret(env: Env, workspaceId: string, boardId: string): Promise<string> {
   if (!pushConfigured(env)) throw new Error('PUSH_SIGNING_KEY is missing or shorter than 32 characters');
-  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(env.PUSH_SIGNING_KEY!), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(env.PUSH_SIGNING_KEY), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
   return hex(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(`superpipeline-push:${workspaceId}:${boardId}`)));
 }
 

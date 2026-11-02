@@ -35,7 +35,7 @@ describe('collections', () => {
     await settle();
     expect(bad.error).toBe("This doesn't exist or isn't shared with you.");
     expect(calls).toEqual([]);
-    stop!();
+    stop();
     let m!: CollectionModel;
     stop = $effect.root(() => { m = new CollectionModel(() => detail.id, vi.fn()); });
     await settle();

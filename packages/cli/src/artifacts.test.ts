@@ -159,7 +159,7 @@ describe('uploadWith details', () => {
     writeFileSync(join(d, 'a.txt'), 'x');
     const { seen, client } = stack();
     await uploadWith(client, d + '/.', {});
-    expect(JSON.parse(seen[0]!.body).title).toBe(basename(d));
+    expect(JSON.parse(seen[0].body).title).toBe(basename(d));
   });
   it('sends the override reason, and turns a server refusal into the shared sentence', async () => {
     const d = tmp();
@@ -182,7 +182,7 @@ describe('uploadWith details', () => {
     for (const bad of ['2026-02-30', '2026-13-01', 'tomorrow']) await expect(uploadWith(client, d, { expires: bad })).rejects.toThrow('--expires takes a real date, YYYY-MM-DD');
     expect(seen).toEqual([]);
     await uploadWith(client, d, { expires: '2026-03-01' });
-    expect(JSON.parse(seen[0]!.body).expiresAt).toBe('2026-03-01T00:00:00.000Z');
+    expect(JSON.parse(seen[0].body).expiresAt).toBe('2026-03-01T00:00:00.000Z');
   });
   it('a refused sign-in says which credential was refused', async () => {
     const res = async () => new Response('', { status: 401 });
@@ -216,7 +216,7 @@ describe('upload, get and revoke', () => {
   });
   it('get --embed --version sends that version and prints the version it minted', async () => {
     const { seen, out } = await run(() => getItem(ID, { embed: true, version: '2', json: false }), answer);
-    expect(JSON.parse(seen[1]!.body)).toEqual({ version: 2 });
+    expect(JSON.parse(seen[1].body)).toEqual({ version: 2 });
     expect(out).toContain('viewer of v2 (until soon): https://v.test/x');
   });
   it('whole-item revoke posts the reason; revoking a version takes no reason', async () => {

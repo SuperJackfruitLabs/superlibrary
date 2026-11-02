@@ -12,7 +12,7 @@ describe('Mermaid (spec §9): strict, themed, replaces its block', () => {
     document.body.append(holder);
     await renderMermaidInto(holder, 'graph TD; A-->B');
     expect(initialize).toHaveBeenLastCalledWith(expect.objectContaining({ startOnLoad: false, securityLevel: 'strict', theme: 'dark' }));
-    expect(render.mock.calls[0]![1]).toBe('graph TD; A-->B');
+    expect(render.mock.calls[0][1]).toBe('graph TD; A-->B');
     expect(document.body.querySelector('figure.diagram svg g.node')).not.toBeNull();
     expect(document.body.contains(holder)).toBe(false);
     delete document.documentElement.dataset.theme;

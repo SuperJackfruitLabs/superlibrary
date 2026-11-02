@@ -32,12 +32,12 @@ describe('the parent in the shell', () => {
     mounted.push(mount(SuiteSwitcher, { target: document.body, props: { products: PRODUCTS, current: 'superlibrary' } }));
     flushSync();
     const btn = document.querySelector<HTMLButtonElement>('button.suite-switcher')!;
-    expect(btn.textContent!.trim()).toBe('Products');
+    expect(btn.textContent.trim()).toBe('Products');
     btn.click(); flushSync();
     const panel = document.getElementById(btn.getAttribute('aria-controls')!)!;
     expect(panel.querySelector('.suite-head')!.textContent).toContain('Super Jackfruit Labs');
     const links = [...panel.querySelectorAll('a')];
-    expect(links.map((a) => a.textContent!.trim())).toEqual(['AgentPod', 'Superlibrary']);   // no address yet: not linked
+    expect(links.map((a) => a.textContent.trim())).toEqual(['AgentPod', 'Superlibrary']);   // no address yet: not linked
     expect(panel.querySelector('[aria-current="true"]')!.textContent).toContain('Superlibrary');
     const chip = document.querySelector<HTMLElement>('.suite-list li')!;
     expect(chip.style.getPropertyValue('--chip-bg')).toMatch(/^var\(--vk-product-[a-z]+-bg\)$/);
@@ -48,7 +48,7 @@ describe('the parent in the shell', () => {
     mounted.push(mount(SuiteFooter, { target: document.body, props: {} }));
     flushSync();
     const link = document.querySelector<HTMLAnchorElement>('footer a')!;
-    expect(link.textContent!.trim()).toBe('Super Jackfruit Labs');
+    expect(link.textContent.trim()).toBe('Super Jackfruit Labs');
     expect(link.getAttribute('href')).toBe('https://superjackfruit.com');
     expect(link.querySelector('svg')).toBeNull();
   });

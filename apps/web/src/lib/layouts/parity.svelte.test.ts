@@ -54,7 +54,7 @@ const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 /** Whether `phrase` is in `text` as whole words: "Run" is not in "Running", "Item" is not in "Items". */
 function has(text: string, phrase: string): boolean {
   const p = norm(phrase);
-  const re = new RegExp(`${WORD.test(p[0]!) ? '(?<![\\p{L}\\p{N}_])' : ''}${esc(p)}${WORD.test(p[p.length - 1]!) ? '(?![\\p{L}\\p{N}_])' : ''}`, 'u');
+  const re = new RegExp(`${WORD.test(p[0]) ? '(?<![\\p{L}\\p{N}_])' : ''}${esc(p)}${WORD.test(p[p.length - 1]) ? '(?![\\p{L}\\p{N}_])' : ''}`, 'u');
   return re.test(text);
 }
 const shown = (el: Element) => el.closest('[hidden]') === null;
@@ -156,8 +156,8 @@ describe.each(['daylight', 'paper', 'quiet'] as const)('%s: a version row reads 
     c = mount(ItemView, { target: document.body, props: { itemId: FIX.artifactId } });
     await settle(); openAll(); await settle();
     const text = document.body.textContent?.replace(/\s+/g, ' ') ?? '';
-    expect(text).toContain(`${when(VERSIONS[0]!.createdAt)} · ${formatBytes(2048)} · 2 files`);
-    expect(text).toContain(`${when(VERSIONS[1]!.createdAt)} · ${formatBytes(512)} · 1 file`);
+    expect(text).toContain(`${when(VERSIONS[0].createdAt)} · ${formatBytes(2048)} · 2 files`);
+    expect(text).toContain(`${when(VERSIONS[1].createdAt)} · ${formatBytes(512)} · 1 file`);
   });
 });
 
@@ -203,7 +203,7 @@ describe('the parity check fails when something is dropped', () => {
   let c: ReturnType<typeof mount> | null = null;
   beforeEach(() => { look.appearance = { ...look.appearance, vibe: 'daylight' }; });
   afterEach(() => { if (c) unmount(c); c = null; document.body.innerHTML = ''; });
-  const openScreen = async (i: number) => { c = SCREENS[i]![1](); await settle(); openAll(); await settle(); };
+  const openScreen = async (i: number) => { c = SCREENS[i][1](); await settle(); openAll(); await settle(); };
   const els = (css: string, text: string) => [...document.querySelectorAll(css)].filter((e) => e.textContent?.trim() === text);
 
   it('whole words only: "Item" is not in "Items", "Run" is not in "Running", "Revoke" is not in "Revoked"', () => {
@@ -228,7 +228,7 @@ describe('the parity check fails when something is dropped', () => {
 
   it('a value moved away from its label is named', async () => {
     await openScreen(1);
-    const dd = els('dt', 'Item')[0]!.nextElementSibling!;
+    const dd = els('dt', 'Item')[0].nextElementSibling!;
     dd.parentElement!.append(dd);
     expect(missing(PARITY.artifact)).toEqual(['row: Item → Artifact']);
   });
@@ -241,7 +241,7 @@ describe('the parity check fails when something is dropped', () => {
 
   it('a heading turned into plain text is named', async () => {
     await openScreen(1);
-    const h = els('h2', 'Provenance')[0]!;
+    const h = els('h2', 'Provenance')[0];
     const p = document.createElement('p');
     p.textContent = h.textContent;
     h.replaceWith(p);
@@ -285,16 +285,16 @@ describe('the parity check fails when something is dropped', () => {
     wrap.append(outer);
     outer.append(list);
     const [v2, v1] = [...list.querySelectorAll(':scope > li')];
-    v2!.append(els('span', 'Revoked')[0]!);
-    expect(v1!.textContent).not.toContain('Revoked');
+    v2.append(els('span', 'Revoked')[0]);
+    expect(v1.textContent).not.toContain('Revoked');
     expect(missing(PARITY.artifact)).toEqual([expect.stringMatching(/^together in li, tr: v1 \| /)]);
   });
 
   it('a wrong size and a revoked version shown as a link are named', async () => {
     await openScreen(1);
-    const size = els('dt', 'Size')[0]!.nextElementSibling!;
-    size.textContent = size.textContent!.replace('2,048', '2048');
-    const v1 = els('span', 'v1')[0]!;
+    const size = els('dt', 'Size')[0].nextElementSibling!;
+    size.textContent = size.textContent.replace('2,048', '2048');
+    const v1 = els('span', 'v1')[0];
     const a = document.createElement('a');
     a.href = '/a/x?v=1';
     v1.replaceWith(a);

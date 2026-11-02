@@ -59,7 +59,7 @@ export function holdModal(dialog: HTMLElement, onEscape: () => void, returnTo: H
     } else {
       next = e.shiftKey ? (i <= 0 ? f.length - 1 : i - 1) : (i === -1 || i === f.length - 1 ? 0 : i + 1);
     }
-    f[next]!.focus();
+    f[next].focus();
   };
   // Focus can still land outside (a click on the backdrop in WebKit, a screen reader): bring it back.
   const onFocusIn = (e: FocusEvent) => { if (dialog.isConnected && e.target instanceof Node && !dialog.contains(e.target)) start(); };

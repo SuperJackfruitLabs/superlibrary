@@ -25,7 +25,7 @@ describe('Quiet: the library as a printed page', () => {
     expect(document.querySelector('label[for="q"]')!.classList.contains('visually-hidden')).toBe(false);
     expect(document.querySelector<HTMLDetailsElement>('details.filters')!.open).toBe(true);
     const first = document.querySelector('ul.results--plain[aria-label="Library"] > li')!;
-    expect(first.querySelector('.sl-facts-line')!.textContent!.replace(/\s+/g, ' ').trim()).toBe('Outcome: Completed. Artifact · Parity board · docs · out/report. Visible to: Everyone in the workspace.');
+    expect(first.querySelector('.sl-facts-line')!.textContent.replace(/\s+/g, ' ').trim()).toBe('Outcome: Completed. Artifact · Parity board · docs · out/report. Visible to: Everyone in the workspace.');
     expect(document.querySelector('.vk-face, .vk-sky')).toBeNull();
   });
 

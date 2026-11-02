@@ -71,7 +71,7 @@ export async function indexItem(env: Env, itemId: string): Promise<'indexed' | '
   for (const s of slots) {
     const vectors = await embedderFor(env, s.embedder_id!).embed(texts);
     await indexFor(env, s).upsert(vectors.map((values, i) => ({
-      id: ids[i]!, values, namespace: item.workspace_id,
+      id: ids[i], values, namespace: item.workspace_id,
       metadata: { itemId, scope: item.scope, kind: item.kind, outcome: item.outcome, embedder: s.embedder_id!, dims: s.dims!, version: content.version, position: i },
     })));
   }

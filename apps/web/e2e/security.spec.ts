@@ -119,7 +119,7 @@ test.describe('the content origin, under a malicious HTML artifact (spec §15)',
   test('a signed URL expires', async ({ page, request }) => {
     const item = await uploadViaApi(request, [{ path: 'a.md', body: '# expires' }]);
     // A genuine token for the item, signed with the dev key (`pnpm e2e` writes it), ten seconds in the past.
-    const jwk = /URL_SIGNING_PRIVATE_KEY='([^']+)'/.exec(readFileSync(new URL('../../api/.dev.vars', import.meta.url), 'utf8'))![1]!;
+    const jwk = /URL_SIGNING_PRIVATE_KEY='([^']+)'/.exec(readFileSync(new URL('../../api/.dev.vars', import.meta.url), 'utf8'))![1];
     const key = await webcrypto.subtle.importKey('jwk', JSON.parse(jwk), { name: 'Ed25519' }, false, ['sign']);
     const sign = async (exp: number) => {
       const g = { itemId: item.itemId, version: 1, exp, host: APP };

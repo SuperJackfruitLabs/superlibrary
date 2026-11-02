@@ -207,6 +207,6 @@ export async function backfillBoard(env: Env, workspaceId: string, boardId: stri
   const msgs: Array<{ body: IngestMessage }> = page.map(([cardId, present]) => ({
     body: present ? { type: 'card.sync', workspaceId, boardId, cardId, reason: 'backfill' } : { type: 'card.deleted', workspaceId, boardId, cardId },
   }));
-  if (rest.length > page.length) msgs.push({ body: { type: 'board.backfill', workspaceId, boardId, after: page[page.length - 1]![0] } });
+  if (rest.length > page.length) msgs.push({ body: { type: 'board.backfill', workspaceId, boardId, after: page[page.length - 1][0] } });
   for (let i = 0; i < msgs.length; i += 100) await env.INGEST.sendBatch(msgs.slice(i, i + 100));
 }

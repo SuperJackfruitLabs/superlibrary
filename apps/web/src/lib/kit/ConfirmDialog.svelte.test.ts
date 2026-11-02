@@ -58,12 +58,12 @@ describe('the confirmation dialog (no browser confirm or prompt)', () => {
 
   it('keeps Tab and Shift+Tab inside', () => {
     const { buttons } = open();
-    buttons[1]!.focus();
+    buttons[1].focus();
     expect(key('Tab').defaultPrevented).toBe(true);
     expect(document.activeElement).toBe(buttons[0]);
     expect(key('Tab', true).defaultPrevented).toBe(true);
     expect(document.activeElement).toBe(buttons[1]);
-    buttons[0]!.focus();
+    buttons[0].focus();
     // Moved here even mid-way: WebKit skips buttons and would leave the dialog for <body>.
     expect(key('Tab').defaultPrevented).toBe(true);
     expect(document.activeElement).toBe(buttons[1]);
@@ -122,9 +122,9 @@ describe('the confirmation dialog (no browser confirm or prompt)', () => {
     field.value = '  wrong file ';
     field.dispatchEvent(new Event('input', { bubbles: true }));
     flushSync();
-    dialog.querySelectorAll('button')[1]!.click();
+    dialog.querySelectorAll('button')[1].click();
     expect(props.onconfirm).toHaveBeenCalledWith('wrong file');
-    buttons[0]!.click();
+    buttons[0].click();
     expect(props.oncancel).toHaveBeenCalledOnce();
   });
 

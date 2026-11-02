@@ -14,12 +14,12 @@ describe('CollectionEntries, table variant', () => {
     c = mount(CollectionEntries, { target: document.body, props: { model, variant: 'table' } });
     flushSync();
     const table = document.querySelector('table[aria-label="Items in this collection"]')!;
-    expect([...table.querySelectorAll('thead th')].map((th) => th.textContent!.trim())).toEqual(['Title', 'Outcome', 'Added', 'Note', 'Action']);
+    expect([...table.querySelectorAll('thead th')].map((th) => th.textContent.trim())).toEqual(['Title', 'Outcome', 'Added', 'Note', 'Action']);
     const rows = [...table.querySelectorAll('tbody tr')];
     expect(rows).toHaveLength(2);
-    expect(rows[0]!.querySelector('td[data-label="Note"]')!.textContent).toBe('Keep this one');
-    expect(rows[1]!.querySelector('td[data-label="Note"]')!.textContent).toBe('');
-    expect(rows[0]!.querySelector('td[data-label="Action"]')!.textContent).toContain('“First”');
+    expect(rows[0].querySelector('td[data-label="Note"]')!.textContent).toBe('Keep this one');
+    expect(rows[1].querySelector('td[data-label="Note"]')!.textContent).toBe('');
+    expect(rows[0].querySelector('td[data-label="Action"]')!.textContent).toContain('“First”');
   });
 });
 
@@ -30,9 +30,9 @@ describe('CollectionEntries, plain variant', () => {
     const first = document.querySelector('ul.results--plain[aria-label="Items in this collection"] > li')!;
     expect([...first.children].map((e) => e.tagName + '.' + (e.className.split(' ')[0] ?? ''))).toEqual(['A.result-link', 'P.sl-facts-line', 'P.snippet', 'BUTTON.']);
     expect(first.querySelector('.result-title')!.textContent).toBe('First');
-    expect(first.querySelector('.sl-facts-line')!.textContent!.replace(/\s+/g, ' ')).toMatch(/^Outcome: Completed\. added /);
+    expect(first.querySelector('.sl-facts-line')!.textContent.replace(/\s+/g, ' ')).toMatch(/^Outcome: Completed\. added /);
     expect(first.querySelector('.snippet')!.textContent).toBe('Keep this one');
-    expect(first.querySelector('button')!.textContent!).toMatch(/^Remove\s*“First” from collection$/);
+    expect(first.querySelector('button')!.textContent).toMatch(/^Remove\s*“First” from collection$/);
     expect(first.querySelector('button .visually-hidden')).not.toBeNull();
   });
 });

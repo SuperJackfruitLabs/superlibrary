@@ -55,7 +55,7 @@ describe('who may call (plan P1, P13)', () => {
       });
       expect(rows).toHaveLength(1);
       expect(rows[0]).toMatchObject({ workspace_id: null, act: null });
-      expect(JSON.parse(rows[0]!.detail)).toMatchObject({ named: AGENT, method: 'GET', path: '/api/v1/whoami' });
+      expect(JSON.parse(rows[0].detail)).toMatchObject({ named: AGENT, method: 'GET', path: '/api/v1/whoami' });
     });
   });
 
@@ -73,7 +73,7 @@ describe('who may call (plan P1, P13)', () => {
         expect((await call('/api/v1/whoami', hub, await onBehalf(await agentProof(), { 'X-On-Behalf-Of': 'prn_bad' }))).status).toBe(400);
       });
       expect(rows).toHaveLength(1);
-      expect(JSON.parse(rows[0]!.detail)).toMatchObject({ named: null });
+      expect(JSON.parse(rows[0].detail)).toMatchObject({ named: null });
     });
   });
 
@@ -128,7 +128,7 @@ describe('who may call (plan P1, P13)', () => {
         expect(await r.json()).toMatchObject({ error: 'product_not_enabled', org: ORG });
       });
       expect(rows).toHaveLength(1);
-      expect(JSON.parse(rows[0]!.detail)).toMatchObject({ reason: 'product not enabled', named: AGENT });
+      expect(JSON.parse(rows[0].detail)).toMatchObject({ reason: 'product not enabled', named: AGENT });
       const viaServiceCaller = await refusalsDuring(HUB_SVC, async () => {
         const r = await serviceCaller(new Request('https://api.test/api/v1/internal', { headers: { Authorization: `Bearer ${hub}`, ...(await onBehalf(await agentProof())) } }), env);
         expect(r instanceof Response ? [r.status, (await r.json<{ error: string }>()).error] : 200).toEqual([403, 'product_not_enabled']);
@@ -152,8 +152,8 @@ describe('who may call (plan P1, P13)', () => {
       const rows = (await auditRows('on_behalf.accepted', AGENT)).slice(before);
       expect(rows).toHaveLength(1);
       expect(rows[0]).toMatchObject({ actor: AGENT, act: HUB_SVC });
-      expect(rows[0]!.workspace_id).toMatch(/^wsp_/);
-      expect(JSON.parse(rows[0]!.detail)).toEqual({ method: 'GET', path: '/api/v1/whoami' });
+      expect(rows[0].workspace_id).toMatch(/^wsp_/);
+      expect(JSON.parse(rows[0].detail)).toEqual({ method: 'GET', path: '/api/v1/whoami' });
       const m = await env.DB.prepare(`SELECT COUNT(*) AS n FROM members WHERE principal_id = ?`).bind(AGENT).first<{ n: number }>();
       expect(m!.n).toBe(0);
     });
@@ -284,8 +284,8 @@ describe('a person is never served through a service (operator ruling R-H1)', ()
         expect(await r.json()).toMatchObject({ error: 'principal_not_supported', detail: DETAIL });
       });
       expect(rows).toHaveLength(1);
-      expect(rows[0]!.act).toBeNull();
-      expect(JSON.parse(rows[0]!.detail)).toMatchObject({ reason: 'delegated_person' });
+      expect(rows[0].act).toBeNull();
+      expect(JSON.parse(rows[0].detail)).toMatchObject({ reason: 'delegated_person' });
     });
   });
 

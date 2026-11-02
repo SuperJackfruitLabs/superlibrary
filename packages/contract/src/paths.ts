@@ -10,7 +10,7 @@ export type PathCheck = { ok: true; path: string } | { ok: false; path: string; 
 const lower = (s: string) => s.toLowerCase().replace(/[. ]+$/, '');
 const anySeg = (pred: (s: string) => boolean) => (segs: string[]) => segs.some((s) => pred(lower(s)));
 const dirSeg = (name: string) => (segs: string[]) => segs.slice(0, -1).some((s) => lower(s) === name);
-const base = (pred: (s: string) => boolean) => (segs: string[]) => pred(lower(segs[segs.length - 1]!));
+const base = (pred: (s: string) => boolean) => (segs: string[]) => pred(lower(segs[segs.length - 1]));
 const sub = (...parts: string[]) => (segs: string[]) => {
   const l = segs.map(lower);
   for (let i = 0; i + parts.length <= l.length; i++) if (parts.every((p, j) => l[i + j] === p)) return true;
