@@ -8,9 +8,12 @@
   "scripts": {
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",
-    "build": "pnpm -r build"
+    "build": "pnpm -r build",
+    "lint": "node scripts/lint.mjs"
   },
   "devDependencies": {
+    "oxlint": "1.88.0",
+    "oxlint-tsgolint": "7.0.2004",
     "typescript": "^6.0.3",
     "vitest": "^4.1.9"
   }
