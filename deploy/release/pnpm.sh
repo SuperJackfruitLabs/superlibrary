@@ -3,4 +3,5 @@
 # the workspace's dependencies from the lockfile.
 command -v pnpm >/dev/null 2>&1 ||
   npm install --global --ignore-scripts "pnpm@$(node -p "require('./package.json').packageManager.split('@')[1].split('+')[0]")"
-pnpm install --frozen-lockfile
+# Dependency scripts never see the deploy's tokens.
+env -u CLOUDFLARE_API_TOKEN -u GH_TOKEN pnpm install --frozen-lockfile

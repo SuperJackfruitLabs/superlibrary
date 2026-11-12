@@ -76,7 +76,7 @@ test('production deploys in the old order, with migrations first', () => {
   const content = at('@superlibrary/content run deploy');
   const web = at('pages deploy');
   assert.ok(migrate < api && api < web, 'migrations, then the API, then web');
-  assert.ok(content > 0);
+  assert.ok(migrate < content && content < web, 'the content Worker after the migrations, before web');
   assert.match(d, /--project-name=superlibrary-web --branch=main/);
 });
 

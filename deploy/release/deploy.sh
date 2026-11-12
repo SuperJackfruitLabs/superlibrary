@@ -12,7 +12,7 @@ export WRANGLER_SEND_METRICS=false
 pnpm --filter @superlibrary/api db:migrate
 pnpm --filter @superlibrary/api run deploy
 pnpm --filter @superlibrary/content run deploy
-pnpm --filter @superlibrary/web build
+env -u CLOUDFLARE_API_TOKEN -u GH_TOKEN pnpm --filter @superlibrary/web build
 # wrangler runs from a neutral directory with an absolute path (project detection rewrites a
 # checkout), and is the lockfile's (installed under apps/api), not an unpinned download.
 root=$PWD
