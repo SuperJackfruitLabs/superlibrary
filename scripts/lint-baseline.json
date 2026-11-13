@@ -27,7 +27,7 @@
   "typescript(require-array-sort-compare)": 3,
   "typescript(restrict-template-expressions)": 4,
   "typescript(unbound-method)": 4,
-  "unicorn(consistent-function-scoping)": 100,
+  "unicorn(consistent-function-scoping)": 99,
   "unicorn(no-array-reverse)": 1,
   "unicorn(no-array-sort)": 63,
   "unicorn(no-new-array)": 12,

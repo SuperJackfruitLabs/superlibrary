@@ -31,12 +31,12 @@ To give an agent the skill too: `SKILL_DIR=~/.claude/skills bash` on the install
 The skill is built into the binary, so it always matches the verbs of the suli that wrote it.
 An existing different program named `suli` or `superlibrary` is refused, never overwritten.
 
-(Releases are built by `.github/workflows/release.yml` when a `v*` tag is pushed.)
+(Releases are built by `.github/workflows/release.yml`, the suite's shared release workflow, when a `v*` tag is pushed.)
 
 ## Deploying
 
 - Every push to `main` deploys staging, at [staging-app.superlibrary.dev](https://staging-app.superlibrary.dev) (`deploy-staging` in `ci.yml`). Main never deploys production.
-- A `v*` tag deploys production, at [app.superlibrary.dev](https://app.superlibrary.dev) (`release.yml`), alongside the suli release. The tag must be on `main`, and `ci.yml`'s push run on `main` for that exact commit must have passed `test` and `e2e`; otherwise nothing deploys. It then applies the remote D1 migrations and deploys the API Worker, the content Worker, then web, and smokes production.
+- A `v*` tag deploys production, at [app.superlibrary.dev](https://app.superlibrary.dev) (`release.yml`, settings in `.github/release-config.json`, hooks in `.github/release/`), with the suli release. The tag must be on `main`, and `ci.yml`'s push run on `main` for that exact commit must have passed; otherwise nothing deploys. It builds the suli binaries at the tag (`deploy/release/build.sh`), then applies the remote D1 migrations and deploys the API Worker, the content Worker, then web (`deploy/release/deploy.sh`), smokes production (`deploy/release/smoke.sh`) and publishes the release. A failed deploy or smoke leaves the release a draft.
 - `superlibrary.dev` and `docs.superlibrary.dev` deploy automatically on merge to main (`.github/workflows/sites.yml` runs `scripts/deploy-sites.sh`, below).
 
 ## Run it locally

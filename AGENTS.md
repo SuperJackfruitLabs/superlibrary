@@ -11,7 +11,7 @@ Start with [`README.md`](README.md) and [`docs/code-quality.md`](docs/code-quali
 - **Characterization test first.** Before a refactor that touches behaviour, commit a test against the old code and prove it can fail (revert the code, watch it go red).
 - **Check the PR is still open before pushing to its branch.** PRs are often merged within minutes, and a push to a merged branch strands the work.
 - **Never rerun main-branch CI jobs.** A rerun on `main` re-queues `deploy-staging`. Rerun PR runs only.
-- **A `v*` tag deploys production** (`release.yml`), after `production-gate` finds main's `test` and `e2e` passed for that commit. Only the operator tags.
+- **A `v*` tag deploys production** through the suite's shared release workflow (`.github/workflows/release.yml` and the kit files in `.github/release/`, synced byte-identical from the suite's release kit: change them there, never here; settings in `.github/release-config.json`; the hooks `.github/release/{build,deploy,smoke}.sh` are SuperLibrary's own and each runs one script in `deploy/release/`), after it finds main's `ci.yml` run passed for that commit. It builds the suli binaries at the tag, deploys the API (migrations first), content and web, smokes production and publishes the release. Write user-visible changes under `## Unreleased` in `CHANGELOG.md`. Only the operator tags.
 - **`pnpm lint` needs `svelte-kit sync`**, which `scripts/lint.mjs` runs first. Run the script, not `oxlint` directly, or the type-aware rules see missing types.
 - **The Claude CI files are synced copies.** `.github/claude/claude-ci.mjs` and the `claude-review`/`claude-triage` workflows come from the suite's shared kit; change them there, not here. The advisory PR review follows [`REVIEW.md`](REVIEW.md).
 

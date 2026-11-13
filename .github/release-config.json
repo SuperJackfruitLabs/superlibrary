@@ -1,0 +1,7 @@
+{
+  "product": "SuperLibrary",
+  "ci_workflow": "ci.yml",
+  "assets": ["dist/suli-*", "scripts/install.sh"],
+  "secrets": ["CLOUDFLARE_API_TOKEN"],
+  "smoke": { "retries": 6, "delay_s": 10 }
+}
