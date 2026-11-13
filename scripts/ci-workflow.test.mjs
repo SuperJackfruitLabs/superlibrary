@@ -41,9 +41,21 @@ test('the app jobs skip only on a landing- or docs-only change, as ci.yml plans 
 });
 
 // A v* tag runs the suite's shared release workflow (synced, byte-identical); what is particular to
-// SuperLibrary is .github/release-config.json and the scripts it names in deploy/release/.
+// SuperLibrary is .github/release-config.json and the hooks at .github/release/<hook>.sh, each of
+// which runs one script in deploy/release/.
 const config = JSON.parse(readFileSync(new URL('../.github/release-config.json', import.meta.url), 'utf8'));
 const script = (f) => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
+const hook = (name) => {
+  const m = script(`.github/release/${name}.sh`).match(/^sh (deploy\/release\/[a-z]+\.sh)$/m);
+  assert.ok(m, `the ${name} hook runs no deploy/release script`);
+  return script(m[1]);
+};
+
+test('the config names no command or script path: hooks are fixed files', () => {
+  for (const k of ['check', 'build_command', 'build_at_tag', 'deploy', 'rollback']) assert.equal(config[k], undefined, `config still has ${k}`);
+  assert.equal(config.smoke?.script, undefined, 'config still has smoke.script');
+  assert.doesNotMatch(rel, /toJSON\(secrets\)|sh -c "\$\(jq/);
+});
 
 test('a v* tag runs the shared release workflow, gated on main CI', () => {
   assert.match(rel, /tags: \['v\*'\]/);
@@ -55,9 +67,9 @@ test('a v* tag runs the shared release workflow, gated on main CI', () => {
 });
 
 test('the CLI binaries are built at the tag, stamped and checked', () => {
-  assert.equal(config.build_at_tag, true);
+  assert.equal(config.artifact, undefined, 'artifact would skip the build hook');
   assert.deepEqual(config.assets, ['dist/suli-*', 'scripts/install.sh']);
-  const build = script(config.build_command.replace(/^sh /, ''));
+  const build = hook('build');
   for (const t of ['darwin-arm64', 'darwin-x64', 'linux-x64', 'linux-arm64']) assert.ok(build.includes(t), `no ${t} build`);
   assert.match(build, /--define SULI_VERSION="\\"\$TAG\\""/);
   assert.match(build, /\.\/dist\/suli-linux-x64 version/);
@@ -65,7 +77,7 @@ test('the CLI binaries are built at the tag, stamped and checked', () => {
 
 test('production deploys in the old order, with migrations first', () => {
   assert.deepEqual(config.secrets, ['CLOUDFLARE_API_TOKEN']);
-  const d = script(config.deploy);
+  const d = hook('deploy');
   const at = (needle) => {
     const i = d.indexOf(needle);
     assert.ok(i > 0, `deploy lacks ${needle}`);
@@ -86,7 +98,7 @@ test('the test job runs the lint ratchet and the architecture test', () => {
 });
 
 test('production smoke covers health, auth, html and discovery', () => {
-  const s = script(config.smoke.script);
+  const s = hook('smoke');
   for (const p of ['/api/health', '/api/v1/me', '= 401', '<html', '/.well-known/oauth-protected-resource', 'https://accounts.superjackfruit.com'])
     assert.ok(s.includes(p), `smoke lacks ${p}`);
 });

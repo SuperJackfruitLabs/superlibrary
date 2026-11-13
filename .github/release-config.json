@@ -1,10 +1,7 @@
 {
   "product": "SuperLibrary",
   "ci_workflow": "ci.yml",
-  "build_at_tag": true,
-  "build_command": "sh deploy/release/build.sh",
   "assets": ["dist/suli-*", "scripts/install.sh"],
   "secrets": ["CLOUDFLARE_API_TOKEN"],
-  "deploy": "deploy/release/deploy.sh",
-  "smoke": { "script": "deploy/release/smoke.sh", "retries": 6, "delay_s": 10 }
+  "smoke": { "retries": 6, "delay_s": 10 }
 }
