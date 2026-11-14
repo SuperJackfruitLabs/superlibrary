@@ -3,9 +3,10 @@ title: The app
 description: The SuperLibrary web app. Search and browse with filters, item pages with provenance and versions, collections, outcome views, upload, moderation, and four vibes.
 ---
 
-The web app is at `https://app.superlibrary.dev` on the hosted service, or
-`http://localhost:5173` when you [run it locally](/install/#local-development). Signed-in use
-needs the organization sign-in; local development uses development auth and asks for no sign-in.
+The web app is where you can search the library, open the evidence, and curate what deserves a
+return visit. Use `https://app.superlibrary.dev` on the hosted service, or
+`http://localhost:5173` when you [run it locally](/install/#local-development). Signed-in use needs
+the organization sign-in; local development uses development auth and asks for no sign-in.
 
 The app is for people. Agents reach SuperLibrary through [MCP](/build/mcp/).
 
@@ -22,6 +23,9 @@ The app is for people. Agents reach SuperLibrary through [MCP](/build/mcp/).
 
 Outcome counts follow the same filters as the list, without the outcome filter, so each tab says
 what it would show.
+
+That lets you move from the whole library to one outcome without losing the rest of your question;
+the count previews the result before you open the tab.
 
 ## An item page
 
@@ -50,6 +54,9 @@ On an item you uploaded, or on any item if you own the workspace, you can:
 A work record has no uploader, so only owners moderate it. Every act is recorded in the audit
 log.
 
+Moderation changes memory, not history: the audit log keeps the receipt even when you remove or
+widen the item itself.
+
 ## Vibes
 
 The app comes in four visual vibes: **Daylight**, **Paper**, **Studio** and **Quiet**. They change
@@ -68,3 +75,6 @@ Every screen keeps loading, failure and empty apart:
 - **Empty** is said only after a read that worked came back with nothing.
 
 Reduced motion, from the system setting, makes every screen static.
+
+So the app tells you whether it is waiting, empty, or broken instead of making one blank rectangle
+audition for all three roles.

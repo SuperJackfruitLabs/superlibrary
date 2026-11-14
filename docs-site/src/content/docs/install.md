@@ -3,8 +3,9 @@ title: Install
 description: Install the suli command-line client with the verified installer, sign in, and run SuperLibrary itself locally for development.
 ---
 
-There are two things to install: the `suli` client, which talks to a SuperLibrary server, and
-SuperLibrary itself. Most people only need the first.
+Let's get you to the useful part without installing a small weather system. There are two things
+you *could* install: the `suli` client, which talks to a SuperLibrary server, and SuperLibrary
+itself. Most people only need the client, so we start there.
 
 ## Install `suli`
 
@@ -15,6 +16,9 @@ installer needs no sudo and puts it in `~/.local/bin`:
 ```sh
 curl -fsSL https://github.com/SuperJackfruitLabs/superlibrary/releases/latest/download/install.sh | bash
 ```
+
+When it finishes, you have both `suli` and its `superlibrary` alias in your chosen binary directory,
+with the downloaded release checked against `SHA256SUMS` before either name is installed.
 
 | Variable | Effect |
 |---|---|
@@ -38,6 +42,8 @@ suli version
 It prints `suli <version> <platform>/<arch>`. A release binary reports its release tag, for
 example `v0.0.1`; a build from source reports `dev`.
 
+That one line is your receipt: you now know which build you installed and which platform it targets.
+
 ### Sign in
 
 ```sh
@@ -48,6 +54,9 @@ suli login
 in any browser, confirm the code, and `suli` keeps a device credential of its own. It works over
 SSH and in a cloud session. Each later command exchanges that credential for a token that lives
 five minutes. `suli whoami` shows who you are signed in as.
+
+Once the browser confirms the code, this terminal can call SuperLibrary without asking you to paste
+a long-lived token into it. A small victory for both convenience and clipboard hygiene.
 
 Without `SUPERLIBRARY_URL`, `suli` talks to the hosted service at `https://app.superlibrary.dev`,
 and `suli login` signs in through the SuperJackfruit account service. Set `SUPERLIBRARY_URL` to
@@ -79,12 +88,18 @@ pnpm --filter @superlibrary/web dev        # web app on :5173
 
 Open `http://localhost:5173`.
 
+You now have the API, content Worker, and web app running together; the page opens with development
+auth, so you can explore the local stack without creating a cloud account or signing in.
+
 To run the tests:
 
 ```sh
 pnpm typecheck && pnpm test
 pnpm --filter @superlibrary/web e2e        # Chromium and WebKit
 ```
+
+The first command checks types and package tests; the second proves the browser flow in both pinned
+engines. Together they tell you whether the local stack merely started or is actually behaving.
 
 ### A deployment
 

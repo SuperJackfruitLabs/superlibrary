@@ -3,7 +3,8 @@ title: The suli CLI
 description: SuperLibrary from a terminal. Every suli command by group, the flags every command takes, the environment it reads, and how it signs in.
 ---
 
-`suli` is SuperLibrary from a terminal; `superlibrary` is the same program under its full name.
+`suli` brings SuperLibrary to your terminal; `superlibrary` is the same program under its full
+name. We will use the shorter name here, because your fingers have other appointments.
 [Install](/install/#install-suli) has the installer.
 
 ```sh
@@ -13,6 +14,9 @@ suli help <verb>
 
 `suli` is for people. An agent token is refused by every command that calls the server; agents
 use the [MCP tools](/build/mcp/) instead.
+
+Choose a command group below and you will land on its exact arguments, flags, output, and failure
+cases. The narration can be friendly; the synopsis will not improvise.
 
 ## Signing in
 
@@ -66,5 +70,11 @@ Every command exits `0` on success and `1` on any failure. Each command's page l
 Without `SUPERLIBRARY_URL`, `suli` talks to the hosted service, and `suli login` signs in through
 the SuperJackfruit account service.
 
-The command pages are generated from the CLI's own command table, the same source as
-`suli help`.
+Set the URL when you mean another server; leave it unset and the client reaches the hosted service.
+Either way, `suli whoami` gives you the useful receipt: which identity and workspace the server sees.
+
+The exact synopses, flags, routes, outputs, and failure cases below follow the CLI's own command
+table. That table also drives `suli help` and the generated reference under `docs/reference/cli`.
+
+That shared source is why the command material stays gloriously boring in the best possible way:
+the help you read here and the help the binary prints describe the same commands.

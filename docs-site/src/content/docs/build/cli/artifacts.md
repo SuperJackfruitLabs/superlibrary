@@ -3,7 +3,9 @@ title: Artifacts
 description: "suli upload, get and revoke: uploading files and folders, reading items and their versions, and revoking."
 ---
 
-Uploading files and folders, reading what is there, and revoking. Every upload passes the path rules, size caps and secret scan before anything is stored.
+This is the artifact life cycle from your terminal: upload a file or folder, inspect the item that
+arrived, and revoke it when it should stop being shown. We keep the command material literal;
+SuperLibrary keeps every upload behind the same path rules, size caps, and secret scan.
 
 ## `suli upload`
 
@@ -30,11 +32,13 @@ suli upload <path> [--title <text>] [--item <itm_…>] [--board <brd_…>] [--en
 
 - A person: a member of the workspace.
 - An agent token: refused.
-- Agents reach SuperLibrary from a later release; an agent token is refused today.
+- Agents read through MCP and link files through AgentPod; their tokens are refused by this command.
 
 **Calls** `POST /api/v1/uploads`, `PUT /api/v1/uploads/:id/files`, `POST /api/v1/uploads/:id/override`, `POST /api/v1/uploads/:id/commit`
 
 **Prints** the item URL (and with --json the item id, version, SHA-256, type and size).
+
+That URL is your receipt: the checks passed, the commit completed, and the item is ready to open.
 
 **Exit status** `0` on success. `1` when:
 
@@ -72,11 +76,13 @@ suli get <item> [--embed] [--version <n>]
 
 - A person: a member of the workspace.
 - An agent token: refused.
-- Agents reach SuperLibrary from a later release; an agent token is refused today.
+- Agents read through MCP and link files through AgentPod; their tokens are refused by this command.
 
 **Calls** `GET /api/v1/items/:id`, `POST /api/v1/items/:id/embed`
 
 **Prints** the item and its versions.
+
+Now you can inspect the provenance and version history before deciding which bytes to open.
 
 **Exit status** `0` on success. `1` when:
 
@@ -112,11 +118,14 @@ suli revoke <item> [--version <n>] [--reason <text>]
 
 - A person: the person who uploaded it, or an owner of the workspace.
 - An agent token: refused.
-- Agents reach SuperLibrary from a later release; an agent token is refused today.
+- Agents read through MCP and link files through AgentPod; their tokens are refused by this command.
 
 **Calls** `POST /api/v1/items/:id/revoke`, `POST /api/v1/items/:id/versions/:n/revoke`
 
 **Prints** "Revoked.".
+
+After that confirmation, the item or selected version can no longer be shown, including through a
+viewer URL that was already minted.
 
 **Exit status** `0` on success. `1` when:
 

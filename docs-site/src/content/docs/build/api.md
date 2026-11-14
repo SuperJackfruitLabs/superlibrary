@@ -3,9 +3,10 @@ title: HTTP API
 description: SuperLibrary's REST API under /api/v1. Authentication, and every route by group, with who may call it.
 ---
 
-The API is served at `/api/v1` on the app's address (`https://app.superlibrary.dev/api/v1` on the
-hosted service; `http://localhost:8787` in [local development](/install/#local-development)).
-Requests and answers are JSON unless noted.
+When you need SuperLibrary below the app, the HTTP API is the common floor. It is served at
+`/api/v1` on the app's address (`https://app.superlibrary.dev/api/v1` on the hosted service;
+`http://localhost:8787` in [local development](/install/#local-development)). Requests and answers
+are JSON unless noted.
 
 ## Authentication
 
@@ -27,6 +28,9 @@ Routes say who may call them:
 - **service**: a signed service call (SuperPipeline's push, the AgentPod hub).
 
 An item the caller cannot see answers 404, never 403. Errors are `{"error": "<code>", ...}`.
+
+With the token and caller type settled, you can read the tables below literally: each route says
+who may cross the boundary, and an invisible item never leaks its existence while refusing you.
 
 ## Identity
 
@@ -72,6 +76,8 @@ See [Uploading](/use/uploading/) for the limits and the scan.
 | `POST /api/v1/related` | viewer | `{cardId, text?}` or `{itemId}`, with optional `limit` (1 to 10) and `maxTokens` (100 to 4,000). Answers `{items}`. |
 
 Search and related answers carry a `Server-Timing` header.
+
+That header lets you inspect retrieval timing without changing the response body you already parse.
 
 ## The library app
 
@@ -120,3 +126,6 @@ Operators only. See [Retention and operations](/use/retention-and-operations/#op
 Browsers may call the API from the origins in `EMBED_HOSTS` (the `me`, item, embed, scope and
 related routes) and `CONSOLE_ORIGINS` (the upload routes and the station-items list). See
 [Embed](/build/embed/#allowed-origins).
+
+Keep your origin in the matching list and the browser can make the intended call; otherwise the API
+leaves the cross-origin door closed.
