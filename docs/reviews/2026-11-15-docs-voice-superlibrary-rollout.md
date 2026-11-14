@@ -1,6 +1,6 @@
 # Claims ledger — SuperLibrary docs voice rollout
 
-Status: draft-stage evidence for the 18-page voice rollout.
+Status: verify-stage evidence for the 18-page voice rollout.
 
 ## Immutable revisions and scope
 
@@ -124,3 +124,28 @@ Read from `.github/workflows/ci.yml:18-21,196-228` and run from the final workin
 - Home-page quick start test command, exactly `pnpm --filter @superlibrary/api exec vitest run test/uploads.test.ts test/search.test.ts`: **pass** — 2 files, **49 tests passed**, matching the page's claim. The run emitted upstream MCP SDK sourcemap warnings about missing source files; no test failed.
 - Frozen dependency-licence audit: **pass** — the installed package manifests at the lockfile's exact resolution reported the SPDX values in `build/licences.md`; the vendored vibekit tarball reported `UNLICENSED`.
 - Live reachability check: `https://app.superlibrary.dev` **200**, `/api/health` **200**, `/mcp` **401** without a token (the documented protected boundary), and `https://docs.superlibrary.dev` **200**. This proves reachability during the run, not private deployment provenance; the claims remain marked UNVERIFIED above.
+
+## Independent verify-stage rerun
+
+At `2026-11-14 20:53 UTC`, Verify reconstructed the seven draft commits from the linked artifact on
+the recorded base and checked the complete tree independently:
+
+- **Scope and patch integrity:** `git diff --check` passed; the diff contains exactly the 18
+  published pages plus this ledger, with no site setup, product code, configuration, component,
+  style, or working-note path.
+- **Evidence integrity:** all 170 `file:line` citations parsed from this ledger resolve at the
+  recorded base across 63 repository files; no cited line range exceeds its file.
+- **Docs lane:** `npm ci` passed with the same one moderate vulnerability report; `npm run build`
+  built 19 pages, Pagefind indexed 19 HTML files, and the sitemap was generated; and
+  `node scripts/check-docs-claims.mjs` reported 20 pages, 17 literal routes, 6 route patterns, and
+  3 MCP tools.
+- **Docs-reference lane:** `pnpm install --frozen-lockfile` passed with 419 packages, and
+  `pnpm --filter @superlibrary/cli exec vitest run src/reference.test.ts` passed 8/8 tests.
+- **Page claim:** the home-page quick-start command passed 49/49 tests again. The same upstream MCP
+  SDK sourcemap warnings appeared and no test failed.
+- **Deployment boundary:** the app, health route, and docs returned 200; unauthenticated MCP
+  returned 401. These are reachability observations only, so the private deployment claims above
+  remain **UNVERIFIED** rather than being promoted to repository-proven facts.
+
+Verify found no unsupported repository claim, privacy leak, silent factual change, or voice-guide
+miss that requires a page correction. Verdict: **publishable** for the operator to apply as one PR.
