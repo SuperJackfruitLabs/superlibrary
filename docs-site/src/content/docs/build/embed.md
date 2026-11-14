@@ -3,8 +3,9 @@ title: Embed
 description: Mount SuperLibrary's artifact viewer in another product's page with @superlibrary/embed. The host's duties, the options, the frame protocol, and which origins may embed it.
 ---
 
-`@superlibrary/embed` mounts SuperLibrary's viewer in a host page. The artifact renders in a
-sandboxed frame on the content origin; the toolbar around it lives in the host page.
+`@superlibrary/embed` lets us place SuperLibrary's viewer inside another product without handing the
+artifact the keys to the host page. The artifact renders in a sandboxed frame on the content
+origin; the toolbar around it lives in the host page.
 
 :::caution[Allowed origins]
 Framing is allowed only from origins listed in configuration. The shipped configuration lists
@@ -40,6 +41,10 @@ await view.setVersion(2);  // false if the host could not mint it
 view.destroy();
 ```
 
+Mounting gives you a live viewer, `setTheme` keeps it with the host's appearance, `setVersion`
+switches only after the host mints access, and `destroy` removes the frame when the host is done.
+The artifact gets a window, not a spare key.
+
 ## The host's duties
 
 1. **Mint with the person's own token.** `getEmbedUrl` calls `POST /api/v1/items/{id}/embed`
@@ -48,6 +53,9 @@ view.destroy();
 2. **Be allowed.** The host's origin must be in the content Worker's `FRAME_ANCESTORS` and the
    API's `EMBED_HOSTS`, and its web client must be allowed to request the SuperLibrary audience
    from the account service.
+
+Do both and the frame opens for the signed-in person on the intended host. Miss either boundary and
+the embed fails closed, before a viewer can accidentally become a public link.
 
 ## The toolbar
 
@@ -105,6 +113,9 @@ The frame is sandboxed without `allow-same-origin`. It talks to the host with `p
 
 The SDK accepts messages only from its own frame.
 
+That check keeps another frame on the page from impersonating the artifact, even if it knows the
+message names.
+
 ## Allowed origins
 
 | Setting | Where | Shipped value |
@@ -113,3 +124,7 @@ The SDK accepts messages only from its own frame.
 | `EMBED_HOSTS` | API | `https://app.superpipeline.dev https://console.agentpod.dev` |
 
 `EMBED_HOSTS` is `FRAME_ANCESTORS` without the app itself; a test holds the two together.
+
+Add a new host to both settings (and to the account service's allowed audience flow), and the host
+can mint and frame the viewer. Updating only one gives you half an embed, which is just a rectangle
+with excellent security instincts.
