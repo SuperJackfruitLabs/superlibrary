@@ -5,6 +5,9 @@ description: What the daily sweep deletes, why retention of unreferenced artifac
 
 ## Retention
 
+Memory still needs housekeeping. Every day, SuperLibrary clears work that has reached an explicit
+end, then treats older unreferenced artifacts according to the mode you chose.
+
 A sweep runs every day at 03:00 UTC. It always deletes:
 
 - items past their expiry date;
@@ -23,6 +26,9 @@ reported, not enforced. An operator switches the mode to `enforce` to make it de
 
 Deleting an item removes its rows, its manifests, and the bytes no other version shares. A blob
 shared with another version or an open upload is kept.
+
+In `report` mode you get the list without the deletion; in `enforce` mode the same rule becomes the
+broom. Choose deliberately—the dust is data.
 
 ## Operators
 
@@ -47,6 +53,10 @@ another embedder:
    in that slot's `vector_slots` row.
 3. `POST /api/v1/admin/index/reindex {"embedder":"<id>"}`.
 4. Watch `SELECT * FROM vector_slots` until the swap.
+
+After step 1, the API can name the new service. After step 2, the idle slot can accept that
+service's vectors. Step 3 starts the rebuild without taking the active slot away, and step 4 gives
+you the visible receipt: the rebuilt slot has become the one serving search.
 
 An embedder of another dimension is refused (`400 dimension_mismatch`) until step 2 is done.
 After a swap, the old slot must drain before the next re-index; one daily reconcile clears it, and

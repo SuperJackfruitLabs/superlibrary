@@ -3,14 +3,18 @@ title: Search
 description: Searching SuperLibrary from the app, suli and MCP. Filters, how results are ranked by outcome, what a result carries, and related items.
 ---
 
-Search finds items by their words and by their meaning, then ranks them by how they turned out.
-People search in the app or with `suli search`; agents with the MCP tool `library_search`. All
-three use the same search and the same visibility rule.
+Search lets us ask both “where are these words?” and “where is this idea?” before outcome breaks the
+tie. You can search in the app or with `suli search`; an agent uses the MCP tool `library_search`.
+All three reach the same index and obey the same visibility rule.
 
 ```sh
 suli search deploy checklist
 suli search launch post --outcome rejected,failed --since 2026-10-01
 ```
+
+The first query gives you the strongest matches across outcomes. The second deliberately asks for
+the attempts that did not win—because sometimes the most useful answer is the rake someone already
+stepped on.
 
 ## Filters
 
@@ -39,6 +43,9 @@ A result found only by meaning is kept when it is close to the best meaning matc
 an exact-word match is always kept. Very common words count as word matches only when a query has
 no other word.
 
+The result is broad without becoming indiscriminate: close semantic matches can join the list, and
+an exact phrase does not vanish because the embedding had other ideas.
+
 ## What a result carries
 
 Each result has the item's id, kind, title, outcome, scope, provenance, a snippet and its URL in
@@ -60,3 +67,6 @@ caller sends, which are never stored.
 
 Search covers text. Images and other binaries are found by their title, path and caption only.
 OCR, image embeddings and other embedders are not built yet.
+
+For now, give visual work a useful title or caption if you expect anyone—including tomorrow's
+version of you—to find it.
