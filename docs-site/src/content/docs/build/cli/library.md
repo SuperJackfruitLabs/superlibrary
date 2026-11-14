@@ -3,7 +3,9 @@ title: Finding and curating
 description: "suli search, collect and scope: searching the library, keeping collections, and widening who can see an item."
 ---
 
-Searching the library with the same filters as the app, keeping collections, and widening who can see an item. Search shows only what you can see; collections and widening are a person's acts and are recorded.
+Here we turn a terminal search into something you can keep: find the work, place selected items in
+collections, and widen an item's scope only when the whole workspace should see it. Search never
+looks beyond your visibility; collection changes and widening remain recorded acts by a person.
 
 ## `suli search`
 
@@ -37,6 +39,9 @@ suli search <words> [--kind <artifact|work-record>] [--outcome <a,b>] [--board <
 
 **Prints** one line per result (id, outcome, title), its snippet and its replacement.
 
+You now have a ranked shortlist with enough context to choose an item without pretending the lower
+outcomes never happened.
+
 **Exit status** `0` on success. `1` when:
 
 - a flag is not one of its values
@@ -61,11 +66,13 @@ suli collect list
 
 - A person: a member of the workspace.
 - An agent token: refused.
-- Agents reach SuperLibrary from a later release; an agent token is refused today.
+- Agents read through MCP and link files through AgentPod; their tokens are refused by this command.
 
 **Calls** `GET /api/v1/collections`
 
 **Prints** one line per collection.
+
+That list gives you the names and visible counts you can use in the commands that follow.
 
 **Exit status** `0` on success. `1` when:
 
@@ -97,11 +104,13 @@ suli collect create <name> [--description <text>]
 
 - A person: a member of the workspace.
 - An agent token: refused.
-- Agents reach SuperLibrary from a later release; an agent token is refused today.
+- Agents read through MCP and link files through AgentPod; their tokens are refused by this command.
 
 **Calls** `POST /api/v1/collections`
 
 **Prints** "Created <name> (<id>).".
+
+Keep either identifier: the name is convenient for people, and the id stays unambiguous in scripts.
 
 **Exit status** `0` on success. `1` when:
 
@@ -130,11 +139,13 @@ suli collect show <collection>
 
 - A person: a member of the workspace.
 - An agent token: refused.
-- Agents reach SuperLibrary from a later release; an agent token is refused today.
+- Agents read through MCP and link files through AgentPod; their tokens are refused by this command.
 
 **Calls** `GET /api/v1/collections`, `GET /api/v1/collections/:id`
 
 **Prints** the collection and one line per item.
+
+You can now inspect the visible shelf before adding to it or taking something away.
 
 **Exit status** `0` on success. `1` when:
 
@@ -168,11 +179,14 @@ suli collect add <collection> <item> [--note <text>]
 
 - A person: a member of the workspace.
 - An agent token: refused.
-- Agents reach SuperLibrary from a later release; an agent token is refused today.
+- Agents read through MCP and link files through AgentPod; their tokens are refused by this command.
 
 **Calls** `GET /api/v1/collections`, `POST /api/v1/collections/:id/items`
 
 **Prints** "Added.".
+
+The item is now referenced by the collection and, if it is an artifact, protected from age-based
+retention while that reference remains.
 
 **Exit status** `0` on success. `1` when:
 
@@ -202,11 +216,13 @@ suli collect remove <collection> <item>
 
 - A person: a member of the workspace.
 - An agent token: refused.
-- Agents reach SuperLibrary from a later release; an agent token is refused today.
+- Agents read through MCP and link files through AgentPod; their tokens are refused by this command.
 
 **Calls** `GET /api/v1/collections`, `DELETE /api/v1/collections/:id/items/:item`
 
 **Prints** "Removed.".
+
+Only the collection changed; the item remains in the library for anyone who could already see it.
 
 **Exit status** `0` on success. `1` when:
 
@@ -235,11 +251,14 @@ suli scope <item> <scope>
 
 - A person: the person who uploaded it, or an owner of the workspace.
 - An agent token: refused.
-- Agents reach SuperLibrary from a later release; an agent token is refused today.
+- Agents read through MCP and link files through AgentPod; their tokens are refused by this command.
 
 **Calls** `POST /api/v1/items/:id/scope`
 
 **Prints** "Everyone in the workspace can now see it.".
+
+That confirmation is the one-way boundary: the item is workspace-wide, and this command cannot
+narrow it again.
 
 **Exit status** `0` on success. `1` when:
 

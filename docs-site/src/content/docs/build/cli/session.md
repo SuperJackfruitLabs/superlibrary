@@ -3,7 +3,9 @@ title: Signing in
 description: "suli help, version, skill, login, logout and whoami: the commands for getting started and signing in."
 ---
 
-Signing in through your Super Jackfruit Labs account, and seeing which identity is in force. `help`, `version` and `logout` send no credential anywhere.
+Let's establish what this binary is, teach it who you are, and make the active identity visible.
+`help`, `version`, and `logout` stay local and send no credential anywhere; the sign-in commands say
+exactly when they cross that boundary.
 
 ## `suli help`
 
@@ -22,6 +24,8 @@ suli help [<verb>]
 - Local: sends no credential to SuperLibrary.
 
 **Prints** help text.
+
+You now have the exact synopsis without making a network request.
 
 **Exit status** `0` on success. `1` when:
 
@@ -46,6 +50,8 @@ suli version
 - Local: sends no credential to SuperLibrary.
 
 **Prints** one line.
+
+That line pins the build and target platform you are about to trust with the next command.
 
 **Exit status** `0` on success. `1` when:
 
@@ -79,6 +85,9 @@ suli skill [<install>] [--dir <dir>]
 
 **Prints** the SKILL.md text; with `install`, the path written (with --json, `{ "path": … }`).
 
+Print it to inspect the instructions, or install it to give an agent a guide that matches this
+binary's actual verbs.
+
 **Exit status** `0` on success. `1` when:
 
 - with `install`: the directory cannot be written
@@ -107,6 +116,9 @@ suli login
 
 **Prints** the link and code, then "Signed in.".
 
+Once you see that confirmation, later commands can exchange the stored device credential for
+short-lived tokens without reopening the browser.
+
 **Exit status** `0` on success. `1` when:
 
 - the server names no sign-in service
@@ -132,6 +144,9 @@ suli logout
 
 **Prints** "Signed out.".
 
+The terminal has forgotten both the device credential and cached token; the next authenticated
+command will need a fresh login.
+
 **Exit status** `0` on success. `1` when:
 
 - it cannot write its output (never in normal use)
@@ -154,11 +169,14 @@ suli whoami
 
 - A person: a member of the workspace.
 - An agent token: refused.
-- Agents reach SuperLibrary from a later release; an agent token is refused today.
+- Agents read through MCP and link files through AgentPod; their tokens are refused by this command.
 
 **Calls** `GET /api/v1/me`
 
 **Prints** principal, workspace and role.
+
+That is the server's view of you—the useful answer when a command's permissions are not the ones
+you expected.
 
 **Exit status** `0` on success. `1` when:
 
