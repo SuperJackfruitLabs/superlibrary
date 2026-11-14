@@ -27,7 +27,7 @@ const api = (path: string, init: RequestInit = {}) =>
   // With the signed-in person's own token for the audience https://app.superlibrary.dev.
   fetch(`https://app.superlibrary.dev/api/v1/items/${path}`, {
     ...init,
-    headers: { authorization: 'Bearer ' + token, 'content-type': 'application/json' },
+    headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
   }).then((res) => res.json());
 
 const view = await mountArtifact(el, {
