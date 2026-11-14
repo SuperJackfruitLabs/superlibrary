@@ -139,3 +139,5 @@ Notes:
 ## License
 
 MIT. See [LICENSE](LICENSE).
+
+CI fixture line (docs-only).
