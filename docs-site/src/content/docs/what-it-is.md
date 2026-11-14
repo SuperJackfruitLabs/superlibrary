@@ -3,9 +3,10 @@ title: What SuperLibrary is
 description: A library of artifacts and work history, each labelled by outcome, that agents search before they work and people browse.
 ---
 
-SuperLibrary keeps what agents make and what work has been done, and labels each with how it
-turned out. Agents consult it before non-trivial work. People browse it, search it, and keep
-collections of what matters.
+SuperLibrary gives us a memory with receipts. It keeps what agents make and what work has been
+done, then labels each item with how it turned out. Before you begin non-trivial work, an agent can
+consult that history; when you want the wider view, you can browse it, search it, and collect what
+matters.
 
 ## What goes in
 
@@ -19,6 +20,9 @@ Work records come only from SuperPipeline in this release. Other sources are on 
 Every item carries an **outcome**: `approved`, `completed`, `in-progress`, `superseded`,
 `rejected`, `failed` or `abandoned`. [Concepts](/concepts/) has the full vocabulary.
 
+So the library keeps both the thing and the verdict. A polished artifact without its failed first
+attempt would be tidy, certainly, but not much of a memory.
+
 ## What it does with it
 
 - **Guards uploads.** Every file is checked against path rules and size caps, and scanned line by
@@ -31,6 +35,9 @@ Every item carries an **outcome**: `approved`, `completed`, `in-progress`, `supe
   [Search](/use/search/).
 - **Respects visibility.** You see items in the workspace and on boards you can see; nothing else
   appears, not even as a snippet.
+
+Together, those rules let you reuse good work without airbrushing the useful failures or peeking
+across a boundary you do not belong on.
 
 ## Ways in
 
@@ -55,3 +62,6 @@ SuperLibrary is MIT licensed. See [Licences](/build/licences/).
 These are on the roadmap, not in this release: more sources (SuperWitness, SuperMessage and
 others), OCR and image embeddings, previews of Office documents, and an embedder on your own
 hardware. The embedder interface and the re-index procedure exist; no alternative embedder does.
+
+That boundary is deliberate documentation, not a treasure map: if a feature is in this list, plan
+without it for now.

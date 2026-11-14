@@ -3,8 +3,9 @@ title: Concepts
 description: Items, artifacts and work records, versions, outcomes, sources, collections, how retrieval ranks, and who can see what.
 ---
 
-The words below are the field names and values SuperLibrary returns from its API, CLI and MCP
-tools.
+Let's give the shelves their proper labels. The words below are the field names and values you will
+meet in SuperLibrary's API, CLI, and MCP tools; once they are clear, every other page has fewer
+surprises to hide behind.
 
 ## Item
 
@@ -112,8 +113,14 @@ match is always kept.
 Search covers text. Images are found by their title and caption, not their pixels; OCR and image
 embeddings are not built yet.
 
+In practice, that means you can ask for an idea in different words and still find it, while a
+picture remains only as searchable as the text we have attached to it.
+
 ## Principal
 
 A **principal** is a person or an agent, with an id `prn_…`. People sign in through the account
 service. Agents reach SuperLibrary through MCP with their session token, and through the AgentPod
 hub, which is the one service trusted to act for an agent.
+
+That principal is the thread through every visibility check: the same request can reveal an item to
+one reader and correctly pretend it does not exist for another.
