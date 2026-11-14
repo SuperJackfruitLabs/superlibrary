@@ -2,43 +2,61 @@
 title: SuperLibrary
 description: The memory of the stack. SuperLibrary keeps what agents make and the work they have done, labelled with how each turned out, so agents can consult it before they work and people can browse it.
 template: splash
-hero:
-  title: The memory of the stack.
-  tagline: What agents made and what work was done, labelled with how each turned out. Agents consult it before they work; people browse it.
-  actions:
-    - text: Get started
-      link: /what-it-is/
-      icon: right-arrow
-    - text: superlibrary.dev
-      link: https://superlibrary.dev
-      icon: external
-      variant: minimal
+status: lights on
 ---
 
-import { Card, CardGrid } from '@astrojs/starlight/components';
+import BentoHome from '@superjackfruit/docs-theme/components/BentoHome.astro';
+import FlowSteps from '@superjackfruit/docs-theme/components/FlowSteps.astro';
+import JackAside from '@superjackfruit/docs-theme/components/JackAside.astro';
+
+<BentoHome
+  claim="What your agents made, and how it turned out."
+  sub="Every artifact and every SuperPipeline card is kept with its outcome, from approved to abandoned. Search puts approved work first and keeps the failures a little lower, never hidden: the library remembers what you'd rather forget. A file with a token in it stops at the door, quarantined, with the file, the line and the rule it broke."
+  actions={[
+    { text: 'What it is', link: '/what-it-is/' },
+    { text: 'Install suli', link: '/install/', variant: 'secondary' },
+  ]}
+  quickstart={{
+    command: 'git clone https://github.com/SuperJackfruitLabs/superlibrary && cd superlibrary && pnpm install && pnpm --filter @superlibrary/api exec vitest run test/uploads.test.ts test/search.test.ts',
+    label: 'Quick start: save, scan and rank, with the suite faked',
+    note: "Needs Node.js 22 and pnpm (the repository pins 11.5.2), nothing else: the API runs in Wrangler's local Workers runtime with development sign-in, a fake embedder and a fake vector index, so no Cloudflare account and no account service. 49 checks, from app/.env refused before a byte is sent to an abandoned card's exact title outranking approved work that only matches by meaning. To use the hosted library, install suli.",
+  }}
+  agent={{ task: "Then explain how SuperLibrary would keep my agents' files and finished cards with their outcomes, and how an agent should search it before it starts a task." }}
+  ask={{ examples: ['What happens if my upload has an API key in it?', 'Why did the failed card rank below the approved one?', "Can an agent see items from a board it isn't on?", 'How does an agent get a file into the library?'] }}
+  flowTitle="How an artifact is saved, labelled and found again (step through it; it waits for you)"
+>
+  <FlowSteps
+    label="Artifact step"
+    steps={[
+      { label: 'Declare', body: "An upload is declared first: a title, a scope (the workspace or one board) and each file's path, size and SHA-256. Path rules and size limits are checked before a byte is sent: 25 MB a file, 100 MB and 500 files a folder. An agent's file comes in through the AgentPod hub, under the same rules.", items: [{ text: 'app/.env', out: true }, { text: 'report.md', win: true }] },
+      { label: 'Scan', body: "Each file's bytes must match what was declared, and every file is scanned line by line for secrets. A file that hits goes to quarantine, never into the library, and the commit answers 422 secret_found with the file, line and rule. Only a person can override, with a reason that is recorded.", items: [{ text: 'leak.ts, line 1: github-token', out: true }, { text: 'clean.txt', win: true }] },
+      { label: 'Commit', body: 'Nothing is in the library until the commit. It makes an item, itm_ and 16 hex digits, or the next version of one, and stores each file once by its hash. An upload starts out completed.', items: [{ text: 'itm_… v1', card: true }] },
+      { label: 'Label', body: "Every item carries one of seven outcomes. A work record's is read from its card, first match wins: superseded, rejected, completed (approved when a gate approved it), failed, abandoned, and in-progress for anything not settled. A person can mark an artifact superseded by another.", items: [{ text: 'approved', win: true }, { text: 'superseded', card: true }, { text: 'failed', card: true }] },
+      { label: 'Found', body: 'Search fuses full-text and meaning, then weighs each match by outcome: approved and completed first, rejected, failed and abandoned lower, never dropped. Only what the caller may see is searched; an item they cannot see answers 404. Agents ask the same index through library_search over MCP.', items: [{ text: 'another workspace', out: true }, { text: 'approved, ranked first', win: true }, { text: 'failed, still listed', card: true }] },
+    ]}
+  />
+</BentoHome>
 
 ## One library, two kinds of item
 
-<CardGrid>
-  <Card title="Artifacts">
-    Files and folders, uploaded by people or linked by agents through AgentPod. Versioned,
-    secret-scanned on the way in, and shown in a sandboxed viewer on a separate origin.
-  </Card>
-  <Card title="Work records">
-    SuperPipeline work history, one record per card, kept current by signed push events.
-  </Card>
-  <Card title="Outcomes">
-    Every item says how it turned out: approved, completed, in-progress, superseded, rejected,
-    failed or abandoned. Search ranks good work first and never hides the rest.
-  </Card>
-  <Card title="Four ways in">
-    The web app, the `suli` command line, an MCP server with three read-only tools, and an HTTP
-    API.
-  </Card>
-</CardGrid>
+**Artifacts.** Files and folders, uploaded by people or linked by agents through AgentPod. Versioned,
+secret-scanned on the way in, and shown in a sandboxed viewer on a separate origin.
+
+**Work records.** SuperPipeline work history, one record per card, kept current by signed push events.
+
+**Outcomes.** Every item says how it turned out: approved, completed, in-progress, superseded, rejected,
+failed or abandoned. Search ranks good work first and never hides the rest.
+
+**Four ways in.** The web app, the `suli` command line, an MCP server with three read-only tools, and an
+HTTP API.
 
 SuperLibrary runs on Cloudflare Workers and signs people in through the SuperJackfruit account
 service. Start with [what it is](/what-it-is/), then [install `suli`](/install/).
+
+<JackAside>
+  I read these docs so you don't have to read all of them at once. Ask me in the box up top, and if
+  the answer isn't in here I'll say so rather than make one up.
+</JackAside>
 
 For agents, the same docs are published as plain text: [`/llms.txt`](/llms.txt) indexes them, and
 [`/llms-full.txt`](/llms-full.txt) is every page in one file.
