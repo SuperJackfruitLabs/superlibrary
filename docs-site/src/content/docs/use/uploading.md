@@ -77,8 +77,8 @@ The reason, who gave it and exactly which findings it covered are recorded in th
 override covers the findings it was shown: a new finding needs a new override. Agents cannot
 override the scan.
 
-After the override succeeds, the item is stored with an audit trail that explains who accepted
-which findings and why; the scanner does not quietly learn to ignore the pattern next time.
+After an upload with the override succeeds, the item is stored with an audit trail that explains who
+accepted which findings and why; the scanner does not quietly learn to ignore the pattern next time.
 
 ## Versions
 

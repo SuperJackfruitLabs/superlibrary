@@ -44,7 +44,7 @@ an exact-word match is always kept. Very common words count as word matches only
 no other word.
 
 The result is broad without becoming indiscriminate: close semantic matches can join the list, and
-an exact phrase does not vanish because the embedding had other ideas.
+an exact-word match does not vanish because the embedding had other ideas.
 
 ## What a result carries
 
