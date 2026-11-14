@@ -73,8 +73,8 @@ the SuperJackfruit account service.
 Set the URL when you mean another server; leave it unset and the client reaches the hosted service.
 Either way, `suli whoami` gives you the useful receipt: which identity and workspace the server sees.
 
-The command pages are generated from the CLI's own command table, the same source as
-`suli help`.
+The command pages below follow the CLI's own command table, which is also the source for `suli help`
+and the generated reference under `docs/reference/cli`.
 
-That shared source is why the reference stays gloriously boring in the best possible way: the help
-you read here and the help the binary prints describe the same commands.
+That table is why the exact material stays gloriously boring in the best possible way: the help you
+read here and the help the binary prints describe the same commands.
