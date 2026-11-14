@@ -131,6 +131,7 @@ Notes:
 ## The sites
 
 - `landing/` is [superlibrary.dev](https://superlibrary.dev); `docs-site/` is [docs.superlibrary.dev](https://docs.superlibrary.dev) (Starlight, with `/llms.txt`).
+- `docs-site/` wears the suite's docs theme, `@superjackfruit/docs-theme`, vendored under `docs-site/vendor/` with the frontdoor and vibekit tarballs it needs: `sjlDocs({ product: 'superlibrary', status: 'lights on' })` in `astro.config.mjs` brings vibekit's plum, the self-hosted faces, the suite street, status badges, Copy Markdown, the footers, the 404, the edit link and llms.txt. Its sidebar uses the suite's groups (Start, Use it, Build on it, Run it, Reference); the theme warns at build time when a top-level group is anything else.
 - Both are plain Astro with their own npm lockfiles, outside the pnpm workspace. `npm ci && npm run dev` in either.
 - `scripts/deploy-sites.sh [landing|docs|all]` builds and deploys them as Cloudflare Workers with static assets, CI runs it on merge to main with the organisation's `CLOUDFLARE_API_TOKEN`; it also runs by hand with a `wrangler login`. Each `wrangler.jsonc` declares its custom domain.
 - `node scripts/check-docs-claims.mjs` fails when a page names an `/api/v1` route or MCP tool that `apps/api` does not define, or a docs page lacks its title or description. CI runs it with the docs build.
