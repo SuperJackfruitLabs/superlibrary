@@ -27,7 +27,7 @@ Here is that boundary in one place:
 | content Worker | `yaml` | ISC |
 | web app | `svelte`, `@sveltejs/kit` | MIT |
 | web app | `fflate` | MIT |
-| web app | `@superjackfruit/vibekit` | SuperJackfruit's own design kit, vendored as a tarball; its package declares `UNLICENSED` |
+| web app | `@superjackfruitlabs/vibekit-ui` | SuperJackfruit's own design kit, vendored as a tarball; its package declares `UNLICENSED` |
 | `suli` CLI, embed | only the workspace's own `@superlibrary/contract` | MIT, with this repository |
 
 The table lists direct dependencies, not everything they pull in. Build and test tools, such as

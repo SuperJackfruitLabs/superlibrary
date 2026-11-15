@@ -1,6 +1,6 @@
 // Shared by the catalogue band's small loader and its lazy scene: which sun phase to show, the
 // product accent as a colour, and how far scroll has pulled the drawer. Phase and accent come from vibekit's plain (no Svelte) entry, so the band follows the same day as the apps.
-import { ACCENTS, ACCENT_HUES, PHASES, PRODUCT_ACCENTS, phaseAt } from '@superjackfruit/vibekit/appearance';
+import { ACCENTS, ACCENT_HUES, PHASES, PRODUCT_ACCENTS, phaseAt } from '@superjackfruitlabs/vibekit-ui/appearance';
 
 /** The visitor's local sun phase. A vibekit page that turned time of day off gets plain noon. */
 export function bandPhase() {
