@@ -1,17 +1,11 @@
 import type { Env } from '../env';
 import { error, json } from '../http';
+import { verifyPush } from './push-signature';
 import { RECORD_EVENT_NAMES, pushConfigured, pushSecret } from './subscribe';
 
 export const MAX_PUSH_BODY = 64 * 1024;
 const BOARD = /^brd_[0-9a-f]{16}$/;
 const CARD = /^card_[0-9a-f]{16}$/;
-
-function timingSafeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let d = 0;
-  for (let i = 0; i < a.length; i++) d |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  return d === 0;
-}
 
 /** Superpipeline's record push (Task A1). Routes only: the consumer reads the card back (plan P5). */
 export async function receivePush(request: Request, env: Env, url: URL): Promise<Response> {
@@ -25,12 +19,11 @@ export async function receivePush(request: Request, env: Env, url: URL): Promise
   if (!row) return error(404, 'not_found');
   // Cap before any HMAC work: a declared length first, then the bytes actually read.
   if (Number(request.headers.get('content-length') ?? 0) > MAX_PUSH_BODY) return error(413, 'too_large');
-  const bytes = await request.arrayBuffer();
+  const bytes = new Uint8Array(await request.arrayBuffer());
   if (bytes.byteLength > MAX_PUSH_BODY) return error(413, 'too_large');
+  // Treaty's x-treaty-signature over t.id.body; the old X-Superpipeline-Signature until the cleanup.
+  if (!(await verifyPush(request.headers, bytes, await pushSecret(env, row.workspace_id, boardId)))) return error(401, 'bad_signature');
   const raw = new TextDecoder().decode(bytes);
-  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(await pushSecret(env, row.workspace_id, boardId)), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
-  const want = 'sha256=' + [...new Uint8Array(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(raw)))].map((x) => x.toString(16).padStart(2, '0')).join('');
-  if (!timingSafeEqual(request.headers.get('X-Superpipeline-Signature') ?? '', want)) return error(401, 'bad_signature');
   let body: { event?: string; boardId?: string; cardIds?: unknown };
   try { body = JSON.parse(raw); } catch { return error(400, 'invalid'); }
   if (body.boardId !== boardId || typeof body.event !== 'string' || !Array.isArray(body.cardIds)) return error(400, 'invalid');

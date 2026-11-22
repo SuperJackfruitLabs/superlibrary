@@ -2,6 +2,7 @@
 import { SELF, createExecutionContext, createScheduledController, env, waitOnExecutionContext } from 'cloudflare:test';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ORG, card, fakePipeline, type FakeState } from './helpers/fake-pipeline';
+import { SIGNATURE_HEADER, signDelivery } from '@superjackfruitlabs/treaty-cloudevents';
 import { RECORD_EVENT_NAMES, SUBSCRIBE_CRON, pushSecret, subscribeAll, subscribeWorkspace } from '../src/sources/subscribe';
 import { pipelineFor } from '../src/sources/superpipeline';
 import wranglerRaw from '../wrangler.jsonc?raw';
@@ -20,6 +21,15 @@ beforeEach(async () => {
   restore = fakePipeline(state);
 });
 afterEach(() => { restore(); __resetServiceTokensForTests(); });
+
+/** The ingest queue's sendBatch, spied on and answering as a queue does. */
+const spySend = () => vi.spyOn(env.INGEST, 'sendBatch').mockResolvedValue({ metadata: {} } as never);
+
+/** A push on treaty's envelope: CloudEvents binary-mode headers for a card.moved, and its signature. */
+const envelope = (id: string, signature: string) => ({
+  'ce-specversion': '1.0', 'ce-id': id, 'ce-source': '/superpipeline/boards/brd_00000000000000b1',
+  'ce-type': 'com.superjackfruit.superpipeline.card.moved.v1', 'content-type': 'application/json', [SIGNATURE_HEADER]: signature,
+});
 
 async function sign(boardId: string, body: string, wsOverride?: string) {
   const ws = wsOverride ?? WS;
@@ -79,6 +89,29 @@ describe('the push receiver', () => {
     expect((await SELF.fetch(url, { method: 'POST', headers: { 'X-Superpipeline-Signature': 'sha256=00' }, body })).status).toBe(401);
     expect((await SELF.fetch(url, { method: 'POST', headers: { 'X-Superpipeline-Signature': await sign('brd_00000000000000b2', body) }, body })).status).toBe(401);
     expect((await SELF.fetch(evUrl('brd_00000000000000b9'), { method: 'POST', headers: { 'X-Superpipeline-Signature': await sign('brd_00000000000000b9', body) }, body })).status).toBe(404);
+  });
+  it("takes a delivery on treaty's envelope, signed with x-treaty-signature over its id", async () => {
+    const ws = await ensureWorkspace(env.DB, ORG);
+    await subscribeWorkspace(env, ws, ORG);
+    const send = spySend();
+    const body = JSON.stringify({ event: 'card.moved', boardId: 'brd_00000000000000b1', seq: 9, ts: '2026-11-23T09:30:00.000Z', cardIds: ['card_00000000000000c1'] });
+    const bytes = new TextEncoder().encode(body);
+    const secret = await pushSecret(env, ws, 'brd_00000000000000b1');
+    const id = 'brd_00000000000000b1:9';
+    const ok = await SELF.fetch(evUrl('brd_00000000000000b1'), { method: 'POST', headers: envelope(id, await signDelivery(secret, id, bytes)), body });
+    expect(ok.status).toBe(202);
+    expect(send).toHaveBeenCalledTimes(1);
+    // Under another id, stale, or signed for another board: refused, and the old header does not rescue it.
+    for (const signature of [
+      await signDelivery(secret, 'brd_00000000000000b1:10', bytes),
+      await signDelivery(secret, id, bytes, Date.now() - 301_000),
+      await signDelivery(await pushSecret(env, ws, 'brd_00000000000000b2'), id, bytes),
+    ]) {
+      const r = await SELF.fetch(evUrl('brd_00000000000000b1'), { method: 'POST', headers: { ...envelope(id, signature), 'X-Superpipeline-Signature': await sign('brd_00000000000000b1', body) }, body });
+      expect(r.status).toBe(401);
+    }
+    expect(send).toHaveBeenCalledTimes(1);
+    send.mockRestore();
   });
   it('refuses a body whose board differs from the URL', async () => {
     const ws = await ensureWorkspace(env.DB, ORG);
