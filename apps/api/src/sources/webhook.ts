@@ -10,6 +10,11 @@ const CARD = /^card_[0-9a-f]{16}$/;
 
 /**
  * SuperPipeline's record push (Task A1). Routes only: the consumer reads the card back (plan P5).
+ *
+ * The answers follow the suite's receiver status contract (treaty `schemas/README.md`): 2xx is
+ * handled or permanently ignored, 503 is transient and sent again, any other 4xx is refused for
+ * good. A board this deployment has not mapped yet is 503, not 404: the next subscription pass may
+ * map it, and a 404 would be dropped.
  */
 export async function receivePush(request: Request, env: Env, url: URL): Promise<Response> {
   // Fail closed: without a usable signing key no signature can mean anything.
@@ -19,7 +24,7 @@ export async function receivePush(request: Request, env: Env, url: URL): Promise
   const workspaceId = url.searchParams.get('ws') ?? '';
   if (workspaceId === '' || workspaceId.length > 100) return error(404, 'not_found');
   const row = await env.DB.prepare(`SELECT workspace_id FROM source_boards WHERE workspace_id = ? AND board_id = ?`).bind(workspaceId, boardId).first<{ workspace_id: string }>();
-  if (!row) return error(404, 'not_found');
+  if (!row) return error(503, 'board_not_mapped');
   // Cap before any HMAC work: a declared length first, then the bytes actually read.
   if (Number(request.headers.get('content-length') ?? 0) > MAX_PUSH_BODY) return error(413, 'too_large');
   const bytes = new Uint8Array(await request.arrayBuffer());

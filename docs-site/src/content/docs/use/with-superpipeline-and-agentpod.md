@@ -28,6 +28,11 @@ against treaty's `record.v1`, and the events subscribed to are that schema's lis
 then reads the card back from SuperPipeline and updates its record. The subscriptions are
 refreshed every hour.
 
+The answers follow the suite's receiver status contract: `202` for an event taken, or one that
+is not a record event; `503` for a board this deployment has not mapped yet, so SuperPipeline
+tries again; `400` for a body that is not `record.v1`, and `401` for a bad signature, which are
+not sent again.
+
 **Backfill.** An operator can read every board in full, archived cards included:
 
 ```

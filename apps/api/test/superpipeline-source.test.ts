@@ -89,7 +89,15 @@ describe('the push receiver', () => {
     const url = evUrl('brd_00000000000000b1');
     expect((await SELF.fetch(url, { method: 'POST', headers: { 'X-Superpipeline-Signature': 'sha256=00' }, body })).status).toBe(401);
     expect((await SELF.fetch(url, { method: 'POST', headers: { 'X-Superpipeline-Signature': await sign('brd_00000000000000b2', body) }, body })).status).toBe(401);
-    expect((await SELF.fetch(evUrl('brd_00000000000000b9'), { method: 'POST', headers: { 'X-Superpipeline-Signature': await sign('brd_00000000000000b9', body) }, body })).status).toBe(404);
+  });
+  it('a board not mapped yet is 503, so the sender tries again; a malformed board is 404', async () => {
+    const ws = await ensureWorkspace(env.DB, ORG);
+    await subscribeWorkspace(env, ws, ORG);
+    const body = JSON.stringify({ event: 'card.updated', boardId: 'brd_00000000000000b9', seq: 1, ts: '2026-11-23T09:30:00.000Z', cardIds: ['card_00000000000000c1'] });
+    const unmapped = await SELF.fetch(evUrl('brd_00000000000000b9'), { method: 'POST', headers: { 'X-Superpipeline-Signature': await sign('brd_00000000000000b9', body) }, body });
+    expect(unmapped.status).toBe(503);
+    expect(await unmapped.json()).toMatchObject({ error: 'board_not_mapped' });
+    expect((await SELF.fetch(evUrl('brd_nope'), { method: 'POST', body })).status).toBe(404);
   });
   it("takes a delivery on treaty's envelope, signed with x-treaty-signature over its id", async () => {
     const ws = await ensureWorkspace(env.DB, ORG);
