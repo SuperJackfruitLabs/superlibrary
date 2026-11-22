@@ -1,11 +1,16 @@
-import type { JWTPayload } from 'jose';
+import {
+  AccessTokenError,
+  createJwksCache,
+  verifyAccessToken,
+  type AccessTokenClaims,
+  type AccessTokenErrorCode,
+  type JwksCache,
+} from '@superjackfruitlabs/treaty-ecosystem-identity';
+import { decodeJwt, decodeProtectedHeader } from 'jose';
 import type { Env } from '../env';
-import { verifyJws } from './jws';
 
 export const ORG_PLANE_PRODUCT = 'superlibrary';
 export const ORG_PLANE_SOURCE = 'org-plane';
-const PRN = /^prn_[0-9a-f]{20}$/;
-const ORG = /^org_[0-9a-f]{20}$/;
 
 export interface OrgPlaneConfig { issuer: string; jwksUrl: string; audience: string }
 export type OrgPlaneMode = { kind: 'off' } | { kind: 'invalid'; reason: string } | { kind: 'on'; cfg: OrgPlaneConfig };
@@ -36,26 +41,81 @@ export function orgPlaneMode(env: Pick<Env, 'ORG_PLANE_ISSUER' | 'ORG_PLANE_JWKS
   return { kind: 'on', cfg: { issuer, jwksUrl, audience } };
 }
 
-export interface OrgPlaneClaims extends JWTPayload {
-  sub: string;
-  principalKind: 'human' | 'agent' | 'service';
-  org: string;
-  ent: string[];
-  scope?: string;
-  act?: { sub?: string };
+/** What the caller rules read. A verified token carries every claim; dev auth makes only these. */
+export type OrgPlaneClaims = Pick<AccessTokenClaims, 'sub' | 'principalKind' | 'org' | 'ent' | 'act' | 'amr' | 'scope'>;
+
+/**
+ * One key-set cache per JWKS URL for the isolate's life: treaty's, with its rules (3 s timeout,
+ * stale while revalidate, an unknown kid refetched at most once per 30 s, the last good set kept
+ * while the issuer is down). Its fetch is looked up per call, so a test's stub is the one used.
+ */
+const caches = new Map<string, JwksCache>();
+
+export function __resetJwksCacheForTests(): void {
+  caches.clear();
 }
 
-const strings = (v: unknown): v is string[] => Array.isArray(v) && v.every((x) => typeof x === 'string');
+function keysAt(url: string): JwksCache {
+  let c = caches.get(url);
+  if (!c) {
+    c = createJwksCache({ url, fetch: (input, init) => fetch(input, init) });
+    caches.set(url, c);
+  }
+  return c;
+}
 
+/** The header's kid when it is worth fetching keys for: an EdDSA header naming a kid. */
+function fetchableKid(token: string): string | null {
+  try {
+    const h = decodeProtectedHeader(token);
+    return h.alg === 'EdDSA' && typeof h.kid === 'string' && h.kid !== '' ? h.kid : null;
+  } catch {
+    return null;
+  }
+}
+
+export type TokenCheck =
+  | { ok: true; claims: AccessTokenClaims }
+  /** `claims` only with product_not_enabled: the token is otherwise good, and the caller answers 403 with its org. */
+  | { ok: false; code: AccessTokenErrorCode; claims?: AccessTokenClaims };
+
+/**
+ * Treaty's verifyAccessToken, fed from the key-set cache. A malformed header, another algorithm or
+ * a missing kid never costs a fetch: the verifier is given no keys and refuses with its own code.
+ */
+export async function checkToken(
+  token: string,
+  o: { keys: JwksCache; issuer: string; audience: string; product: string; now?: number },
+): Promise<TokenCheck> {
+  const kid = fetchableKid(token);
+  let jwks: { keys: unknown[] } = { keys: [] };
+  if (kid !== null) {
+    try {
+      jwks = await o.keys.getKeys(kid);
+    } catch {
+      return { ok: false, code: 'unknown_key' }; // no key set was ever loaded
+    }
+  }
+  try {
+    const claims = await verifyAccessToken(token, { jwks, issuer: o.issuer, audience: o.audience, product: o.product, now: o.now });
+    return { ok: true, claims };
+  } catch (e) {
+    if (!(e instanceof AccessTokenError)) return { ok: false, code: 'malformed' };
+    // product_not_enabled is the verifier's last check, after the signature and every claim rule
+    // (test/org-plane.test.ts pins that a second fault is refused first), so the payload is good.
+    if (e.code === 'product_not_enabled') return { ok: false, code: e.code, claims: decodeJwt(token) as AccessTokenClaims };
+    return { ok: false, code: e.code };
+  }
+}
+
+/**
+ * The verified claims, or null for every refusal (expired and forged are the same answer). A token
+ * whose `ent` lacks Superlibrary comes back with its claims: the caller refuses it with 403
+ * product_not_enabled, in the order its own rules check.
+ */
 export async function verifyOrgPlaneToken(token: string, cfg: OrgPlaneConfig): Promise<OrgPlaneClaims | null> {
-  const p = await verifyJws(token, { issuer: cfg.issuer, jwksUrl: cfg.jwksUrl, audience: cfg.audience, requiredClaims: ['exp', 'iat', 'jti', 'sub'] });
-  if (!p) return null;
-  if (typeof p.sub !== 'string' || !PRN.test(p.sub)) return null;
-  const kind = p.principalKind;
-  if (kind !== 'human' && kind !== 'agent' && kind !== 'service') return null;
-  if (typeof p.org !== 'string' || !ORG.test(p.org)) return null;
-  if (!strings(p.ent)) return null;
-  return p as OrgPlaneClaims;
+  const r = await checkToken(token, { keys: keysAt(cfg.jwksUrl), issuer: cfg.issuer, audience: cfg.audience, product: ORG_PLANE_PRODUCT });
+  return r.ok ? r.claims : (r.claims ?? null);
 }
 
 /** RFC 9728, as Superpipeline serves it (apps/api/src/mcp/auth.ts). Null when the plane is off. */

@@ -41,9 +41,28 @@ describe('the organization plane, offline', () => {
     await withOrgPlane(async () => {
       expect((await me(bearer(await planeToken({ jti: undefined })))).status).toBe(401);
       const { privateKey } = await planeKeys();
-      const noIat = await new SignJWT({ sub: HUMAN, principalKind: 'human', org: ORG, ent: ['superlibrary'], jti: 'x' })
+      const noIat = await new SignJWT({ sub: HUMAN, principalKind: 'human', org: ORG, ent: ['superlibrary'], mayDispatch: [], mayGrantReach: false, jti: 'x' })
         .setProtectedHeader({ alg: 'EdDSA', kid: KID }).setIssuer(PLANE).setAudience(APP_AUD).setExpirationTime('5m').sign(privateKey);
       expect((await me(bearer(noIat))).status).toBe(401);
+    });
+  });
+
+  it('refuses what the suite token rules refuse: over 300 s, no control pair, a non-prn mayDispatch, no kid', async () => {
+    await withOrgPlane(async () => {
+      expect((await me(bearer(await planeToken({}, { exp: '301s' })))).status).toBe(401);
+      expect((await me(bearer(await planeToken({}, { exp: '300s' })))).status).toBe(200);
+      for (const t of [
+        await planeToken({}, { exp: '1h' }),
+        await planeToken({ mayDispatch: undefined }),
+        await planeToken({ mayGrantReach: undefined }),
+        await planeToken({ mayGrantReach: 'false' }),
+        await planeToken({ mayDispatch: ['prn_*'] }),
+        await planeToken({}, { kid: '' }),
+      ]) {
+        const res = await me(bearer(t));
+        expect(res.status).toBe(401);
+        expect(await res.json()).toEqual({ error: 'sign_in_required' });
+      }
     });
   });
 
