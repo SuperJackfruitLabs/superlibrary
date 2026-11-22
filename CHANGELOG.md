@@ -9,7 +9,9 @@ v0.0.5 predate this file: their notes are on the GitHub releases.
 
 - SuperPipeline's push is read on treaty's delivery contract: `x-treaty-signature` over the
   event's timestamp, id and body is verified, with the older `X-Superpipeline-Signature` as the
-  fallback until SuperPipeline stops sending it. Treaty 0.0.17.
+  fallback until SuperPipeline stops sending it. Record bodies are checked against treaty's
+  `record.v1` (a body that is not, such as one with a non-string card id, is now refused with
+  400), and the event list comes from that schema. Treaty 0.0.17.
 
 - Sign-in tokens are checked by the suite's shared verifier (treaty's `verifyAccessToken`), to
   the same rules as every other product. SuperLibrary now refuses a token that lives longer than

@@ -1,13 +1,10 @@
 import type { Env } from '../env';
 import { PipelineError, pipelineFor, type SuperpipelineClient } from './superpipeline';
 import { ensureWorkspace } from '../auth/caller';
+import { RECORD_EVENT_NAMES } from './record-event';
 
-/** Superpipeline's record events as built (A1 RECORD_EVENTS); a push config may subscribe to nothing else. */
-export const RECORD_EVENT_NAMES = [
-  'card.created', 'card.updated', 'card.moved', 'card.advanced', 'card.completed', 'card.rejected', 'card.failed',
-  'card.blocked', 'card.deleted', 'card.resumed', 'card.comment.added', 'card.comment.deleted', 'gate.resolved',
-  'link.added', 'link.removed',
-] as const;
+/** SuperPipeline's record events, from treaty's record.v1; a push config may subscribe to nothing else. */
+export { RECORD_EVENT_NAMES };
 
 const hex = (b: ArrayBuffer) => [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, '0')).join('');
 

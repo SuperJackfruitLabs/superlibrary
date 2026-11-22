@@ -23,9 +23,10 @@ Each event arrives on treaty's delivery contract: a CloudEvent in HTTP binary mo
 `x-treaty-signature` over its timestamp, its event id and its body, with a per-board secret
 derived from `PUSH_SIGNING_KEY`, so only SuperPipeline can post them. A push signed only with the
 older `X-Superpipeline-Signature` is still accepted until SuperPipeline stops sending it; a
-treaty signature that fails is refused, whatever else the push carries. SuperLibrary then reads
-the card back from SuperPipeline and updates its record. The subscriptions are refreshed every
-hour.
+treaty signature that fails is refused, whatever else the push carries. Each body is checked
+against treaty's `record.v1`, and the events subscribed to are that schema's list. SuperLibrary
+then reads the card back from SuperPipeline and updates its record. The subscriptions are
+refreshed every hour.
 
 **Backfill.** An operator can read every board in full, archived cards included:
 
