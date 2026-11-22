@@ -1,0 +1,13 @@
+{
+  "product": "superlibrary",
+  "treaty": "0.0.15",
+  "produces": ["superlibrary.api"],
+  "consumes": [
+    "accounts.token-claims",
+    "accounts.plane-api",
+    "accounts.sign-in",
+    "superpipeline.direct-push",
+    "superpipeline.board-read",
+    "agentpod.capability-catalog"
+  ]
+}

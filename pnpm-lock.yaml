@@ -8,6 +8,9 @@ importers:
 
   .:
     devDependencies:
+      '@superjackfruitlabs/treaty-contracts':
+        specifier: 0.0.15
+        version: 0.0.15
       oxlint:
         specifier: 1.88.0
         version: 1.88.0(oxlint-tsgolint@7.0.2004)
@@ -1281,6 +1284,10 @@ packages:
     engines: {node: '>=22'}
     peerDependencies:
       svelte: ^5.56.0
+
+  '@superjackfruitlabs/treaty-contracts@0.0.15':
+    resolution: {integrity: sha512-7JE6yFDT6ICWY8/iY1PuLIQF9vot0UhONAdvNn+ZCDAEd0B7ypoiWdmaGLvhjBXiXJ0ObjdotsIMuf2UMGWv2A==}
+    hasBin: true
 
   '@superjackfruitlabs/treaty-ecosystem-identity@0.0.15':
     resolution: {integrity: sha512-CmWbTLyU/YT5OuB1Ke1pUzhUsOA8V1cd6mQY4HZ8eXIZFPwNW+1wBknB3MeveseXyefm24SLlc6WQld0WFl3Yg==}
@@ -2882,8 +2889,7 @@ snapshots:
     dependencies:
       css-tree: 3.2.1
 
-  '@cfworker/json-schema@4.1.1':
-    optional: true
+  '@cfworker/json-schema@4.1.1': {}
 
   '@chevrotain/cst-dts-gen@13.2.0':
     dependencies:
@@ -3596,6 +3602,10 @@ snapshots:
     transitivePeerDependencies:
       - '@internationalized/date'
       - '@sveltejs/kit'
+
+  '@superjackfruitlabs/treaty-contracts@0.0.15':
+    dependencies:
+      '@cfworker/json-schema': 4.1.1
 
   '@superjackfruitlabs/treaty-ecosystem-identity@0.0.15':
     dependencies:

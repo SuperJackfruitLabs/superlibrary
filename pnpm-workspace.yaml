@@ -9,3 +9,4 @@ allowBuilds:
 # pinned version only. Drop an entry once its version is a day old.
 minimumReleaseAgeExclude:
   - '@superjackfruitlabs/treaty-ecosystem-identity@0.0.15'
+  - '@superjackfruitlabs/treaty-contracts@0.0.15'

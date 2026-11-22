@@ -116,6 +116,9 @@ jobs:
       # The docs-only plan and the `check` verdict (scripts/ci-plan.mjs). A change to either is
       # not docs-only, so this runs whenever they change.
       - run: node --test scripts/ci-plan.test.mjs
+      # treaty.json: the crossings SuperLibrary produces and consumes, checked against the pinned
+      # treaty release's registry (the installed `treaty` bin, @superjackfruitlabs/treaty-contracts).
+      - run: pnpm exec treaty verify
 
   e2e:
     needs: [changes]
