@@ -7,6 +7,11 @@ v0.0.5 predate this file: their notes are on the GitHub releases.
 
 ## Unreleased
 
+- Sign-in tokens are checked by the suite's shared verifier (treaty's `verifyAccessToken`), to
+  the same rules as every other product. SuperLibrary now refuses a token that lives longer than
+  300 s, lacks `mayDispatch` or `mayGrantReach`, carries a `mayDispatch` value that is not a
+  principal id, has no `kid`, or carries a conditional claim of the wrong type; and it allows 30 s
+  of clock skew on `exp`, `nbf` and `iat` where it allowed none.
 - Releases come from the suite's shared release workflow: production deploys only a tag whose
   main CI run passed, the suli binaries come with `SHA256SUMS` and a build-provenance
   attestation, and the release notes carry a summary, this section and the grouped commits.

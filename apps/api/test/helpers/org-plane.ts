@@ -1,6 +1,6 @@
 import { env } from 'cloudflare:test';
 import { SignJWT, exportJWK, generateKeyPair } from 'jose';
-import { __resetJwksCacheForTests } from '../../src/auth/jws';
+import { __resetJwksCacheForTests } from '../../src/auth/org-plane';
 
 export const PLANE = 'https://accounts.test';
 export const PLANE_JWKS = `${PLANE}/api/auth/jwks`;
@@ -36,7 +36,8 @@ export async function planeToken(
   };
   for (const [k, v] of Object.entries(payload)) if (v === undefined) delete payload[k];
   return new SignJWT(payload)
-    .setProtectedHeader({ alg: 'EdDSA', kid: opts.kid ?? KID })
+    // kid '' leaves the header without one.
+    .setProtectedHeader(opts.kid === '' ? { alg: 'EdDSA' } : { alg: 'EdDSA', kid: opts.kid ?? KID })
     .setIssuer(opts.iss ?? PLANE)
     .setAudience(opts.aud ?? [APP_AUD, `${PLANE}/api/auth/oauth2/userinfo`])
     .setIssuedAt()
