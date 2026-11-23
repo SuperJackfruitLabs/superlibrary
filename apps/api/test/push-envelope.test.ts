@@ -26,12 +26,12 @@ describe("treaty's push-delivery vectors", () => {
       expect({ name: r.name, ok }).toEqual({ name: r.name, ok: false });
     }
   });
-  it('a treaty signature that fails is not rescued by a valid old header', async () => {
+  it('the old X-Superpipeline-Signature is refused, alone or beside a failing treaty signature', async () => {
     const d = vectors.deliveries[0];
     const body = UTF8.encode(d.http.body);
     const key = await crypto.subtle.importKey('raw', UTF8.encode(d.secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
     const old = 'sha256=' + [...new Uint8Array(await crypto.subtle.sign('HMAC', key, body))].map((x) => x.toString(16).padStart(2, '0')).join('');
-    expect(await verifyPush(new Headers({ 'X-Superpipeline-Signature': old }), body, d.secret, d.t * 1000)).toBe(true);
+    expect(await verifyPush(new Headers({ 'X-Superpipeline-Signature': old }), body, d.secret, d.t * 1000)).toBe(false);
     const both = headersOf({ ...d.http.headers, 'X-Superpipeline-Signature': old, 'ce-id': 'brd_134a0ddb6d434478:99' });
     expect(await verifyPush(both, body, d.secret, d.t * 1000)).toBe(false);
   });

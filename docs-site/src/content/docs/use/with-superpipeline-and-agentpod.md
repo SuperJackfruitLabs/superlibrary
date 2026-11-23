@@ -21,9 +21,9 @@ POST /api/v1/sources/superpipeline/events
 
 Each event arrives on treaty's delivery contract: a CloudEvent in HTTP binary mode, signed in
 `x-treaty-signature` over its timestamp, its event id and its body, with a per-board secret
-derived from `PUSH_SIGNING_KEY`, so only SuperPipeline can post them. A push signed only with the
-older `X-Superpipeline-Signature` is still accepted until SuperPipeline stops sending it; a
-treaty signature that fails is refused, whatever else the push carries. Each body is checked
+derived from `PUSH_SIGNING_KEY`, so only SuperPipeline can post them. A push without a valid
+`x-treaty-signature` is refused, whatever else it carries; the older `X-Superpipeline-Signature`
+is no longer accepted, so SuperPipeline must be v0.0.37 or later. Each body is checked
 against treaty's `record.v1`, and the events subscribed to are that schema's list. SuperLibrary
 then reads the card back from SuperPipeline and updates its record. The subscriptions are
 refreshed every hour.
