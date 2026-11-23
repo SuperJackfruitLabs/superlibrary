@@ -7,6 +7,8 @@ v0.0.5 predate this file: their notes are on the GitHub releases.
 
 ## Unreleased
 
+## v0.0.6 — 2026-11-23
+
 - SuperPipeline's push is read on treaty's delivery contract: `x-treaty-signature` over the
   event's timestamp, id and body is verified, with the older `X-Superpipeline-Signature` as the
   fallback until SuperPipeline stops sending it. Record bodies are checked against treaty's
