@@ -2,6 +2,8 @@
 import { SELF, createExecutionContext, createScheduledController, env, waitOnExecutionContext } from 'cloudflare:test';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ORG, card, fakePipeline, type FakeState } from './helpers/fake-pipeline';
+import { SIGNATURE_HEADER, signDelivery } from '@superjackfruitlabs/treaty-cloudevents';
+import recordSchema from '@superjackfruitlabs/treaty-event-schemas/superpipeline/record.v1.json';
 import { RECORD_EVENT_NAMES, SUBSCRIBE_CRON, pushSecret, subscribeAll, subscribeWorkspace } from '../src/sources/subscribe';
 import { pipelineFor } from '../src/sources/superpipeline';
 import wranglerRaw from '../wrangler.jsonc?raw';
@@ -20,6 +22,15 @@ beforeEach(async () => {
   restore = fakePipeline(state);
 });
 afterEach(() => { restore(); __resetServiceTokensForTests(); });
+
+/** The ingest queue's sendBatch, spied on and answering as a queue does. */
+const spySend = () => vi.spyOn(env.INGEST, 'sendBatch').mockResolvedValue({ metadata: {} } as never);
+
+/** A push on treaty's envelope: CloudEvents binary-mode headers for a card.moved, and its signature. */
+const envelope = (id: string, signature: string) => ({
+  'ce-specversion': '1.0', 'ce-id': id, 'ce-source': '/superpipeline/boards/brd_00000000000000b1',
+  'ce-type': 'com.superjackfruit.superpipeline.card.moved.v1', 'content-type': 'application/json', [SIGNATURE_HEADER]: signature,
+});
 
 async function sign(boardId: string, body: string, wsOverride?: string) {
   const ws = wsOverride ?? WS;
@@ -52,7 +63,7 @@ describe('the push receiver', () => {
   it('turns a signed record event into one card.sync per card', async () => {
     const ws = await ensureWorkspace(env.DB, ORG);
     await subscribeWorkspace(env, ws, ORG);
-    const send = vi.spyOn(env.INGEST, 'sendBatch').mockResolvedValue({ metadata: {} } as never);
+    const send = spySend();
     const body = JSON.stringify({ event: 'link.added', boardId: 'brd_00000000000000b1', seq: 7, ts: '2026-10-10T00:00:00Z', cardIds: ['card_00000000000000c2', 'card_00000000000000c1'] });
     const r = await SELF.fetch(evUrl('brd_00000000000000b1'), { method: 'POST', headers: { 'X-Superpipeline-Signature': await sign('brd_00000000000000b1', body), 'X-Superpipeline-Event': 'link.added', 'content-type': 'application/json' }, body });
     expect(r.status).toBe(202);
@@ -65,8 +76,8 @@ describe('the push receiver', () => {
   it('card.deleted becomes a deletion', async () => {
     const ws = await ensureWorkspace(env.DB, ORG);
     await subscribeWorkspace(env, ws, ORG);
-    const send = vi.spyOn(env.INGEST, 'sendBatch').mockResolvedValue({ metadata: {} } as never);
-    const body = JSON.stringify({ event: 'card.deleted', boardId: 'brd_00000000000000b1', seq: 8, ts: 't', cardIds: ['card_00000000000000c1'] });
+    const send = spySend();
+    const body = JSON.stringify({ event: 'card.deleted', boardId: 'brd_00000000000000b1', seq: 8, ts: '2026-11-23T09:30:00.000Z', cardIds: ['card_00000000000000c1'] });
     await SELF.fetch(evUrl('brd_00000000000000b1'), { method: 'POST', headers: { 'X-Superpipeline-Signature': await sign('brd_00000000000000b1', body) }, body });
     expect(send).toHaveBeenCalledWith([{ body: { type: 'card.deleted', workspaceId: ws, boardId: 'brd_00000000000000b1', cardId: 'card_00000000000000c1' } }]);
     send.mockRestore();
@@ -74,16 +85,61 @@ describe('the push receiver', () => {
   it('refuses a bad signature, a signature for another board, and an unknown board', async () => {
     const ws = await ensureWorkspace(env.DB, ORG);
     await subscribeWorkspace(env, ws, ORG);
-    const body = JSON.stringify({ event: 'card.updated', boardId: 'brd_00000000000000b1', seq: 1, ts: 't', cardIds: ['card_00000000000000c1'] });
+    const body = JSON.stringify({ event: 'card.updated', boardId: 'brd_00000000000000b1', seq: 1, ts: '2026-11-23T09:30:00.000Z', cardIds: ['card_00000000000000c1'] });
     const url = evUrl('brd_00000000000000b1');
     expect((await SELF.fetch(url, { method: 'POST', headers: { 'X-Superpipeline-Signature': 'sha256=00' }, body })).status).toBe(401);
     expect((await SELF.fetch(url, { method: 'POST', headers: { 'X-Superpipeline-Signature': await sign('brd_00000000000000b2', body) }, body })).status).toBe(401);
-    expect((await SELF.fetch(evUrl('brd_00000000000000b9'), { method: 'POST', headers: { 'X-Superpipeline-Signature': await sign('brd_00000000000000b9', body) }, body })).status).toBe(404);
+  });
+  it('a board not mapped yet is 503, so the sender tries again; a malformed board is 404', async () => {
+    const ws = await ensureWorkspace(env.DB, ORG);
+    await subscribeWorkspace(env, ws, ORG);
+    const body = JSON.stringify({ event: 'card.updated', boardId: 'brd_00000000000000b9', seq: 1, ts: '2026-11-23T09:30:00.000Z', cardIds: ['card_00000000000000c1'] });
+    const unmapped = await SELF.fetch(evUrl('brd_00000000000000b9'), { method: 'POST', headers: { 'X-Superpipeline-Signature': await sign('brd_00000000000000b9', body) }, body });
+    expect(unmapped.status).toBe(503);
+    expect(await unmapped.json()).toMatchObject({ error: 'board_not_mapped' });
+    expect((await SELF.fetch(evUrl('brd_nope'), { method: 'POST', body })).status).toBe(404);
+  });
+  it("takes a delivery on treaty's envelope, signed with x-treaty-signature over its id", async () => {
+    const ws = await ensureWorkspace(env.DB, ORG);
+    await subscribeWorkspace(env, ws, ORG);
+    const send = spySend();
+    const body = JSON.stringify({ event: 'card.moved', boardId: 'brd_00000000000000b1', seq: 9, ts: '2026-11-23T09:30:00.000Z', cardIds: ['card_00000000000000c1'] });
+    const bytes = new TextEncoder().encode(body);
+    const secret = await pushSecret(env, ws, 'brd_00000000000000b1');
+    const id = 'brd_00000000000000b1:9';
+    const ok = await SELF.fetch(evUrl('brd_00000000000000b1'), { method: 'POST', headers: envelope(id, await signDelivery(secret, id, bytes)), body });
+    expect(ok.status).toBe(202);
+    expect(send).toHaveBeenCalledTimes(1);
+    // Under another id, stale, or signed for another board: refused, and the old header does not rescue it.
+    for (const signature of [
+      await signDelivery(secret, 'brd_00000000000000b1:10', bytes),
+      await signDelivery(secret, id, bytes, Date.now() - 301_000),
+      await signDelivery(await pushSecret(env, ws, 'brd_00000000000000b2'), id, bytes),
+    ]) {
+      const r = await SELF.fetch(evUrl('brd_00000000000000b1'), { method: 'POST', headers: { ...envelope(id, signature), 'X-Superpipeline-Signature': await sign('brd_00000000000000b1', body) }, body });
+      expect(r.status).toBe(401);
+    }
+    expect(send).toHaveBeenCalledTimes(1);
+    send.mockRestore();
+  });
+  it('refuses a record event that is not record.v1, before queueing', async () => {
+    const ws = await ensureWorkspace(env.DB, ORG);
+    await subscribeWorkspace(env, ws, ORG);
+    const send = spySend();
+    const good = { event: 'card.updated', boardId: 'brd_00000000000000b1', seq: 1, ts: '2026-11-23T09:30:00.000Z', cardIds: ['card_00000000000000c1'] };
+    const { seq: _seq, ...noSeq } = good;
+    for (const bad of [noSeq, { ...good, ts: 'yesterday' }, { ...good, cardIds: ['card_00000000000000c1', 7] }]) {
+      const body = JSON.stringify(bad);
+      const r = await SELF.fetch(evUrl('brd_00000000000000b1'), { method: 'POST', headers: { 'X-Superpipeline-Signature': await sign('brd_00000000000000b1', body) }, body });
+      expect(r.status).toBe(400);
+    }
+    expect(send).not.toHaveBeenCalled();
+    send.mockRestore();
   });
   it('refuses a body whose board differs from the URL', async () => {
     const ws = await ensureWorkspace(env.DB, ORG);
     await subscribeWorkspace(env, ws, ORG);
-    const body = JSON.stringify({ event: 'card.updated', boardId: 'brd_00000000000000b2', seq: 1, ts: 't', cardIds: ['card_00000000000000c1'] });
+    const body = JSON.stringify({ event: 'card.updated', boardId: 'brd_00000000000000b2', seq: 1, ts: '2026-11-23T09:30:00.000Z', cardIds: ['card_00000000000000c1'] });
     const r = await SELF.fetch(evUrl('brd_00000000000000b1'), { method: 'POST', headers: { 'X-Superpipeline-Signature': await sign('brd_00000000000000b1', body) }, body });
     expect(r.status).toBe(400);
   });
@@ -92,12 +148,10 @@ describe('the push receiver', () => {
 
 
 describe('the event list (ruling RA4)', () => {
-  it('is exactly Superpipeline\'s record events as built', () => {
-    expect([...RECORD_EVENT_NAMES]).toEqual([
-      'card.created', 'card.updated', 'card.moved', 'card.advanced', 'card.completed', 'card.rejected', 'card.failed',
-      'card.blocked', 'card.deleted', 'card.resumed', 'card.comment.added', 'card.comment.deleted', 'gate.resolved',
-      'link.added', 'link.removed',
-    ]);
+  it("is exactly treaty's record.v1 events, read from the schema rather than copied", () => {
+    expect([...RECORD_EVENT_NAMES]).toEqual(recordSchema.properties.event.enum);
+    expect(RECORD_EVENT_NAMES).toContain('card.completed');
+    expect(RECORD_EVENT_NAMES).toContain('link.removed');
   });
 });
 
@@ -105,8 +159,8 @@ describe('the receiver guards', () => {
   it('ignores an event that is not a record event, without queueing', async () => {
     const ws = await ensureWorkspace(env.DB, ORG);
     await subscribeWorkspace(env, ws, ORG);
-    const send = vi.spyOn(env.INGEST, 'sendBatch').mockResolvedValue({ metadata: {} } as never);
-    const body = JSON.stringify({ event: 'work.available', boardId: 'brd_00000000000000b1', seq: 1, ts: 't', cardIds: ['card_00000000000000c1'] });
+    const send = spySend();
+    const body = JSON.stringify({ event: 'work.available', boardId: 'brd_00000000000000b1', seq: 1, ts: '2026-11-23T09:30:00.000Z', cardIds: ['card_00000000000000c1'] });
     const r = await SELF.fetch(evUrl('brd_00000000000000b1'), { method: 'POST', headers: { 'X-Superpipeline-Signature': await sign('brd_00000000000000b1', body) }, body });
     expect(r.status).toBe(202);
     expect(send).not.toHaveBeenCalled();
@@ -115,8 +169,8 @@ describe('the receiver guards', () => {
   it('drops card ids that are not card ids', async () => {
     const ws = await ensureWorkspace(env.DB, ORG);
     await subscribeWorkspace(env, ws, ORG);
-    const send = vi.spyOn(env.INGEST, 'sendBatch').mockResolvedValue({ metadata: {} } as never);
-    const body = JSON.stringify({ event: 'card.updated', boardId: 'brd_00000000000000b1', seq: 1, ts: 't', cardIds: ['../x', 7, 'card_00000000000000c1'] });
+    const send = spySend();
+    const body = JSON.stringify({ event: 'card.updated', boardId: 'brd_00000000000000b1', seq: 1, ts: '2026-11-23T09:30:00.000Z', cardIds: ['../x', 'card_00000000000000c1'] });
     await SELF.fetch(evUrl('brd_00000000000000b1'), { method: 'POST', headers: { 'X-Superpipeline-Signature': await sign('brd_00000000000000b1', body) }, body });
     expect(send).toHaveBeenCalledWith([{ body: { type: 'card.sync', workspaceId: ws, boardId: 'brd_00000000000000b1', cardId: 'card_00000000000000c1', reason: 'card.updated' } }]);
     send.mockRestore();
@@ -125,8 +179,8 @@ describe('the receiver guards', () => {
     const other = await ensureWorkspace(env.DB, 'org_00000000000000000a02');
     const ws = await ensureWorkspace(env.DB, ORG);
     await subscribeWorkspace(env, ws, ORG);
-    const send = vi.spyOn(env.INGEST, 'sendBatch').mockResolvedValue({ metadata: {} } as never);
-    const body = JSON.stringify({ event: 'card.updated', boardId: 'brd_00000000000000b1', seq: 1, ts: 't', cardIds: ['card_00000000000000c1'] });
+    const send = spySend();
+    const body = JSON.stringify({ event: 'card.updated', boardId: 'brd_00000000000000b1', seq: 1, ts: '2026-11-23T09:30:00.000Z', cardIds: ['card_00000000000000c1'] });
     await SELF.fetch(evUrl('brd_00000000000000b1'), { method: 'POST', headers: { 'X-Superpipeline-Signature': await sign('brd_00000000000000b1', body) }, body });
     const sent = send.mock.calls[0][0] as Array<{ body: { workspaceId: string } }>;
     expect(sent[0].body.workspaceId).toBe(ws);
@@ -182,9 +236,9 @@ describe('fail closed and bounds', () => {
   };
   it('with no signing key the receiver answers 503 and queues nothing', async () => {
     await subscribeWorkspace(env, WS, ORG);
-    const body = JSON.stringify({ event: 'card.updated', boardId: B1, seq: 1, ts: 't', cardIds: ['card_00000000000000c1'] });
+    const body = JSON.stringify({ event: 'card.updated', boardId: B1, seq: 1, ts: '2026-11-23T09:30:00.000Z', cardIds: ['card_00000000000000c1'] });
     const sig = await sign(B1, body);
-    const send = vi.spyOn(env.INGEST, 'sendBatch').mockResolvedValue({ metadata: {} } as never);
+    const send = spySend();
     for (const key of [undefined, '', 'short']) {
       await withKey(key, async () => {
         expect((await SELF.fetch(evUrl(B1), { method: 'POST', headers: { 'X-Superpipeline-Signature': sig }, body })).status).toBe(503);
@@ -207,8 +261,8 @@ describe('fail closed and bounds', () => {
     const other = await ensureWorkspace(env.DB, 'org_00000000000000000a02');
     await subscribeWorkspace(env, WS, ORG);
     await env.DB.prepare(`INSERT OR IGNORE INTO source_boards (workspace_id, board_id, name, last_seen_at) VALUES (?, ?, 'Other', 't')`).bind(other, B1).run();
-    const send = vi.spyOn(env.INGEST, 'sendBatch').mockResolvedValue({ metadata: {} } as never);
-    const body = JSON.stringify({ event: 'card.updated', boardId: B1, seq: 1, ts: 't', cardIds: ['card_00000000000000c1'] });
+    const send = spySend();
+    const body = JSON.stringify({ event: 'card.updated', boardId: B1, seq: 1, ts: '2026-11-23T09:30:00.000Z', cardIds: ['card_00000000000000c1'] });
     const forOther = await SELF.fetch(evUrl(B1, other), { method: 'POST', headers: { 'X-Superpipeline-Signature': await sign(B1, body, WS) }, body });
     expect(forOther.status).toBe(401);
     expect(send).not.toHaveBeenCalled();
@@ -220,7 +274,7 @@ describe('fail closed and bounds', () => {
   });
   it('a body over 64 KB is refused before the signature is computed', async () => {
     await subscribeWorkspace(env, WS, ORG);
-    const body = JSON.stringify({ event: 'card.updated', boardId: B1, seq: 1, ts: 't', cardIds: [], pad: 'x'.repeat(70 * 1024) });
+    const body = JSON.stringify({ event: 'card.updated', boardId: B1, seq: 1, ts: '2026-11-23T09:30:00.000Z', cardIds: [], pad: 'x'.repeat(70 * 1024) });
     const r = await SELF.fetch(evUrl(B1), { method: 'POST', headers: { 'X-Superpipeline-Signature': await sign(B1, body) }, body });
     expect(r.status).toBe(413);
   });

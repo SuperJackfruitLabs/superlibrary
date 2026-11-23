@@ -19,9 +19,19 @@ SuperPipeline posts record events to:
 POST /api/v1/sources/superpipeline/events
 ```
 
-Each event is signed with HMAC-SHA-256 from `PUSH_SIGNING_KEY`, so only SuperPipeline can post
-them. SuperLibrary then reads the card back from SuperPipeline and updates its record. The
-subscriptions are refreshed every hour.
+Each event arrives on treaty's delivery contract: a CloudEvent in HTTP binary mode, signed in
+`x-treaty-signature` over its timestamp, its event id and its body, with a per-board secret
+derived from `PUSH_SIGNING_KEY`, so only SuperPipeline can post them. A push signed only with the
+older `X-Superpipeline-Signature` is still accepted until SuperPipeline stops sending it; a
+treaty signature that fails is refused, whatever else the push carries. Each body is checked
+against treaty's `record.v1`, and the events subscribed to are that schema's list. SuperLibrary
+then reads the card back from SuperPipeline and updates its record. The subscriptions are
+refreshed every hour.
+
+The answers follow the suite's receiver status contract: `202` for an event taken, or one that
+is not a record event; `503` for a board this deployment has not mapped yet, so SuperPipeline
+tries again; `400` for a body that is not `record.v1`, and `401` for a bad signature, which are
+not sent again.
 
 **Backfill.** An operator can read every board in full, archived cards included:
 
