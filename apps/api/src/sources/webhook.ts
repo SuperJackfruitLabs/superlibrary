@@ -29,7 +29,7 @@ export async function receivePush(request: Request, env: Env, url: URL): Promise
   if (Number(request.headers.get('content-length') ?? 0) > MAX_PUSH_BODY) return error(413, 'too_large');
   const bytes = new Uint8Array(await request.arrayBuffer());
   if (bytes.byteLength > MAX_PUSH_BODY) return error(413, 'too_large');
-  // Treaty's x-treaty-signature over t.id.body; the old X-Superpipeline-Signature until the cleanup.
+  // Treaty's x-treaty-signature over t.id.body, and nothing else.
   if (!(await verifyPush(request.headers, bytes, await pushSecret(env, row.workspace_id, boardId)))) return error(401, 'bad_signature');
   let body: unknown;
   try { body = JSON.parse(new TextDecoder().decode(bytes)); } catch { return error(400, 'invalid'); }

@@ -7,6 +7,10 @@ v0.0.5 predate this file: their notes are on the GitHub releases.
 
 ## Unreleased
 
+- A SuperPipeline push must carry a valid `x-treaty-signature`: the older
+  `X-Superpipeline-Signature` fallback is gone, and a push signed only with it is refused with 401.
+  Needs SuperPipeline v0.0.37 or later, which no longer sends the old header.
+
 ## v0.0.6 — 2026-11-23
 
 - SuperPipeline's push is read on treaty's delivery contract: `x-treaty-signature` over the
