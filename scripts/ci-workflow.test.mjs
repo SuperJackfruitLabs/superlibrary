@@ -60,7 +60,9 @@ test('the config names no command or script path: hooks are fixed files', () => 
 test('a v* tag runs the shared release workflow, gated on main CI', () => {
   assert.match(rel, /tags: \['v\*'\]/);
   assert.match(rel, /git merge-base --is-ancestor "\$SHA" origin\/main/);
-  assert.match(rel, /actions\/workflows\/\$wf\/runs\?head_sha=\$SHA&branch=main&status=success/);
+  assert.match(rel, /actions\/workflows\/\$wf\/runs\?head_sha=\$SHA&branch=main/);
+  // the gate checks the run's outcome itself: GitHub's status=success list once left out a passed run
+  assert.match(rel, /select\(\.status == "completed" and \.conclusion == "success"\)/);
   // the gate requires ci.yml's whole run; a landing- or docs-only commit's run passes with its app jobs skipped
   assert.equal(config.ci_workflow, 'ci.yml');
   assert.equal(config.product, 'SuperLibrary');
