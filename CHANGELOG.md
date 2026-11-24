@@ -7,6 +7,10 @@ v0.0.5 predate this file: their notes are on the GitHub releases.
 
 ## Unreleased
 
+- The routes other products call (uploads, related work, roster invalidation, `me`, and an
+  item's read, embed grant and widening) are checked in the API tests against treaty's
+  `superlibrary.api` contract (`api.v1`), refusals and the fields each code carries included.
+  Treaty 0.0.19.
 - A SuperPipeline push must carry a valid `x-treaty-signature`: the older
   `X-Superpipeline-Signature` fallback is gone, and a push signed only with it is refused with 401.
   Needs SuperPipeline v0.0.37 or later, which no longer sends the old header.
