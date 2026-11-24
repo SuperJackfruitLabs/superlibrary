@@ -1,4 +1,5 @@
 import type { Env } from '../env';
+import { hubConforms, refusedAnswer } from './hub-contract';
 import { serviceToken } from './plane';
 
 export interface HubStation { id: string; key: string; owner: string }
@@ -24,7 +25,10 @@ export async function hubStation(env: Env, org: string, stationId: string): Prom
   }
   if (res.status === 404) return null;
   if (!res.ok) throw new HubUnavailable(`hub station ${res.status}`);
-  const b = (await res.json().catch(() => null)) as Partial<HubStation> | null;
-  if (!b || b.id !== stationId || typeof b.key !== 'string' || typeof b.owner !== 'string') throw new HubUnavailable('hub station answer malformed');
+  // Treaty's capability-catalog.v1, and the station asked for: anything else is no answer.
+  const b: unknown = await res.json().catch(() => undefined);
+  const why: string[] = [];
+  if (!hubConforms('readStationOwner', res.status, b, why)) throw new HubUnavailable(refusedAnswer('readStationOwner', res.status, why));
+  if (b.id !== stationId) throw new HubUnavailable('hub station answer names another station');
   return { id: b.id, key: b.key, owner: b.owner };
 }

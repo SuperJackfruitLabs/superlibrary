@@ -62,6 +62,19 @@ describe("a person's console link (gap S1)", () => {
     expect(r.body.error).toBe('hub_unreachable');
     expect(await sessions()).toBe(before);
   });
+  it.each([
+    ['an empty key', { id: STN, key: '', owner: HUMAN }],
+    ['no owner', { id: STN, key: 'notes-station' }],
+    ['another station', { id: 'stn_00000000000000c2', key: 'notes-station', owner: HUMAN }],
+  ])("an answer treaty's capability-catalog.v1 refuses (%s) is no answer: 502, nothing recorded", async (_, raw) => {
+    await workspaceOf();
+    restore = fakeHub({ raw });
+    const before = await sessions();
+    const r = await upload([{ path: 'x.md', body: '# x' }], { title: 'x', stationFile: { station: STN, path: 'x.md' } });
+    expect(r.status).toBe(502);
+    expect(r.body.error).toBe('hub_unreachable');
+    expect(await sessions()).toBe(before);
+  });
   it("the path is checked like any link's, and a station file never comes with a source or an item", async () => {
     await workspaceOf();
     mine();

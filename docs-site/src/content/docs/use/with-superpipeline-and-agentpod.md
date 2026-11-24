@@ -28,6 +28,14 @@ against treaty's `record.v1`, and the events subscribed to are that schema's lis
 then reads the card back from SuperPipeline and updates its record. The subscriptions are
 refreshed every hour.
 
+Every read of a board, a card, its attempts, comments, links and gates is checked against
+treaty's `board-read.v1` before SuperLibrary uses it. An answer the contract refuses counts as
+SuperPipeline being unavailable: the card is tried again later, and the log names the read and the
+fields that failed, never the card's content. A gate's decision is read as the contract keeps it,
+an open value: `approve`, `approve_manual` and `approve_automatic` all approve the work; a
+decision SuperLibrary does not know is kept in the record as recorded and never counts as an
+approval.
+
 The answers follow the suite's receiver status contract: `202` for an event taken, or one that
 is not a record event; `503` for a board this deployment has not mapped yet, so SuperPipeline
 tries again; `400` for a body that is not `record.v1`, and `401` for a bad signature, which are
@@ -79,6 +87,10 @@ That read gives the console a station-specific list without widening a single it
 
 **Agents' boards.** What an agent can see is its roster of boards, read from the hub. The hub
 tells SuperLibrary when an agent's roster changes (`POST /api/v1/roster/invalidate`).
+
+The roster and the station-owner read are checked against treaty's `capability-catalog.v1`. An
+answer it refuses is no answer: a roster falls back to a cached one under an hour old, else to
+workspace items only, and a person's station link is refused with `502 hub_unreachable`.
 
 **What it needs:** an AgentPod hub, `HUB_SERVICE_PRINCIPAL` naming it, and `SERVICE_CREDENTIALS`
 for reading rosters.

@@ -1,5 +1,5 @@
 import { SELF, env } from 'cloudflare:test';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { canSee, viewerScopes, visibleBinds, visibleSql, type ItemRow } from '../src/items/visibility';
 import { invalidateRoster, rosterBoards } from '../src/clients/roster';
 import { __resetServiceTokensForTests } from '../src/clients/plane';
@@ -15,7 +15,7 @@ const bag = env as unknown as Record<string, unknown>;
 const realFetch = globalThis.fetch;
 afterEach(async () => { globalThis.fetch = realFetch; __resetServiceTokensForTests(); bag.SERVICE_CREDENTIALS = ''; bag.ORG_PLANE_URL = ''; bag.HUB_SERVICE_PRINCIPAL = ''; await env.DB.prepare(`DELETE FROM roster_cache`).run(); });
 
-function hub(boards: string[] | 'down', seen: string[] = []) {
+function hub(boards: string[] | 'down' | { raw: unknown }, seen: string[] = []) {
   bag.ORG_PLANE_URL = 'https://accounts.test';
   bag.SERVICE_CREDENTIALS = JSON.stringify({ [ORG]: 'svc_lib:secret' });
   globalThis.fetch = (async (i: RequestInfo | URL) => {
@@ -23,7 +23,7 @@ function hub(boards: string[] | 'down', seen: string[] = []) {
     seen.push(u);
     if (u.endsWith('/api/token/service')) return Response.json({ access_token: 't', expires_in: 300 });
     if (boards === 'down') return new Response(null, { status: 503 });
-    return Response.json({ boards });
+    return Response.json('raw' in boards ? boards.raw : { boards });
   });
   return seen;
 }
@@ -90,6 +90,21 @@ const seedCache = (age: number, boards: string[], ws = WS) =>
 const hubCalls = (seen: string[]) => seen.filter((u) => u.includes('/api/bridge/principals/')).length;
 
 describe('roster cache ages and keys', () => {
+  it.each([
+    ['a board that is not a board id', { boards: ['brd_00000000000000b2', 'not-a-board'] }],
+    ['no boards list', { roster: [] }],
+  ])("an answer treaty's capability-catalog.v1 refuses (%s) is no answer: the cache under an hour, else nothing", async (_, raw) => {
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+    await seedCache(600_000, ['brd_00000000000000b1']);
+    hub({ raw });
+    expect(await rosterBoards(env, agent)).toEqual(['brd_00000000000000b1']);
+    await env.DB.prepare(`DELETE FROM roster_cache WHERE principal_id = ?`).bind(agent.principalId).run();
+    expect(await rosterBoards(env, agent)).toEqual([]);
+    const logged = err.mock.calls.map((c) => c.join(' ')).join('\n');
+    err.mockRestore();
+    expect(logged).toContain("hub listPrincipalBoards 200: the answer does not match treaty's contract at #");
+    expect(logged).not.toContain('Bearer');
+  });
   it('older than the TTL but under an hour: refetched when the hub answers, used when it is down', async () => {
     await seedCache(600_000, ['brd_00000000000000b1']);
     const seen = hub(['brd_00000000000000b2']);

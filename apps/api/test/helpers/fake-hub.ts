@@ -4,9 +4,10 @@ import { ORG } from './org-plane';
 
 /**
  * The hub's station-owner read (Task 25H) and the plane's service token; restore with the returned function.
- * `down`: the hub answers 503. `unreachable`: the request itself fails (network, timeout).
+ * `down`: the hub answers 503. `unreachable`: the request itself fails (network, timeout). `{ raw }`:
+ * the hub answers 200 with that body, whatever station is asked for.
  */
-export function fakeHub(stations: Record<string, { key: string; owner: string }> | 'down' | 'unreachable', seen: string[] = []): () => void {
+export function fakeHub(stations: Record<string, { key: string; owner: string }> | 'down' | 'unreachable' | { raw: unknown }, seen: string[] = []): () => void {
   const bag = env as unknown as Record<string, unknown>;
   bag.ORG_PLANE_URL = 'https://accounts.test';
   bag.SERVICE_CREDENTIALS = JSON.stringify({ [ORG]: 'svc_lib:secret' });
@@ -18,6 +19,7 @@ export function fakeHub(stations: Record<string, { key: string; owner: string }>
     if (u.origin !== 'https://hub.test') return real(input, init);
     if (stations === 'unreachable') throw new TypeError('fetch failed');
     if (stations === 'down') return new Response(null, { status: 503 });
+    if ('raw' in stations) return Response.json(stations.raw);
     const m = /^\/api\/bridge\/stations\/([^/]+)$/.exec(u.pathname);
     const id = m ? decodeURIComponent(m[1]) : '';
     const s = stations[id];

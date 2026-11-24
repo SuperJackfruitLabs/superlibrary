@@ -118,7 +118,7 @@ describe('syncCard', () => {
     expect(await env.DB.prepare(`SELECT 1 FROM item_references WHERE item_id = ?`).bind(other.body.itemId).first()).toBeNull();
   });
   it('a record with a redacted secret is flagged', async () => {
-    bundleOf(C1).comments = [{ id: 'cmt_1', author: { kind: 'agent', id: 'agt', name: null }, body: 'AKIAABCDEFGHIJKLMNOP', createdAt: 't', deletedAt: null }];
+    bundleOf(C1).comments = [{ id: 'cmt_1', author: { kind: 'agent', id: 'agt', name: null }, body: 'AKIAABCDEFGHIJKLMNOP', createdAt: '2026-10-02T00:00:00.000Z', deletedAt: null }];
     await syncCard(env, { workspaceId: ws, boardId: B, cardId: C1 });
     const r = await recordOf(C1);
     expect(r.redacted).toBe(1);
@@ -149,6 +149,36 @@ describe('ingestBatch', () => {
     expect(res.explicitAcks).toEqual(['a']);
     expect(res.retryMessages.map((m: { msgId: string }) => m.msgId)).toEqual(['b']);
     globalThis.fetch = real;
+  });
+  it("retries a message whose answer treaty's board-read.v1 refuses, logged without the card's text, and acks the rest", async () => {
+    // A SuperPipeline drifted from the contract: C2's card comes back with a state the contract does not name.
+    state.answer = (path, body) => (path.endsWith(`/cards/${C2}`) ? { card: { ...(body as { card: object }).card, title: 'the drifted card', state: 'paused' } } : body);
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const batch = createMessageBatch<IngestMessage>('superlibrary-ingest', [
+      { id: 'a', timestamp: new Date(), attempts: 1, body: { type: 'card.sync', workspaceId: ws, boardId: B, cardId: C1, reason: 'card.updated' } },
+      { id: 'b', timestamp: new Date(), attempts: 1, body: { type: 'card.sync', workspaceId: ws, boardId: B, cardId: C2, reason: 'card.updated' } },
+    ]);
+    const ctx = createExecutionContext();
+    await ingestBatch(batch, env);
+    const res = await getQueueResult(batch, ctx);
+    const logged = err.mock.calls.map((c) => c.join(' ')).join('\n');
+    err.mockRestore();
+    expect(res.explicitAcks).toEqual(['a']);
+    expect(res.retryMessages.map((m: { msgId: string }) => m.msgId)).toEqual(['b']);
+    expect(logged).toContain("ingest failed card.sync 502 superpipeline readCard 200: the answer does not match treaty's contract at #/card/state");
+    expect(logged).not.toContain('the drifted card');
+    expect((await recordOf(C2))?.title).not.toBe('the drifted card');
+  });
+  it('a gate decided approve_automatic approves the work; an expired or unknown decision does not', async () => {
+    const gate = (id: string, decision: string) => ({ id, cardId: C1, stageKey: 'review', status: 'resolved', decision, resolvedAt: '2026-10-03T00:00:00.000Z' });
+    Object.assign(bundleOf(C1), { card: card(C1, { state: 'completed' }), gates: [gate('gate_1', 'approve_automatic')] });
+    Object.assign(bundleOf(C2), { card: card(C2, { state: 'completed' }), gates: [gate('gate_2', 'expired'), gate('gate_3', 'a_new_decision')] });
+    await syncCard(env, { workspaceId: ws, boardId: B, cardId: C1 });
+    await syncCard(env, { workspaceId: ws, boardId: B, cardId: C2 });
+    expect((await recordOf(C1)).outcome).toBe('approved');
+    const r2 = await recordOf(C2);
+    expect(r2.outcome).toBe('completed');
+    expect(JSON.parse(r2.body).gates.map((g: { decision: string }) => g.decision)).toEqual(['expired', 'a_new_decision']);
   });
   it('two messages for one card in a batch read it once', async () => {
     const batch = createMessageBatch<IngestMessage>('superlibrary-ingest', [
