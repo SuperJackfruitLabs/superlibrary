@@ -8,7 +8,7 @@ allowBuilds:
 # pnpm's default one-day release age, waived for the suite's own contract packages at the exact
 # pinned version only. Drop an entry once its version is a day old.
 minimumReleaseAgeExclude:
-  - '@superjackfruitlabs/treaty-cloudevents@0.0.19'
-  - '@superjackfruitlabs/treaty-contracts@0.0.19'
-  - '@superjackfruitlabs/treaty-ecosystem-identity@0.0.19'
-  - '@superjackfruitlabs/treaty-event-schemas@0.0.19'
+  - '@superjackfruitlabs/treaty-cloudevents@0.0.20'
+  - '@superjackfruitlabs/treaty-contracts@0.0.20'
+  - '@superjackfruitlabs/treaty-ecosystem-identity@0.0.20'
+  - '@superjackfruitlabs/treaty-event-schemas@0.0.20'

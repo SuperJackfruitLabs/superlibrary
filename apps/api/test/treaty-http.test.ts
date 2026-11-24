@@ -30,12 +30,17 @@ describe("the contract hook (treaty's superlibrary.api)", () => {
     expect(takeMismatches()).toHaveLength(2);
   });
 
-  it("lets a work record's known differences through, and nothing beside them", () => {
+  it('takes an ingested work record as it is, with no allowance, and refuses what treaty does not describe', () => {
     const item = { id: 'itm_00000000000000a1', kind: 'work-record', title: 'A card', scope: 'workspace', outcome: 'completed', createdBy: 'source:superpipeline', createdAt: '2026-11-01T00:00:00Z', latestVersion: 0, expiresAt: null, revokedAt: null };
-    checkExchange('GET', `${API}/api/v1/items/${item.id}`, noBody, 200, JSON_TYPE, JSON.stringify({ item, versions: [] }));
+    const read = (body: unknown) => checkExchange('GET', `${API}/api/v1/items/${item.id}`, noBody, 200, JSON_TYPE, JSON.stringify(body));
+    read({ item, versions: [] });
     expect(takeMismatches()).toEqual([]);
-    checkExchange('GET', `${API}/api/v1/items/${item.id}`, noBody, 200, JSON_TYPE, JSON.stringify({ item: { ...item, scope: 7 }, versions: [] }));
-    expect(takeMismatches()).toHaveLength(1);
+    // Off the contract: another source, version 0 on an upload, a source writing an artifact, and a bad field.
+    read({ item: { ...item, createdBy: 'source:elsewhere' }, versions: [] });
+    read({ item: { ...item, kind: 'artifact', createdBy: 'prn_000000000000000000a1' }, versions: [] });
+    read({ item: { ...item, kind: 'artifact', latestVersion: 1 }, versions: [] });
+    read({ item: { ...item, scope: 7 }, versions: [] });
+    expect(takeMismatches()).toHaveLength(4);
   });
 
   it('ignores a route the contract does not describe', () => {
