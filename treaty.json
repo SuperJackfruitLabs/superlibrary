@@ -1,6 +1,6 @@
 {
   "product": "superlibrary",
-  "treaty": "0.0.17",
+  "treaty": "0.0.19",
   "produces": ["superlibrary.api"],
   "consumes": [
     "accounts.token-claims",
