@@ -20,6 +20,8 @@ v0.0.5 predate this file: their notes are on the GitHub releases.
 - A gate decided `approve_manual` or `approve_automatic` now makes a completed card's outcome
   `approved`, as `approve` does. An `expired` gate reads as closed, and a decision SuperLibrary
   does not know is kept in the work record as recorded and shown as it is, never as an approval.
+- The embed bundle is checked against treaty's record of it (`superlibrary-embed.json`): at the
+  recorded version it must build to the recorded SHA-256s, so a changed embed needs a new version.
 - A SuperPipeline push must carry a valid `x-treaty-signature`: the older
   `X-Superpipeline-Signature` fallback is gone, and a push signed only with it is refused with 401.
   Needs SuperPipeline v0.0.37 or later, which no longer sends the old header.
