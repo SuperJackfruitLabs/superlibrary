@@ -13,7 +13,8 @@
  *   so an invalid request is not itself a mismatch; a server that accepts one is.
  *
  * A mismatch is recorded, and `setup.ts`'s `afterEach` fails the test that made it, naming the
- * operation, the status and the first errors.
+ * operation, the status and the first errors. Nothing is allowed through: treaty 0.0.20's
+ * `ItemSummary` describes ingested work records, the last gap this suite held open.
  */
 import { createBundle, matchRoute, openApi, validateRequest, validateResponse, type Api } from '@superjackfruitlabs/treaty-contracts';
 import api from '@superjackfruitlabs/treaty-contracts/data/schemas/http/superlibrary/api.v1.openapi.json';
@@ -23,24 +24,6 @@ export const DOCUMENT = 'schemas/http/superlibrary/api.v1.openapi.json';
 
 const bundle = createBundle({ [DOCUMENT]: api, 'schemas/common/flat-error.v1.json': flatError });
 const API: Api = openApi(bundle, DOCUMENT);
-
-/**
- * Where this product and the contract disagree and the contract is believed wrong: reported, and
- * held here so the rest of the suite stays checked. A response is let through only when every one
- * of its errors matches an entry's patterns; any other error in the same body still fails. Each
- * entry says why. Remove an entry when the treaty release that fixes it is pinned.
- */
-export const ALLOWED_MISMATCHES: readonly { errors: readonly RegExp[]; why: string }[] = [
-  {
-    // Reported to treaty: api.v1's ItemSummary was written from uploaded artifacts only.
-    errors: [/^#\/item\/createdBy String does not match pattern\.$/, /^#\/item\/latestVersion 0 is less than 1\.$/],
-    why:
-      "A work record is written by SuperPipeline's ingest, not a principal: its createdBy is `source:superpipeline` and " +
-      'its latestVersion is 0 (it has no uploaded versions). api.v1 requires a `prn_` id and a version of at least 1.',
-  },
-];
-
-const allowed = (error: string) => ALLOWED_MISMATCHES.some((a) => a.errors.some((r) => r.test(error)));
 
 /** How many exchanges were checked, by operation, so a test can prove the hook ran. */
 export const treatyHttpChecked: Record<string, number> = {};
@@ -95,7 +78,7 @@ export function checkExchange(
     problems.push(`${operation} ${status}: the response is not JSON (${contentType ?? 'no content-type'})`);
   } else {
     const result = validateResponse(bundle, API, operation, status, received.value);
-    if (!result.valid && !result.errors.every(allowed)) problems.push(`${operation} ${status} does not validate against ${DOCUMENT}:\n  ${first(result.errors)}\n  body: ${responseText.slice(0, 400)}`);
+    if (!result.valid) problems.push(`${operation} ${status} does not validate against ${DOCUMENT}:\n  ${first(result.errors)}\n  body: ${responseText.slice(0, 400)}`);
   }
 
   if (problems.length === 0) return;

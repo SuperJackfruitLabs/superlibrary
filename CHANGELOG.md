@@ -7,6 +7,9 @@ v0.0.5 predate this file: their notes are on the GitHub releases.
 
 ## Unreleased
 
+- Treaty 0.0.20, whose `api.v1` `ItemSummary` describes ingested work records
+  (`createdBy: "source:superpipeline"`, `latestVersion: 0`). The API tests' contract hook no
+  longer lets anything through: its `ALLOWED_MISMATCHES` is gone.
 - The routes other products call (uploads, related work, roster invalidation, `me`, and an
   item's read, embed grant and widening) are checked in the API tests against treaty's
   `superlibrary.api` contract (`api.v1`), refusals and the fields each code carries included.
