@@ -7,6 +7,8 @@ v0.0.5 predate this file: their notes are on the GitHub releases.
 
 ## Unreleased
 
+## v0.0.7 — 2026-11-24
+
 - Treaty 0.0.20, whose `api.v1` `ItemSummary` describes ingested work records
   (`createdBy: "source:superpipeline"`, `latestVersion: 0`). The API tests' contract hook no
   longer lets anything through: its `ALLOWED_MISMATCHES` is gone.
