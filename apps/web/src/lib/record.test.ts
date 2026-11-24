@@ -26,6 +26,14 @@ describe('the work-record timeline (spec §11: stages, agents, handoffs, comment
     expect(t[3]).toMatchObject({ who: 'A person', detail: 'Ship it' });
     expect(timelineOf(rec({ archivedAt: '2026-10-04T00:00:00.000Z' })).at(-1)!.title).toBe('Gate at final: waiting');
   });
+  it("a gate's decision is open: every approval reads as approved, an unknown one as SuperPipeline recorded it", () => {
+    const gates = ['approve', 'approve_manual', 'approve_automatic', 'reject', 'expired', 'a_new_decision'].map((decision, i) => ({ id: `g${i}`, stage: 'review', decision, resolvedAt: `2026-10-02T1${i}:00:00.000Z` }));
+    const t = timelineOf(rec({ handoffs: [], comments: [], gates })).filter((e) => e.kind === 'gate');
+    expect(t.map((e) => [e.title, e.tone])).toEqual([
+      ['Gate at review: approved', 'good'], ['Gate at review: approved', 'good'], ['Gate at review: approved', 'good'],
+      ['Gate at review: rejected', 'bad'], ['Gate at review: closed, expired', 'neutral'], ['Gate at review: decided (a_new_decision)', 'neutral'],
+    ]);
+  });
   it('a handoff is text: a string, a summary, else its JSON, capped', () => {
     expect(handoffText('  done ')).toBe('done');
     expect(handoffText({ text: 'ok' })).toBe('ok');

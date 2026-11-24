@@ -13,10 +13,10 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.1",
-    "@superjackfruitlabs/treaty-cloudevents": "0.0.17",
-    "@superjackfruitlabs/treaty-contracts": "0.0.17",
-    "@superjackfruitlabs/treaty-ecosystem-identity": "0.0.17",
-    "@superjackfruitlabs/treaty-event-schemas": "0.0.17",
+    "@superjackfruitlabs/treaty-cloudevents": "0.0.19",
+    "@superjackfruitlabs/treaty-contracts": "0.0.19",
+    "@superjackfruitlabs/treaty-ecosystem-identity": "0.0.19",
+    "@superjackfruitlabs/treaty-event-schemas": "0.0.19",
     "@superlibrary/contract": "workspace:*",
     "jose": "^6.2.8",
     "zod": "^4.4.3"

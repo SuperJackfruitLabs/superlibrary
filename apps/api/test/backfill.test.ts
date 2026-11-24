@@ -18,7 +18,7 @@ beforeEach(() => {
   state = { boards: new Map(), pushConfigs: [], calls: [] };
   const cards = new Map();
   const shapes: Array<[string, Partial<ReturnType<typeof card>>, any]> = [
-    ['card_00000000000000e1', { state: 'completed' }, { gates: [{ id: 'gate_1', cardId: 'card_00000000000000e1', stageKey: 'review', status: 'resolved', decision: 'approve', resolvedAt: 't' }] }],
+    ['card_00000000000000e1', { state: 'completed' }, { gates: [{ id: 'gate_1', cardId: 'card_00000000000000e1', stageKey: 'review', status: 'resolved', decision: 'approve', resolvedAt: '2026-10-03T00:00:00.000Z' }] }],
     ['card_00000000000000e2', { state: 'rejected' }, {}],
     ['card_00000000000000e3', { state: 'working', archivedAt: '2026-09-01T00:00:00Z' }, {}],
     ['card_00000000000000e4', { state: 'input-required', needsHuman: { reason: 'repeated-failure' } }, {}],

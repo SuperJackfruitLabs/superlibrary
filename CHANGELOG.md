@@ -7,6 +7,21 @@ v0.0.5 predate this file: their notes are on the GitHub releases.
 
 ## Unreleased
 
+- The routes other products call (uploads, related work, roster invalidation, `me`, and an
+  item's read, embed grant and widening) are checked in the API tests against treaty's
+  `superlibrary.api` contract (`api.v1`), refusals and the fields each code carries included.
+  Treaty 0.0.19.
+- SuperPipeline's board, card, attempt, comment, link and gate reads, and the AgentPod hub's
+  roster and station-owner reads, are checked against treaty's `board-read.v1` and
+  `capability-catalog.v1`. An answer the contracts refuse is treated as the product being
+  unavailable (the card is retried; the roster falls back to its cache, else workspace items only;
+  a station link is refused with 502), where before it was read as it came. A roster that lists
+  one malformed board id is now refused whole rather than filtered.
+- A gate decided `approve_manual` or `approve_automatic` now makes a completed card's outcome
+  `approved`, as `approve` does. An `expired` gate reads as closed, and a decision SuperLibrary
+  does not know is kept in the work record as recorded and shown as it is, never as an approval.
+- The embed bundle is checked against treaty's record of it (`superlibrary-embed.json`): at the
+  recorded version it must build to the recorded SHA-256s, so a changed embed needs a new version.
 - A SuperPipeline push must carry a valid `x-treaty-signature`: the older
   `X-Superpipeline-Signature` fallback is gone, and a push signed only with it is refused with 401.
   Needs SuperPipeline v0.0.37 or later, which no longer sends the old header.

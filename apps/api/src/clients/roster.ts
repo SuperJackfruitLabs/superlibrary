@@ -1,9 +1,9 @@
 import type { Env } from '../env';
 import type { AgentViewer } from '../auth/caller';
+import { hubConforms, refusedAnswer } from './hub-contract';
 import { serviceToken } from './plane';
 
 const STALE_MAX_MS = 3600_000;
-const BOARD = /^brd_[0-9a-f]{16}$/;
 
 /** Spec §4: the boards an agent holds an enabled bridge row on, from the AgentPod hub, cached. */
 export async function rosterBoards(env: Env, a: AgentViewer): Promise<string[]> {
@@ -14,7 +14,11 @@ export async function rosterBoards(env: Env, a: AgentViewer): Promise<string[]> 
     const token = await serviceToken(env, a.org, env.HUB_AUDIENCE!);
     const res = await fetch(`${env.HUB_URL}/api/bridge/principals/${a.principalId}/boards`, { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(3000) });
     if (!res.ok) throw new Error(`hub roster ${res.status}`);
-    const boards = ((await res.json()) as { boards: unknown[] }).boards.filter((b): b is string => typeof b === 'string' && BOARD.test(b));
+    // Treaty's capability-catalog.v1: an answer it refuses is no answer, as a failed read is.
+    const body: unknown = await res.json().catch(() => undefined);
+    const why: string[] = [];
+    if (!hubConforms('listPrincipalBoards', res.status, body, why)) throw new Error(refusedAnswer('listPrincipalBoards', res.status, why));
+    const { boards } = body;
     await env.DB.prepare(`INSERT OR REPLACE INTO roster_cache (principal_id, workspace_id, boards, fetched_at) VALUES (?, ?, ?, ?)`).bind(a.principalId, a.workspaceId, JSON.stringify(boards), Date.now()).run();
     return boards;
   } catch (e) {

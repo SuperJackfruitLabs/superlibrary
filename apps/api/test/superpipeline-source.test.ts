@@ -213,13 +213,13 @@ describe('the client', () => {
     b.cards.get('card_00000000000000c1')!.links = [{ fromCardId: 'card_00000000000000c1', toCardId: 'card_00000000000000c2', kind: 'supersedes' }];
     const sp = pipelineFor(env, ORG);
     const bundle = await sp.cardBundle('brd_00000000000000b1', 'card_00000000000000c1');
-    expect(bundle?.links).toEqual([{ fromCardId: 'card_00000000000000c1', toCardId: 'card_00000000000000c2', kind: 'supersedes' }]);
+    expect(bundle?.links).toMatchObject([{ fromCardId: 'card_00000000000000c1', toCardId: 'card_00000000000000c2', kind: 'supersedes' }]);
     expect(await sp.cardBundle('brd_00000000000000b1', 'card_000000000000ffff')).toBeNull();
     expect(await sp.cardBundle('brd_00000000000000b9', 'card_00000000000000c1')).toBeNull();
   });
   it('lists boards and snapshots one', async () => {
     const sp = pipelineFor(env, ORG);
-    expect(await sp.boards()).toEqual([{ id: 'brd_00000000000000b1', name: 'Build' }]);
+    expect(await sp.boards()).toMatchObject([{ id: 'brd_00000000000000b1', name: 'Build' }]);
     expect((await sp.snapshot('brd_00000000000000b1')).cards.map((c) => c.id)).toEqual(['card_00000000000000c1']);
   });
 });

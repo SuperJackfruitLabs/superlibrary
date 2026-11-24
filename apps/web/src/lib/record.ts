@@ -1,10 +1,19 @@
 // apps/web/src/lib/record.ts
-import type { WorkRecord } from '@superlibrary/contract';
+import { gateVerdict, type WorkRecord } from '@superlibrary/contract';
 
 export type Tone = 'good' | 'bad' | 'neutral';
 export interface TimelineEntry { key: string; kind: 'created' | 'attempt' | 'comment' | 'gate' | 'archived'; at: string | null; title: string; who: string | null; detail: string | null; tone: Tone }
 
-const GATE_WORDS = { approve: 'approved', request_changes: 'sent back for changes', reject: 'rejected' } as const;
+const GATE_WORDS = { approved: 'approved', changes_requested: 'sent back for changes', rejected: 'rejected', expired: 'closed, expired' } as const;
+const toneOfGate = (decision: string | null): Tone => {
+  const v = gateVerdict(decision);
+  return v === 'approved' ? 'good' : v === 'changes_requested' || v === 'rejected' ? 'bad' : 'neutral';
+};
+/** A gate's decision in words; one this version does not know is shown as SuperPipeline recorded it. */
+function gateWords(decision: string): string {
+  const v = gateVerdict(decision);
+  return v === 'other' || v === 'pending' ? `decided (${decision})` : GATE_WORDS[v];
+}
 const toneOf = (status: string): Tone =>
   /^(completed|produced|succeeded|done)$/.test(status) ? 'good' : /^(failed|error|rejected|canceled|cancelled|timed_out)$/.test(status) ? 'bad' : 'neutral';
 
@@ -31,8 +40,8 @@ export function timelineOf(r: WorkRecord): TimelineEntry[] {
     out.push({ key: `comment:${c.id}`, kind: 'comment', at: c.createdAt, title: 'Comment', who: c.author.name ?? (c.author.kind === 'agent' ? 'An agent' : 'A person'), detail: c.body, tone: 'neutral' });
   }
   for (const g of r.gates) {
-    out.push({ key: `gate:${g.id}`, kind: 'gate', at: g.resolvedAt, title: g.decision ? `Gate at ${g.stage}: ${GATE_WORDS[g.decision]}` : `Gate at ${g.stage}: waiting`,
-      who: null, detail: null, tone: g.decision === 'approve' ? 'good' : g.decision ? 'bad' : 'neutral' });
+    out.push({ key: `gate:${g.id}`, kind: 'gate', at: g.resolvedAt, title: g.decision ? `Gate at ${g.stage}: ${gateWords(g.decision)}` : `Gate at ${g.stage}: waiting`,
+      who: null, detail: null, tone: toneOfGate(g.decision) });
   }
   if (r.archivedAt) out.push({ key: 'archived', kind: 'archived', at: r.archivedAt, title: 'Archived', who: null, detail: null, tone: 'neutral' });
   return out

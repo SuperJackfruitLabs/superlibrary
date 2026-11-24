@@ -9,8 +9,8 @@ importers:
   .:
     devDependencies:
       '@superjackfruitlabs/treaty-contracts':
-        specifier: 0.0.17
-        version: 0.0.17
+        specifier: 0.0.19
+        version: 0.0.19
       oxlint:
         specifier: 1.88.0
         version: 1.88.0(oxlint-tsgolint@7.0.2004)
@@ -30,17 +30,17 @@ importers:
         specifier: 1.32.1
         version: 1.32.1(@cfworker/json-schema@4.1.1)(zod@4.6.5)
       '@superjackfruitlabs/treaty-cloudevents':
-        specifier: 0.0.17
-        version: 0.0.17
+        specifier: 0.0.19
+        version: 0.0.19
       '@superjackfruitlabs/treaty-contracts':
-        specifier: 0.0.17
-        version: 0.0.17
+        specifier: 0.0.19
+        version: 0.0.19
       '@superjackfruitlabs/treaty-ecosystem-identity':
-        specifier: 0.0.17
-        version: 0.0.17
+        specifier: 0.0.19
+        version: 0.0.19
       '@superjackfruitlabs/treaty-event-schemas':
-        specifier: 0.0.17
-        version: 0.0.17
+        specifier: 0.0.19
+        version: 0.0.19
       '@superlibrary/contract':
         specifier: workspace:*
         version: link:../../packages/contract
@@ -1294,18 +1294,18 @@ packages:
     peerDependencies:
       svelte: ^5.56.0
 
-  '@superjackfruitlabs/treaty-cloudevents@0.0.17':
-    resolution: {integrity: sha512-PIKkpNAs3Or8uT8aFWzlkdsjhjy3DFnTLlY98lfhpzVKLr3vf7kkthSt3wqlqXTAP2KxtfExVMybZ4DfSg5k0w==}
+  '@superjackfruitlabs/treaty-cloudevents@0.0.19':
+    resolution: {integrity: sha512-F/ovsuMPqo5lbqkQsDDSJZxcwhFRS8JvT+3K3yU1jrzacVoUCRRnQKnLbheGDrGk1lRI30yJ52+N25FznojrcQ==}
 
-  '@superjackfruitlabs/treaty-contracts@0.0.17':
-    resolution: {integrity: sha512-vIdcKTZQ4RknuknCUwFPWPveQ9a/SFQlPsJeSI6CJq9CLQ5X/zyX7cGRNwt6EMCELm0QLNBJRz9QxpCXepc/PQ==}
+  '@superjackfruitlabs/treaty-contracts@0.0.19':
+    resolution: {integrity: sha512-05trkBfP2PgXOCeiJZ+l9mvDVdfLF9H8W0JWm+ZfObIWm5lsCTnh6RpS3/4tkDrmm46LpRxQrlhcakvHgu/qIQ==}
     hasBin: true
 
-  '@superjackfruitlabs/treaty-ecosystem-identity@0.0.17':
-    resolution: {integrity: sha512-83W9pimeBuvygNYXIaYv7spQvw0VBqf4gcTcC/fCfNFQxKL/rnTvmI1PiCaX25jn8mJ23hRd6D3lk/3w7zpkrA==}
+  '@superjackfruitlabs/treaty-ecosystem-identity@0.0.19':
+    resolution: {integrity: sha512-Ji5NFEhJeSz7I3s4jciaDV1pR2CCyAGcrJY6lGrIMPH2BYUDYO8UDPjqBRM3Zpt8rK76A7ChvjtXNc05FvjrHQ==}
 
-  '@superjackfruitlabs/treaty-event-schemas@0.0.17':
-    resolution: {integrity: sha512-xVT21KGu0KjQ8P0AjTYGjKTwWWZztMJFdisHvSY2WOZHECv47yYEZ6qb1oXkpwi98h9a1bY/g1e92xaoMUFydA==}
+  '@superjackfruitlabs/treaty-event-schemas@0.0.19':
+    resolution: {integrity: sha512-mbQ/YORDx/buKAZZvjbiEEx96yuj/wjfWxql15vxDT6PNtR6YjdWvA7PdZNmon2sXDNPF55lduccU9q/3ZlgdA==}
 
   '@sveltejs/acorn-typescript@1.0.13':
     resolution: {integrity: sha512-wgKggnhZVL9Bfx1OaKKTrYY9BFRk6C8UAkQNUcIv1+llzYrIqy+RZm5HPKzn0NpEBvTVhTqB4kQyllZywsRBRQ==}
@@ -3618,17 +3618,17 @@ snapshots:
       - '@internationalized/date'
       - '@sveltejs/kit'
 
-  '@superjackfruitlabs/treaty-cloudevents@0.0.17': {}
+  '@superjackfruitlabs/treaty-cloudevents@0.0.19': {}
 
-  '@superjackfruitlabs/treaty-contracts@0.0.17':
+  '@superjackfruitlabs/treaty-contracts@0.0.19':
     dependencies:
       '@cfworker/json-schema': 4.1.1
 
-  '@superjackfruitlabs/treaty-ecosystem-identity@0.0.17':
+  '@superjackfruitlabs/treaty-ecosystem-identity@0.0.19':
     dependencies:
       jose: 6.2.12
 
-  '@superjackfruitlabs/treaty-event-schemas@0.0.17': {}
+  '@superjackfruitlabs/treaty-event-schemas@0.0.19': {}
 
   '@sveltejs/acorn-typescript@1.0.13(acorn@8.19.0)':
     dependencies:

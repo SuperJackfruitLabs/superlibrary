@@ -18,6 +18,12 @@ The package is not published to npm. A product in another repository vendors a b
 --filter @superlibrary/embed bundle` writes `dist/superlibrary-embed.js`, one ES module, and its
 types. Record the SuperLibrary commit and each file's SHA-256 beside the copy.
 
+The suite's contract registry (treaty) records the embed by version and each file's SHA-256 in
+`contracts/artifacts/superlibrary-embed.json`. SuperLibrary's tests build the bundle and check it
+against that record: at the recorded version the bytes must match, so a change to the embed ships
+under a new version in `packages/embed/package.json`, and treaty records its hash when a host
+vendors it.
+
 ## Mounting
 
 ```ts

@@ -31,8 +31,29 @@ export interface WorkRecordReference {
 export interface WorkRecordGate {
   id: string;
   stage: string;
-  decision: 'approve' | 'request_changes' | 'reject' | null;
+  /**
+   * The decision SuperPipeline recorded, or null while pending. Open, as treaty's board-read.v1
+   * keeps it: the board writes approve, approve_manual, approve_automatic, request_changes, reject
+   * and an expired marker, and may add more. Read it with `gateVerdict`.
+   */
+  decision: string | null;
   resolvedAt: string | null;
+}
+
+/** The decisions that approve the work: plain, and an approval that delivers by hand or on its own. */
+const APPROVALS: ReadonlySet<string> = new Set(['approve', 'approve_manual', 'approve_automatic']);
+
+/**
+ * What a gate's decision means to a reader. A decision this version does not know is `other`, never
+ * an approval: shown as it was recorded, and never counted toward an outcome.
+ */
+export function gateVerdict(decision: string | null): 'pending' | 'approved' | 'changes_requested' | 'rejected' | 'expired' | 'other' {
+  if (decision === null) return 'pending';
+  if (APPROVALS.has(decision)) return 'approved';
+  if (decision === 'request_changes') return 'changes_requested';
+  if (decision === 'reject') return 'rejected';
+  if (decision === 'expired') return 'expired';
+  return 'other';
 }
 
 /** The whole card, start to finish (spec §3, Work record). Stored in D1 (plan P16). */

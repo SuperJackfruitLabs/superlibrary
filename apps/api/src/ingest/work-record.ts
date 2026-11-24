@@ -1,4 +1,4 @@
-import { ITEM_ID, WORK_RECORD_SCHEMA, type Outcome, type WorkRecord } from '@superlibrary/contract';
+import { ITEM_ID, WORK_RECORD_SCHEMA, gateVerdict, type Outcome, type WorkRecord } from '@superlibrary/contract';
 import { REDACTED, redactSecrets } from '../guard/secrets';
 import type { CardBundle } from '../sources/superpipeline';
 
@@ -13,7 +13,7 @@ export function outcomeOf(b: CardBundle): Outcome {
   if (supersededByOf(b)) return 'superseded';
   const s = b.card.state;
   if (s === 'rejected') return 'rejected';
-  if (s === 'completed') return b.gates.some((g) => g.decision === 'approve') ? 'approved' : 'completed';
+  if (s === 'completed') return b.gates.some((g) => gateVerdict(g.decision) === 'approved') ? 'approved' : 'completed';
   if (s === 'failed' || b.card.needsHuman?.reason === 'repeated-failure') return 'failed';
   if (s === 'canceled' || b.card.archivedAt) return 'abandoned';
   return 'in-progress';

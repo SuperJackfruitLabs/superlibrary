@@ -29,6 +29,12 @@ Routes say who may call them:
 
 An item the caller cannot see answers 404, never 403. Errors are `{"error": "<code>", ...}`.
 
+The ten routes other products call (the uploads routes, related work, roster invalidation,
+`GET /api/v1/me`, and an item's read, embed grant and widening) are a suite contract: treaty's
+`schemas/http/superlibrary/api.v1.openapi.json`, with each refusal's code and the fields beside it.
+SuperLibrary's API tests check every answer those routes give against it, so a change to their
+shape fails here before a consumer sees it.
+
 With the token and caller type settled, you can read the tables below literally: each route says
 who may cross the boundary, and an invisible item never leaks its existence while refusing you.
 

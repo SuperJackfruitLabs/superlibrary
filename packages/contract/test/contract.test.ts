@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   ITEM_ID, newId, contentLabel, itemIdFromLabel, SCOPE_RE, LIMITS, UploadCreate,
   FRAME_SANDBOX, contentCsp, encodePath, formatToken, parseToken, signingMessage, b64url, fromB64url,
-  compareTreePaths, orderFiles, sizeRefusal,
+  compareTreePaths, orderFiles, sizeRefusal, gateVerdict,
 } from '../src/index';
 
 describe('ids', () => {
@@ -108,5 +108,12 @@ describe('sizeRefusal', () => {
     expect(sizeRefusal.folder()).toBe('Together these are more than 100 MB, the limit for a folder.');
     expect(sizeRefusal.files()).toBe('A folder may have at most 500 files.');
     expect(sizeRefusal.files(501)).toBe('A folder may have at most 500 files; this has 501.');
+  });
+});
+
+describe("a gate's decision, open as treaty's board-read.v1 keeps it", () => {
+  it('reads every approval as approved and never counts an unknown decision as one', () => {
+    expect(['approve', 'approve_manual', 'approve_automatic'].map(gateVerdict)).toEqual(['approved', 'approved', 'approved']);
+    expect([null, 'request_changes', 'reject', 'expired', 'approve_later', ''].map(gateVerdict)).toEqual(['pending', 'changes_requested', 'rejected', 'expired', 'other', 'other']);
   });
 });
